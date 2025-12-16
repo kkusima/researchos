@@ -872,7 +872,7 @@ function ProjectsView() {
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showReorder, setShowReorder] = useState(false)
-  const [viewMode, setViewMode] = useState('list') // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedProjectIDs, setSelectedProjectIDs] = useState(new Set())
 
