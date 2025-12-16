@@ -122,19 +122,15 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
-        // Check if we have OAuth callback params (don't strip yet - Supabase needs them!)
-        const hasOAuthCallback = window.location.search.includes('code=') || 
-                                  window.location.hash.includes('access_token=')
+        const hasCode = window.location.search.includes('code=') || 
+                        window.location.hash.includes('access_token=')
         
-        if (hasOAuthCallback) {
-          console.log('🔄 OAuth callback detected, letting Supabase process it...')
-        }
+        if (hasCode) console.log('🔄 OAuth callback detected')
 
-        // Get current session with timeout to prevent infinite loading
-        // This will also exchange the ?code= for a session if present
+        // Get current session with timeout
         const sessionPromise = supabase.auth.getSession()
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timed out after 8s')), 8000)
+          setTimeout(() => reject(new Error('Session fetch timed out')), 8000)
         )
         
         const { data: { session }, error: sessionError } = await Promise.race([
@@ -142,33 +138,36 @@ export function AuthProvider({ children }) {
           timeoutPromise
         ])
         
-        // NOW strip OAuth artifacts from URL (after Supabase processed them)
-        stripOAuthArtifacts()
-        
-        if (sessionError) {
-          console.error('❌ Session error:', sessionError)
-          if (!cancelled) {
-            setUser(null)
-            setProfileReady(false)
-            setLoading(false)
-          }
-          return
-        }
-
-        console.log('📋 Session:', session ? '✅ ' + session.user.email : '❌ Not logged in')
+        if (sessionError) throw sessionError
 
         if (session?.user) {
-          // Ensure profile exists before setting user
+          console.log('📋 Session restored:', session.user.email)
+          stripOAuthArtifacts()
           const profileOk = await ensureUserProfile(session.user)
           
           if (!cancelled) {
             setUser(session.user)
             setProfileReady(profileOk)
+            setLoading(false)
           }
         } else {
-          if (!cancelled) {
-            setUser(null)
-            setProfileReady(false)
+          // No session yet
+          if (hasCode) {
+            console.log('⏳ Waiting for OAuth exchange...')
+            // Don't stop loading yet, wait for onAuthStateChange
+            // But add a fallback timeout
+            setTimeout(() => {
+              if (!cancelled) {
+                console.log('⚠️ OAuth wait timed out')
+                setLoading(false)
+              }
+            }, 10000)
+          } else {
+            if (!cancelled) {
+              setUser(null)
+              setProfileReady(false)
+              setLoading(false)
+            }
           }
         }
       } catch (e) {
@@ -176,41 +175,29 @@ export function AuthProvider({ children }) {
         if (!cancelled) {
           setUser(null)
           setProfileReady(false)
-        }
-      } finally {
-        if (!cancelled) {
           setLoading(false)
         }
       }
     }
 
-    // Start auth initialization
     initAuth()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔔 Auth event:', event)
-        
         if (cancelled) return
 
-        // Always strip artifacts on auth events
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           stripOAuthArtifacts()
-        }
-
-        if (session?.user) {
-          console.log('👤 User:', session.user.email)
-          
-          // Ensure profile before updating state
-          const profileOk = await ensureUserProfile(session.user)
-          
-          if (!cancelled) {
-            setUser(session.user)
-            setProfileReady(profileOk)
-            setLoading(false)
+          if (session?.user) {
+            const profileOk = await ensureUserProfile(session.user)
+            if (!cancelled) {
+              setUser(session.user)
+              setProfileReady(profileOk)
+              setLoading(false)
+            }
           }
-        } else {
+        } else if (event === 'SIGNED_OUT') {
           if (!cancelled) {
             setUser(null)
             setProfileReady(false)
