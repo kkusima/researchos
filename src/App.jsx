@@ -1236,7 +1236,7 @@ function ProjectListItem({ project, index, onSelect, onDelete }) {
 
   return (
     <div
-      className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative animate-fade-in"
+      className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative animate-fade-in overflow-visible"
       style={{ animationDelay: `${index * 30}ms` }}
       onClick={onSelect}
     >
@@ -1852,6 +1852,7 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
   const [stages, setStages] = useState([...project.stages])
   const [loading, setLoading] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleDragStart = (e, index) => {
     setDraggedIndex(index)
@@ -1992,17 +1993,6 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
             </div>
           </div>
 
-          {/* Danger Zone */}
-          <div className="pt-4 border-t border-gray-200">
-            <h3 className="text-sm font-medium text-red-600 mb-2">Danger Zone</h3>
-            <button
-              onClick={() => { onClose(); onDelete(); }}
-              className="w-full py-3 px-4 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 flex items-center justify-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Project
-            </button>
-          </div>
         </div>
 
         <div className="flex gap-3 p-6 border-t border-gray-200">
@@ -2017,6 +2007,39 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Changes
           </button>
+        </div>
+
+        {/* Danger Zone - Below buttons */}
+        <div className="px-6 pb-6">
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full py-3 px-4 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Project
+            </button>
+          ) : (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <p className="text-sm text-red-700 mb-3 text-center">
+                Are you sure you want to delete <strong>{project.title}</strong>? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { onClose(); onDelete(); }}
+                  className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                >
+                  Yes, Delete
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
