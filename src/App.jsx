@@ -191,7 +191,7 @@ function TabNav({ tab, setTab }) {
 // PROJECTS VIEW
 // ============================================
 function ProjectsView() {
-  const { projects, setProjects, setView, setSelectedProject, loading } = useApp()
+  const { projects, setProjects, setView, setSelectedProject, loading, reorderProjects } = useApp()
   const { user, demoMode } = useAuth()
   const [showCreate, setShowCreate] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
