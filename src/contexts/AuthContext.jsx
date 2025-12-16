@@ -122,11 +122,19 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
-        // Strip OAuth artifacts FIRST before any session check
-        const hadArtifacts = stripOAuthArtifacts()
+        // Check if we have OAuth callback params (don't strip yet - Supabase needs them!)
+        const hasOAuthCallback = window.location.search.includes('code=') || 
+                                  window.location.hash.includes('access_token=')
         
-        // Get current session
+        if (hasOAuthCallback) {
+          console.log('🔄 OAuth callback detected, letting Supabase process it...')
+        }
+
+        // Get current session - this will also exchange the ?code= for a session if present
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        // NOW strip OAuth artifacts from URL (after Supabase processed them)
+        stripOAuthArtifacts()
         
         if (sessionError) {
           console.error('❌ Session error:', sessionError)
