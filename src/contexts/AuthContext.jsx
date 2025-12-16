@@ -5,6 +5,33 @@ const AuthContext = createContext({})
 
 export const useAuth = () => useContext(AuthContext)
 
+// Helper: Promise with timeout
+const withTimeout = (promise, ms, errorMsg = 'Operation timed out') => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+  ])
+}
+
+// Helper: Clean URL of OAuth artifacts
+const cleanUrl = () => {
+  try {
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('code') || url.searchParams.has('error') || url.hash.includes('access_token')) {
+      url.searchParams.delete('code')
+      url.searchParams.delete('state')
+      url.searchParams.delete('error')
+      url.searchParams.delete('error_description')
+      url.hash = ''
+      window.history.replaceState({}, document.title, url.pathname || '/')
+      return true
+    }
+  } catch (e) {
+    console.warn('Failed to clean URL:', e)
+  }
+  return false
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,56 +39,14 @@ export function AuthProvider({ children }) {
   const [demoMode] = useState(!supabase)
   const initRef = useRef(false)
 
-  // Strip OAuth artifacts from URL to prevent re-processing on refresh
-  const stripOAuthArtifacts = useCallback(() => {
-    try {
-      const url = new URL(window.location.href)
-      const hashHasTokens = /access_token=|refresh_token=|provider_token=|expires_at=|token_type=/.test(url.hash)
-      const hasCode = url.searchParams.has('code')
-
-      if (!hashHasTokens && !hasCode) return false
-
-      if (hashHasTokens) url.hash = ''
-      if (hasCode) {
-        ['code', 'state', 'error', 'error_description'].forEach(k => url.searchParams.delete(k))
-      }
-
-      window.history.replaceState({}, document.title, url.pathname || '/')
-      console.log('🧹 Cleaned OAuth artifacts from URL')
-      return true
-    } catch (e) {
-      console.warn('⚠️ Failed to strip OAuth artifacts:', e)
-      return false
-    }
-  }, [])
-
-  // Ensure user exists in public.users table (required for FK constraints)
+  // Ensure user exists in public.users table
   const ensureUserProfile = useCallback(async (authUser) => {
     if (!supabase || !authUser) return false
 
     try {
-      console.log('👤 Ensuring user profile for:', authUser.email)
-      
-      // First check if user exists
-      const { data: existing, error: checkError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', authUser.id)
-        .maybeSingle()
-
-      if (checkError) {
-        console.error('❌ Error checking user:', checkError)
-      }
-
-      if (existing) {
-        console.log('✅ User profile already exists')
-        return true
-      }
-
-      // Create user profile
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
+      // Use upsert directly - simpler and handles both cases
+      const { error } = await withTimeout(
+        supabase.from('users').upsert({
           id: authUser.id,
           email: authUser.email,
           name: authUser.user_metadata?.full_name || 
@@ -69,45 +54,46 @@ export function AuthProvider({ children }) {
                 authUser.email?.split('@')[0] || 'User',
           avatar_url: authUser.user_metadata?.avatar_url || 
                       authUser.user_metadata?.picture || null
-        })
+        }, { onConflict: 'id' }),
+        5000,
+        'Profile sync timed out'
+      )
 
-      if (insertError) {
-        // Try upsert as fallback (in case of race condition)
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert({
-            id: authUser.id,
-            email: authUser.email,
-            name: authUser.user_metadata?.full_name || 
-                  authUser.user_metadata?.name || 
-                  authUser.email?.split('@')[0] || 'User',
-            avatar_url: authUser.user_metadata?.avatar_url || 
-                        authUser.user_metadata?.picture || null
-          }, { onConflict: 'id' })
-
-        if (upsertError) {
-          console.error('❌ Error upserting user:', upsertError)
-          return false
-        }
+      if (error) {
+        console.error('Profile sync error:', error)
+        // Don't block auth for profile errors - user can still use the app
+        return false
       }
-
-      console.log('✅ User profile created')
       return true
     } catch (e) {
-      console.error('❌ Error ensuring user profile:', e)
+      console.error('Profile sync failed:', e)
       return false
     }
   }, [])
+
+  // Handle successful authentication
+  const handleAuthSuccess = useCallback(async (session) => {
+    if (!session?.user) {
+      setUser(null)
+      setProfileReady(false)
+      return
+    }
+
+    console.log('✅ Authenticated:', session.user.email)
+    setUser(session.user)
+    
+    // Profile sync in background - don't block UI
+    ensureUserProfile(session.user).then(setProfileReady)
+  }, [ensureUserProfile])
 
   useEffect(() => {
     // Prevent double initialization in React StrictMode
     if (initRef.current) return
     initRef.current = true
 
-    let cancelled = false
-
+    // Demo mode - no Supabase
     if (!supabase) {
-      console.log('🎭 Running in DEMO MODE')
+      console.log('🎭 Demo mode - no Supabase configured')
       setUser({
         id: 'demo-user',
         email: 'demo@researchos.app',
@@ -118,69 +104,78 @@ export function AuthProvider({ children }) {
       return
     }
 
-    console.log('🔐 Initializing authentication...')
+    let mounted = true
 
-    const initAuth = async () => {
+    const initialize = async () => {
+      console.log('🔐 Initializing auth...')
+      
       try {
-        const urlParams = new URLSearchParams(window.location.search)
-        const code = urlParams.get('code')
-        const hasTokens = window.location.hash.includes('access_token=')
-        
-        // If we have a code, explicitly exchange it for a session
+        // Check for OAuth callback code
+        const params = new URLSearchParams(window.location.search)
+        const code = params.get('code')
+        const error = params.get('error')
+
+        // Handle OAuth error
+        if (error) {
+          console.error('OAuth error:', error, params.get('error_description'))
+          cleanUrl()
+          if (mounted) setLoading(false)
+          return
+        }
+
+        // Handle OAuth code exchange
         if (code) {
-          console.log('🔄 OAuth code detected, exchanging for session...')
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          console.log('🔄 Exchanging OAuth code...')
+          cleanUrl() // Clean URL immediately to prevent re-processing
           
-          if (error) {
-            console.error('❌ Code exchange failed:', error)
-            stripOAuthArtifacts()
-            setLoading(false)
-            return
-          }
-          
-          if (data?.session?.user) {
-            console.log('✅ Code exchanged successfully:', data.session.user.email)
-            stripOAuthArtifacts()
-            const profileOk = await ensureUserProfile(data.session.user)
-            
-            if (!cancelled) {
-              setUser(data.session.user)
-              setProfileReady(profileOk)
-              setLoading(false)
+          try {
+            const { data, error: exchangeError } = await withTimeout(
+              supabase.auth.exchangeCodeForSession(code),
+              10000,
+              'Code exchange timed out'
+            )
+
+            if (exchangeError) {
+              console.error('Code exchange failed:', exchangeError)
+              // Fall through to check for existing session
+            } else if (data?.session) {
+              if (mounted) {
+                await handleAuthSuccess(data.session)
+                setLoading(false)
+              }
+              return
             }
-            return
+          } catch (e) {
+            console.error('Code exchange error:', e)
+            // Fall through to check for existing session
           }
         }
 
         // Check for existing session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
+        const { data: { session }, error: sessionError } = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          'Session check timed out'
+        )
+
         if (sessionError) {
-          console.error('❌ Session error:', sessionError)
-          throw sessionError
+          console.error('Session check failed:', sessionError)
         }
 
-        if (session?.user) {
-          console.log('✅ Existing session found:', session.user.email)
-          const profileOk = await ensureUserProfile(session.user)
-          
-          if (!cancelled) {
-            setUser(session.user)
-            setProfileReady(profileOk)
-            setLoading(false)
-          }
-        } else {
-          console.log('ℹ️ No session found')
-          if (!cancelled) {
+        if (mounted) {
+          if (session) {
+            await handleAuthSuccess(session)
+          } else {
+            console.log('ℹ️ No session')
             setUser(null)
             setProfileReady(false)
-            setLoading(false)
           }
+          setLoading(false)
         }
       } catch (e) {
-        console.error('❌ Auth init error:', e)
-        stripOAuthArtifacts()
-        if (!cancelled) {
+        console.error('Auth initialization failed:', e)
+        cleanUrl()
+        if (mounted) {
           setUser(null)
           setProfileReady(false)
           setLoading(false)
@@ -188,38 +183,33 @@ export function AuthProvider({ children }) {
       }
     }
 
-    initAuth()
-
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔔 Auth event:', event)
-        if (cancelled) return
+        
+        if (!mounted) return
 
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          stripOAuthArtifacts()
-          if (session?.user) {
-            const profileOk = await ensureUserProfile(session.user)
-            if (!cancelled) {
-              setUser(session.user)
-              setProfileReady(profileOk)
-              setLoading(false)
-            }
-          }
+          await handleAuthSuccess(session)
+          setLoading(false)
         } else if (event === 'SIGNED_OUT') {
-          if (!cancelled) {
-            setUser(null)
-            setProfileReady(false)
-            setLoading(false)
-          }
+          setUser(null)
+          setProfileReady(false)
+          setLoading(false)
         }
       }
     )
 
+    // Initialize
+    initialize()
+
+    // Cleanup
     return () => {
-      cancelled = true
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [stripOAuthArtifacts, ensureUserProfile])
+  }, [handleAuthSuccess])
 
   const signInWithGoogle = async () => {
     if (!supabase) {
@@ -228,10 +218,7 @@ export function AuthProvider({ children }) {
     }
 
     console.log('🚀 Starting Google Sign-In...')
-
-    // Always use current origin for redirect (works for both localhost and production)
     const redirectTo = window.location.origin
-    console.log('🔗 Redirect URL:', redirectTo)
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -245,8 +232,8 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('❌ Sign in error:', error)
-      alert('Sign in error: ' + error.message)
+      console.error('Sign in error:', error)
+      alert('Sign in failed: ' + error.message)
     }
   }
 
@@ -257,15 +244,15 @@ export function AuthProvider({ children }) {
       return
     }
 
-    console.log('👋 Signing out...')
-    
     try {
       await supabase.auth.signOut()
       setUser(null)
       setProfileReady(false)
-      console.log('✅ Signed out')
     } catch (e) {
-      console.error('❌ Sign out error:', e)
+      console.error('Sign out error:', e)
+      // Force clear state even on error
+      setUser(null)
+      setProfileReady(false)
     }
   }
 
