@@ -302,6 +302,7 @@ export function AuthProvider({ children }) {
       email,
       password,
       options: {
+        emailRedirectTo: window.location.origin,
         data: {
           full_name: name || email.split('@')[0],
           name: name || email.split('@')[0]
@@ -314,13 +315,19 @@ export function AuthProvider({ children }) {
       return { error }
     }
 
-    // For local Supabase, email confirmation is usually disabled
-    // so the user should be logged in immediately
+    // Check if email confirmation is required
+    // If user exists but no session, email confirmation is pending
+    if (data?.user && !data?.session) {
+      console.log('📧 Email confirmation required')
+      return { data, error: null, confirmationRequired: true }
+    }
+
+    // If session exists, user is logged in (no confirmation required)
     if (data?.session) {
       await handleAuthSuccess(data.session)
     }
 
-    return { data, error: null }
+    return { data, error: null, confirmationRequired: false }
   }
 
   // Email/Password sign in (for local development)
