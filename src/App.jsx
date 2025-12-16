@@ -1816,6 +1816,19 @@ function ProjectDetail() {
           project={project} 
           onClose={() => setShowSettings(false)} 
           onUpdate={updateProject}
+          onDelete={async () => {
+            if (!window.confirm('Delete this project and all its data?')) return
+            if (demoMode) {
+              const newProjects = projects.filter(p => p.id !== project.id)
+              setProjects(newProjects)
+              saveLocal(newProjects)
+            } else {
+              await db.deleteProject(project.id)
+              setProjects(projects.filter(p => p.id !== project.id))
+            }
+            setSelectedProject(null)
+            setView('main')
+          }}
         />
       )}
 
@@ -1832,7 +1845,7 @@ function ProjectDetail() {
 // ============================================
 // PROJECT SETTINGS MODAL
 // ============================================
-function ProjectSettingsModal({ project, onClose, onUpdate }) {
+function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
   const { demoMode } = useAuth()
   const [title, setTitle] = useState(project.title)
   const [emoji, setEmoji] = useState(project.emoji)
@@ -1977,6 +1990,18 @@ function ProjectSettingsModal({ project, onClose, onUpdate }) {
                 Add Stage
               </button>
             </div>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-red-600 mb-2">Danger Zone</h3>
+            <button
+              onClick={() => { onClose(); onDelete(); }}
+              className="w-full py-3 px-4 border-2 border-red-200 text-red-600 rounded-xl font-medium hover:bg-red-50 flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Project
+            </button>
           </div>
         </div>
 
