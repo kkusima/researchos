@@ -196,9 +196,20 @@ function ProjectsView() {
   const [showCreate, setShowCreate] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOption, setSortOption] = useState('priority')
+  const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showReorder, setShowReorder] = useState(false)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedProjectIDs, setSelectedProjectIDs] = useState(new Set())
+
+  const handleSortChange = (newOption) => {
+    if (newOption === sortOption) {
+      // Toggle direction if same option clicked
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortOption(newOption)
+      setSortDirection('asc')
+    }
+  }
 
   const filteredProjects = projects.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -206,16 +217,17 @@ function ProjectsView() {
 
   const computeSorted = () => {
     const sorted = [...filteredProjects]
+    const dir = sortDirection === 'asc' ? 1 : -1
     switch (sortOption) {
       case 'priority':
         return sorted.sort((a, b) => {
           if (a.priority_rank === b.priority_rank) return a.title.localeCompare(b.title)
-          return a.priority_rank - b.priority_rank
+          return (a.priority_rank - b.priority_rank) * dir
         })
       case 'progress':
-        return sorted.sort((a, b) => b.progress - a.progress)
+        return sorted.sort((a, b) => (b.progress - a.progress) * dir)
       case 'name':
-        return sorted.sort((a, b) => a.title.localeCompare(b.title))
+        return sorted.sort((a, b) => a.title.localeCompare(b.title) * dir)
       default:
         return sorted
     }
@@ -283,15 +295,24 @@ function ProjectsView() {
             />
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <select
-              value={sortOption}
-              onChange={e => setSortOption(e.target.value)}
-              className="input-sleek"
-            >
-              <option value="priority">Sort by Priority</option>
-              <option value="progress">Sort by Progress</option>
-              <option value="name">Sort by Name</option>
-            </select>
+            <div className="flex items-center gap-1">
+              {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'name', label: 'Name' }].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => handleSortChange(opt.key)}
+                  className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                    sortOption === opt.key
+                      ? 'bg-gray-200 text-gray-900 font-medium'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {opt.label}
+                  {sortOption === opt.key && (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+              ))}
+            </div>
             <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
               <MoreVertical className="w-4 h-4" />
               <span className="hidden sm:inline">Reorder</span>
@@ -1486,6 +1507,17 @@ function TaskDetail() {
 // ============================================
 function AllTasksView() {
   const { projects, setSelectedProject, setSelectedTask, setView } = useApp()
+  const [sortOption, setSortOption] = useState('priority')
+  const [sortDirection, setSortDirection] = useState('asc')
+
+  const handleSortChange = (newOption) => {
+    if (newOption === sortOption) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortOption(newOption)
+      setSortDirection('asc')
+    }
+  }
 
   const allTasks = []
   projects.forEach(p => {
@@ -1495,11 +1527,42 @@ function AllTasksView() {
       })
     })
   })
-  allTasks.sort((a, b) => a.project.priority_rank - b.project.priority_rank)
+
+  // Sort tasks based on selected option and direction
+  const dir = sortDirection === 'asc' ? 1 : -1
+  if (sortOption === 'priority') {
+    allTasks.sort((a, b) => (a.project.priority_rank - b.project.priority_rank) * dir)
+  } else if (sortOption === 'created') {
+    allTasks.sort((a, b) => {
+      const dateA = new Date(a.task.created_at || 0).getTime()
+      const dateB = new Date(b.task.created_at || 0).getTime()
+      return (dateA - dateB) * dir
+    })
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">All Tasks</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">All Tasks</h1>
+        <div className="flex items-center gap-1">
+          {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Date Created' }].map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => handleSortChange(opt.key)}
+              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                sortOption === opt.key
+                  ? 'bg-gray-200 text-gray-900 font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {opt.label}
+              {sortOption === opt.key && (
+                sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {allTasks.length === 0 ? (
         <div className="glass-card rounded-2xl p-12 text-center">
