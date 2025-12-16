@@ -872,7 +872,7 @@ function ProjectsView() {
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showReorder, setShowReorder] = useState(false)
-  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('list') // 'grid' or 'list'
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedProjectIDs, setSelectedProjectIDs] = useState(new Set())
 
@@ -1140,12 +1140,10 @@ function ReorderModal({ projects, onReorder, onClose }) {
 // PRIORITY BADGE COMPONENT
 // ============================================
 function PriorityBadge({ rank }) {
-  const priority = PRIORITIES.find(p => p.rank === rank) || PRIORITIES[1]
   return (
     <span 
-      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-      style={{ backgroundColor: priority.color }}
-      title={`${priority.name} Priority`}
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gray-400"
+      title={`Priority ${rank}`}
     >
       {rank}
     </span>
@@ -1372,11 +1370,14 @@ function CreateProjectModal({ onClose }) {
     setLoading(true)
     setErrorMsg('')
 
+    // New projects get lowest priority (highest number = added to end)
+    const newPriorityRank = projects.length + 1
+
     const newProject = {
       id: uuid(),
       title: title.trim(),
       emoji,
-      priority_rank: 1, // Default to high priority
+      priority_rank: newPriorityRank,
       current_stage_index: 0,
       owner_id: user?.id || 'demo',
       created_at: new Date().toISOString(),
@@ -1390,8 +1391,8 @@ function CreateProjectModal({ onClose }) {
     }
 
     if (demoMode) {
-      setProjects([newProject, ...projects])
-      saveLocal([newProject, ...projects])
+      setProjects([...projects, newProject])
+      saveLocal([...projects, newProject])
     } else {
       // Check if user profile is ready (required for FK constraint)
       if (!profileReady) {
