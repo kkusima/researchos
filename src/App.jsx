@@ -4,7 +4,8 @@ import { db, supabase } from './lib/supabase'
 import { 
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare,
-  Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical
+  Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
+  LayoutGrid, List
 } from 'lucide-react'
 
 // App Context
@@ -871,6 +872,7 @@ function ProjectsView() {
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showReorder, setShowReorder] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedProjectIDs, setSelectedProjectIDs] = useState(new Set())
 
@@ -953,6 +955,27 @@ function ProjectsView() {
           <p className="text-gray-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              title="Grid view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              title="List view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
           <div className="flex items-center gap-1">
             {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'name', label: 'Name' }].map(opt => (
               <button
@@ -991,10 +1014,22 @@ function ProjectsView() {
             Create Project
           </button>
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {sortedProjects.map((project, i) => (
             <ProjectCard 
+              key={project.id} 
+              project={project} 
+              index={i}
+              onSelect={() => { setSelectedProject(project); setView('project'); }}
+              onDelete={() => deleteProject(project.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sortedProjects.map((project, i) => (
+            <ProjectListItem 
               key={project.id} 
               project={project} 
               index={i}
@@ -1102,7 +1137,23 @@ function ReorderModal({ projects, onReorder, onClose }) {
 }
 
 // ============================================
-// PROJECT CARD
+// PRIORITY BADGE COMPONENT
+// ============================================
+function PriorityBadge({ rank }) {
+  const priority = PRIORITIES.find(p => p.rank === rank) || PRIORITIES[1]
+  return (
+    <span 
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
+      style={{ backgroundColor: priority.color }}
+      title={`${priority.name} Priority`}
+    >
+      {rank}
+    </span>
+  )
+}
+
+// ============================================
+// PROJECT CARD (Grid View)
 // ============================================
 function ProjectCard({ project, index, onSelect, onDelete }) {
   const [showMenu, setShowMenu] = useState(false)
@@ -1115,7 +1166,12 @@ function ProjectCard({ project, index, onSelect, onDelete }) {
       style={{ animationDelay: `${index * 50}ms` }}
       onClick={onSelect}
     >
-      <div className="flex items-start gap-4 mb-4">
+      {/* Priority Badge */}
+      <div className="absolute top-3 left-3">
+        <PriorityBadge rank={project.priority_rank} />
+      </div>
+      
+      <div className="flex items-start gap-4 mb-4 mt-4">
         <span className="text-4xl">{project.emoji}</span>
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-lg text-gray-900 truncate">{project.title}</h3>
@@ -1147,6 +1203,108 @@ function ProjectCard({ project, index, onSelect, onDelete }) {
       >
         <MoreVertical className="w-4 h-4 text-gray-400" />
       </button>
+
+      {showMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
+          <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
+            <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+              <Copy className="w-4 h-4" />
+              Duplicate
+            </button>
+            <button 
+              onClick={() => { setShowMenu(false); onDelete(); }}
+              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// PROJECT LIST ITEM (List View)
+// ============================================
+function ProjectListItem({ project, index, onSelect, onDelete }) {
+  const [showMenu, setShowMenu] = useState(false)
+  const progress = getProgress(project)
+  const currentStage = project.stages?.[project.current_stage_index]
+  const totalStages = project.stages?.length || 0
+  const completedStages = project.current_stage_index || 0
+
+  return (
+    <div
+      className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative animate-fade-in"
+      style={{ animationDelay: `${index * 30}ms` }}
+      onClick={onSelect}
+    >
+      <div className="flex items-center gap-4">
+        {/* Priority Badge */}
+        <PriorityBadge rank={project.priority_rank} />
+        
+        {/* Emoji */}
+        <span className="text-2xl flex-shrink-0">{project.emoji}</span>
+        
+        {/* Title and Stage - Takes most space */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900">{project.title}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-gray-500">{currentStage?.name || 'No stage'}</span>
+            {project.project_members?.length > 0 && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {project.project_members.length + 1}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {/* Progress - Compact display */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Stage Progress Dots */}
+          <div className="hidden sm:flex items-center gap-1" title={`Stage ${completedStages + 1} of ${totalStages}`}>
+            {project.stages?.slice(0, 7).map((stage, i) => (
+              <div
+                key={stage.id}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  i < completedStages 
+                    ? 'bg-green-500' 
+                    : i === completedStages 
+                      ? 'bg-blue-500' 
+                      : 'bg-gray-200'
+                }`}
+                title={stage.name}
+              />
+            ))}
+            {totalStages > 7 && (
+              <span className="text-xs text-gray-400">+{totalStages - 7}</span>
+            )}
+          </div>
+          
+          {/* Percentage */}
+          <div className="flex items-center gap-2 min-w-[60px]">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
+                style={{ width: `${progress * 100}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-gray-600 w-8">{Math.round(progress * 100)}%</span>
+          </div>
+        </div>
+        
+        {/* Menu Button */}
+        <button
+          onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+        >
+          <MoreVertical className="w-4 h-4 text-gray-400" />
+        </button>
+      </div>
 
       {showMenu && (
         <>
