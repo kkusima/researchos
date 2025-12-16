@@ -122,31 +122,38 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
-        const hasCode = window.location.search.includes('code=')
+        const urlParams = new URLSearchParams(window.location.search)
+        const code = urlParams.get('code')
         const hasTokens = window.location.hash.includes('access_token=')
         
-        if (hasCode || hasTokens) {
-          console.log('🔄 OAuth callback detected, exchanging code...')
+        // If we have a code, explicitly exchange it for a session
+        if (code) {
+          console.log('🔄 OAuth code detected, exchanging for session...')
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          
+          if (error) {
+            console.error('❌ Code exchange failed:', error)
+            stripOAuthArtifacts()
+            setLoading(false)
+            return
+          }
+          
+          if (data?.session?.user) {
+            console.log('✅ Code exchanged successfully:', data.session.user.email)
+            stripOAuthArtifacts()
+            const profileOk = await ensureUserProfile(data.session.user)
+            
+            if (!cancelled) {
+              setUser(data.session.user)
+              setProfileReady(profileOk)
+              setLoading(false)
+            }
+            return
+          }
         }
 
-        // For PKCE flow with code in URL, we need to let Supabase exchange it first
-        // The exchangeCodeForSession is handled automatically by detectSessionInUrl
-        // but we should give it a moment to complete
-        if (hasCode) {
-          // Small delay to allow Supabase to process the code
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
-
-        // Get current session with timeout
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timed out')), 10000)
-        )
-        
-        const { data: { session }, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ])
+        // Check for existing session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
           console.error('❌ Session error:', sessionError)
@@ -154,8 +161,7 @@ export function AuthProvider({ children }) {
         }
 
         if (session?.user) {
-          console.log('✅ Session found:', session.user.email)
-          stripOAuthArtifacts()
+          console.log('✅ Existing session found:', session.user.email)
           const profileOk = await ensureUserProfile(session.user)
           
           if (!cancelled) {
@@ -165,23 +171,10 @@ export function AuthProvider({ children }) {
           }
         } else {
           console.log('ℹ️ No session found')
-          // No session - if we had a code, wait for auth state change
-          if (hasCode) {
-            console.log('⏳ Code present but no session yet, waiting for exchange...')
-            // The onAuthStateChange will handle it
-            setTimeout(() => {
-              if (!cancelled && !user) {
-                console.log('⚠️ OAuth exchange timed out')
-                stripOAuthArtifacts()
-                setLoading(false)
-              }
-            }, 8000)
-          } else {
-            if (!cancelled) {
-              setUser(null)
-              setProfileReady(false)
-              setLoading(false)
-            }
+          if (!cancelled) {
+            setUser(null)
+            setProfileReady(false)
+            setLoading(false)
           }
         }
       } catch (e) {
