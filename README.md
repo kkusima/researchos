@@ -11,9 +11,9 @@ A modern, collaborative research project management application designed for res
 
 ResearchOS is a lightweight project management tool built specifically for research workflows. It helps you organize projects into customizable stages, track tasks with subtasks, and collaborate with team members in real-time.
 
-[![Demo Video1]]([https://user-images.githubusercontent.com/XXXX/demo.webm](https://github.com/kkusima/researchos/blob/main/V1.webm))
+[![Demo Video1]]([https://github.com/kkusima/researchos/blob/main/V1.webm])
 
-[![Demo Video2]]([https://user-images.githubusercontent.com/XXXX/demo.webm](https://github.com/kkusima/researchos/blob/main/V1.webm))
+[![Demo Video2]]([https://github.com/kkusima/researchos/blob/main/V2.webm])
 
 ## Key Features
 
