@@ -42,14 +42,16 @@ const saveLocal = (data) => {
 // LOGIN PAGE
 // ============================================
 function LoginPage() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, demoMode } = useAuth()
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, demoMode } = useAuth()
   const [loading, setLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+  const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [confirmationSent, setConfirmationSent] = useState(false)
+  const [resetEmailSent, setResetEmailSent] = useState(false)
 
   const handleGoogleLogin = async () => {
     setLoading(true)
@@ -78,6 +80,49 @@ function LoginPage() {
       }
     }
     setLoading(false)
+  }
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    
+    const { error } = await sendPasswordReset(email)
+    if (error) {
+      setError(error.message)
+    } else {
+      setResetEmailSent(true)
+    }
+    setLoading(false)
+  }
+
+  // Show password reset email sent message
+  if (resetEmailSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f3f4f6 0%, #6b7280 100%)' }}>
+        <div className="glass-card rounded-3xl p-8 w-full max-w-md text-center animate-fade-in">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center text-4xl bg-blue-100">
+            🔐
+          </div>
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-2">Check Your Email</h1>
+          <p className="text-gray-600 mb-4">
+            We've sent a password reset link to <strong>{email}</strong>
+          </p>
+          <p className="text-gray-500 text-sm mb-6">
+            Click the link in the email to reset your password, then come back here to sign in.
+          </p>
+          <button
+            onClick={() => { setResetEmailSent(false); setIsForgotPassword(false); }}
+            className="w-full px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all"
+          >
+            Back to Sign In
+          </button>
+        </div>
+        <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
+          © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+        </p>
+      </div>
+    )
   }
 
   // Show confirmation message after sign up
@@ -147,64 +192,122 @@ function LoginPage() {
           </div>
         </div>
 
-        {/* Email/Password Form */}
-        <form onSubmit={handleEmailSubmit} className="text-left">
-          {isSignUp && (
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
-              />
-            </div>
-          )}
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              minLength={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
-            />
-          </div>
+        {/* Forgot Password Form */}
+        {isForgotPassword ? (
+          <>
+            <form onSubmit={handleForgotPassword} className="text-left">
+              <p className="text-sm text-gray-600 mb-4">
+                Enter your email address and we'll send you a link to reset your password.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                />
+              </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-4">{error}</p>
-          )}
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-4">{error}</p>
+              )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </button>
-        </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                Send Reset Link
+              </button>
+            </form>
 
-        <button
-          onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
-          className="text-sm text-gray-500 hover:text-gray-700 mt-4"
-        >
-          {isSignUp ? 'Already have an account? Sign in' : "Need an account? Sign Up"}
-        </button>
+            <button
+              onClick={() => { setIsForgotPassword(false); setError(''); }}
+              className="text-sm text-gray-500 hover:text-gray-700 mt-4"
+            >
+              Back to Sign In
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Email/Password Form */}
+            <form onSubmit={handleEmailSubmit} className="text-left">
+              {isSignUp && (
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                  />
+                </div>
+              )}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+                />
+              </div>
+              
+              {!isSignUp && (
+                <div className="text-right mb-4">
+                  <button
+                    type="button"
+                    onClick={() => { setIsForgotPassword(true); setError(''); }}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
+              
+              {isSignUp && <div className="mb-4" />}
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-4">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                {isSignUp ? 'Create Account' : 'Sign In'}
+              </button>
+            </form>
+
+            <button
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
+              className="text-sm text-gray-500 hover:text-gray-700 mt-4"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : "Need an account? Sign Up"}
+            </button>
+          </>
+        )}
 
         {demoMode && (
           <p className="mt-4 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">

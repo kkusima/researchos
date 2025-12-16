@@ -488,12 +488,84 @@ $$;
 
 -- Functions for updated_at
 CREATE OR REPLACE FUNCTION public.update_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
+
+-- Helper functions for RLS policies (recreate with search_path set)
+-- Note: We use CREATE OR REPLACE and must keep the same parameter names
+
+CREATE OR REPLACE FUNCTION public.is_project_owner(p_project_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.projects 
+    WHERE id = p_project_id AND owner_id = auth.uid()
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_project_member(p_project_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.project_members 
+    WHERE project_id = p_project_id AND user_id = auth.uid()
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_access_project(p_project_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.projects WHERE id = p_project_id AND owner_id = auth.uid()
+  ) OR EXISTS (
+    SELECT 1 FROM public.project_members WHERE project_id = p_project_id AND user_id = auth.uid()
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_project_id_for_stage(p_stage_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN (SELECT project_id FROM public.stages WHERE id = p_stage_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_project_id_for_task(p_task_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN (SELECT s.project_id FROM public.tasks t JOIN public.stages s ON t.stage_id = s.id WHERE t.id = p_task_id);
+END;
+$$;
 
 -- Triggers for updated_at (conditional create)
 DO $$
@@ -555,14 +627,18 @@ $$;
 
 -- Trigger function to set project owner automatically
 CREATE OR REPLACE FUNCTION public.set_project_owner()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF NEW.owner_id IS NULL THEN
     NEW.owner_id := (SELECT auth.uid());
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Create trigger if not exists
 DO $$
@@ -603,7 +679,11 @@ CREATE POLICY "Users can create projects" ON public.projects
 -- Ensure a public.users row exists for every auth user.
 -- Without this, `projects.owner_id REFERENCES public.users(id)` will reject inserts.
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   -- Create user profile
   INSERT INTO public.users (id, email, name, avatar_url)
@@ -636,7 +716,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DO $$
 BEGIN
