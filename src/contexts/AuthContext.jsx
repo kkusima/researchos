@@ -130,8 +130,17 @@ export function AuthProvider({ children }) {
           console.log('🔄 OAuth callback detected, letting Supabase process it...')
         }
 
-        // Get current session - this will also exchange the ?code= for a session if present
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        // Get current session with timeout to prevent infinite loading
+        // This will also exchange the ?code= for a session if present
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session fetch timed out after 8s')), 8000)
+        )
+        
+        const { data: { session }, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ])
         
         // NOW strip OAuth artifacts from URL (after Supabase processed them)
         stripOAuthArtifacts()
