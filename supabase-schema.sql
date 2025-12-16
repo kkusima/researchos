@@ -104,6 +104,23 @@ BEGIN
 END;
 $$;
 
+-- Allow users to look up other users by email (for sharing/inviting)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can lookup others by email'
+      AND n.nspname = 'public' AND c.relname = 'users'
+  ) THEN
+    CREATE POLICY "Users can lookup others by email" ON public.users
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+END;
+$$;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -184,6 +201,27 @@ BEGIN
   ) THEN
     CREATE POLICY "Owners can update projects" ON public.projects
       FOR UPDATE TO authenticated USING (owner_id = (SELECT auth.uid()));
+  END IF;
+END;
+$$;
+
+-- Project members with editor/admin role can update projects
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Editors can update projects'
+      AND n.nspname = 'public' AND c.relname = 'projects'
+  ) THEN
+    CREATE POLICY "Editors can update projects" ON public.projects
+      FOR UPDATE TO authenticated USING (
+        id IN (
+          SELECT project_id FROM public.project_members 
+          WHERE user_id = (SELECT auth.uid()) AND role IN ('editor', 'admin')
+        )
+      );
   END IF;
 END;
 $$;
@@ -273,6 +311,27 @@ BEGIN
     CREATE POLICY "Stages manageable by project owners" ON public.stages
       FOR ALL TO authenticated USING (
         project_id IN (SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid()))
+      );
+  END IF;
+END;
+$$;
+
+-- Stages manageable by project members with editor/admin role
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Stages manageable by project editors'
+      AND n.nspname = 'public' AND c.relname = 'stages'
+  ) THEN
+    CREATE POLICY "Stages manageable by project editors" ON public.stages
+      FOR ALL TO authenticated USING (
+        project_id IN (
+          SELECT project_id FROM public.project_members 
+          WHERE user_id = (SELECT auth.uid()) AND role IN ('editor', 'admin')
+        )
       );
   END IF;
 END;

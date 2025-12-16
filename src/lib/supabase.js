@@ -44,31 +44,68 @@ const logError = (operation, error) => {
 
 // Database helper functions
 export const db = {
-  // Projects - FIXED: Simplified query to avoid nested join issues
+  // Projects - Get owned AND shared projects
   async getProjects(userId) {
     if (!supabase) return { data: [], error: null }
     
     try {
       console.log('📦 Loading projects for user:', userId)
       
-      // First, get projects
-      const { data: projects, error: projectsError } = await supabase
+      // Get projects where user is owner OR member
+      // First get owned projects
+      const { data: ownedProjects, error: ownedError } = await supabase
         .from('projects')
         .select('*')
         .eq('owner_id', userId)
-        .order('priority_rank', { ascending: true })
       
-      if (projectsError) {
-        logError('getProjects', projectsError)
-        return { data: [], error: projectsError }
+      if (ownedError) {
+        logError('getOwnedProjects', ownedError)
       }
 
-      if (!projects || projects.length === 0) {
+      // Then get projects where user is a member
+      const { data: membershipData, error: memberError } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', userId)
+      
+      if (memberError) {
+        logError('getMemberships', memberError)
+      }
+
+      // Get shared projects
+      let sharedProjects = []
+      if (membershipData && membershipData.length > 0) {
+        const sharedProjectIds = membershipData.map(m => m.project_id)
+        const { data: shared, error: sharedError } = await supabase
+          .from('projects')
+          .select('*')
+          .in('id', sharedProjectIds)
+        
+        if (sharedError) {
+          logError('getSharedProjects', sharedError)
+        } else {
+          sharedProjects = shared || []
+        }
+      }
+
+      // Combine and deduplicate
+      const allProjectsMap = new Map()
+      ;(ownedProjects || []).forEach(p => allProjectsMap.set(p.id, { ...p, isOwner: true }))
+      sharedProjects.forEach(p => {
+        if (!allProjectsMap.has(p.id)) {
+          allProjectsMap.set(p.id, { ...p, isOwner: false })
+        }
+      })
+      
+      const projects = Array.from(allProjectsMap.values())
+        .sort((a, b) => a.priority_rank - b.priority_rank)
+
+      if (projects.length === 0) {
         console.log('📦 No projects found')
         return { data: [], error: null }
       }
 
-      console.log(`📦 Found ${projects.length} projects, loading details...`)
+      console.log(`📦 Found ${projects.length} projects (${ownedProjects?.length || 0} owned, ${sharedProjects.length} shared), loading details...`)
 
       // Then get related data for each project
       const projectsWithData = await Promise.all(
@@ -111,10 +148,13 @@ export const db = {
             })
           )
 
-          // Get project members
+          // Get project members with user info
           const { data: members } = await supabase
             .from('project_members')
-            .select('*')
+            .select(`
+              *,
+              user:users(id, email, name, avatar_url)
+            `)
             .eq('project_id', project.id)
 
           return { 
@@ -393,33 +433,71 @@ export const db = {
     }
   },
 
-  // Project sharing
-  async shareProject(projectId, email, role = 'viewer') {
+  // Project sharing - share by email
+  // The user must have signed in at least once to exist in the users table
+  async shareProject(projectId, email, role = 'editor') {
     if (!supabase) return { data: null, error: null }
     
     try {
-      // First find user by email
+      // Find user by email using RPC function (bypasses RLS)
+      // First try direct lookup (will work if policies allow)
+      let userId = null
+      
+      // Try to find the user - we need to use a function or service role for this
+      // For now, we'll try the direct query which may work depending on RLS setup
       const { data: user, error: userError } = await supabase
         .from('users')
-        .select('id')
-        .eq('email', email)
-        .single()
+        .select('id, email, name')
+        .eq('email', email.toLowerCase())
+        .maybeSingle()
       
-      if (userError || !user) {
-        return { data: null, error: { message: 'User not found' } }
+      if (userError) {
+        console.error('Error looking up user:', userError)
+        return { data: null, error: { message: 'Unable to look up user. They may need to sign in first.' } }
       }
 
+      if (!user) {
+        return { 
+          data: null, 
+          error: { 
+            message: 'User not found. They need to sign in to ResearchOS at least once before they can be invited.' 
+          } 
+        }
+      }
+
+      userId = user.id
+
+      // Check if already a member
+      const { data: existingMember } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (existingMember) {
+        return { data: null, error: { message: 'This user is already a member of this project.' } }
+      }
+
+      // Add as project member
       const { data, error } = await supabase
         .from('project_members')
-        .insert({ project_id: projectId, user_id: user.id, role })
-        .select()
+        .insert({ project_id: projectId, user_id: userId, role })
+        .select(`
+          *,
+          user:users(id, email, name, avatar_url)
+        `)
         .single()
       
-      if (error) logError('shareProject', error)
-      return { data, error }
+      if (error) {
+        logError('shareProject', error)
+        return { data: null, error: { message: 'Failed to add member. Please try again.' } }
+      }
+      
+      return { data, error: null }
     } catch (error) {
       logError('shareProject:catch', error)
-      return { data: null, error }
+      return { data: null, error: { message: 'An unexpected error occurred.' } }
     }
   },
 

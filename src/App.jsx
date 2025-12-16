@@ -1191,12 +1191,13 @@ function ProjectSettingsModal({ project, onClose, onUpdate }) {
 // ============================================
 // SHARE MODAL
 // ============================================
-function ShareModal({ project, onClose }) {
-  const { demoMode } = useAuth()
+function ShareModal({ project, onClose, onUpdate }) {
+  const { demoMode, user } = useAuth()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [members, setMembers] = useState(project.project_members || [])
 
   const handleShare = async () => {
     if (!email.trim()) return
@@ -1205,20 +1206,35 @@ function ShareModal({ project, onClose }) {
     setSuccess('')
 
     if (demoMode) {
-      setSuccess('Sharing requires Supabase configuration')
+      setError('Sharing requires Supabase to be configured')
       setLoading(false)
       return
     }
 
-    const { error } = await db.shareProject(project.id, email.trim())
-    if (error) {
-      setError(error.message || 'Failed to share project')
+    const { data, error: shareError } = await db.shareProject(project.id, email.trim())
+    if (shareError) {
+      setError(shareError.message || 'Failed to share project')
     } else {
-      setSuccess(`Invitation sent to ${email}`)
+      setSuccess(`${email} has been added to the project!`)
       setEmail('')
+      // Add new member to local state
+      if (data) {
+        setMembers(prev => [...prev, data])
+      }
     }
     setLoading(false)
   }
+
+  const handleRemoveMember = async (userId) => {
+    if (demoMode) return
+    
+    const { error } = await db.removeProjectMember(project.id, userId)
+    if (!error) {
+      setMembers(prev => prev.filter(m => m.user_id !== userId))
+    }
+  }
+
+  const isOwner = project.owner_id === user?.id
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1238,49 +1254,88 @@ function ShareModal({ project, onClose }) {
             Invite collaborators to work on "{project.title}" with you.
           </p>
 
-          <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="email"
-                placeholder="Enter email address"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleShare()}
-                className="input-sleek pl-10"
-              />
-            </div>
-            <button
-              onClick={handleShare}
-              disabled={!email.trim() || loading}
-              className="btn-gradient flex items-center gap-2"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-              Invite
-            </button>
-          </div>
-
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
-          {success && <p className="text-sm text-green-600 bg-green-50 rounded-lg p-3">{success}</p>}
-
-          {project.project_members?.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Team Members</h3>
-              <div className="space-y-2">
-                {project.project_members.map(member => (
-                  <div key={member.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="avatar text-xs">{member.user?.name?.[0] || '?'}</div>
-                      <div>
-                        <div className="font-medium text-sm">{member.user?.name || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500">{member.role}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          {isOwner && (
+            <div className="flex gap-2 mb-4">
+              <div className="relative flex-1">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleShare()}
+                  className="input-sleek pl-10"
+                />
               </div>
+              <button
+                onClick={handleShare}
+                disabled={!email.trim() || loading}
+                className="btn-gradient flex items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                Invite
+              </button>
             </div>
           )}
+
+          {!isOwner && (
+            <p className="text-sm text-amber-600 bg-amber-50 rounded-lg p-3 mb-4">
+              Only the project owner can invite new members.
+            </p>
+          )}
+
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</p>}
+          {success && <p className="text-sm text-green-600 bg-green-50 rounded-lg p-3 mb-4">{success}</p>}
+
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Team</h3>
+            <div className="space-y-2">
+              {/* Show owner first */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="avatar text-xs bg-gradient-to-br from-gray-400 to-gray-600">
+                    {user?.user_metadata?.name?.[0] || user?.email?.[0] || 'O'}
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">
+                      {project.owner_id === user?.id ? 'You' : 'Owner'}
+                    </div>
+                    <div className="text-xs text-gray-500">Owner</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Show members */}
+              {members.map(member => (
+                <div key={member.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="avatar text-xs">
+                      {member.user?.name?.[0] || member.user?.email?.[0] || '?'}
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">
+                        {member.user?.name || member.user?.email || 'Unknown'}
+                        {member.user_id === user?.id && ' (You)'}
+                      </div>
+                      <div className="text-xs text-gray-500 capitalize">{member.role}</div>
+                    </div>
+                  </div>
+                  {isOwner && member.user_id !== user?.id && (
+                    <button
+                      onClick={() => handleRemoveMember(member.user_id)}
+                      className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-4">
+            Note: Users must sign in to ResearchOS at least once before they can be invited.
+          </p>
         </div>
       </div>
     </div>
