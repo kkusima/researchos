@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= vite",
+    "dev:live": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },

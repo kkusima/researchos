@@ -290,6 +290,64 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Email/Password sign up (for local development)
+  const signUpWithEmail = async (email, password, name = '') => {
+    if (!supabase) {
+      alert('Demo mode: Sign up requires Supabase configuration')
+      return { error: new Error('Demo mode') }
+    }
+
+    console.log('📝 Starting email sign up...')
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name || email.split('@')[0],
+          name: name || email.split('@')[0]
+        }
+      }
+    })
+
+    if (error) {
+      console.error('Sign up error:', error)
+      return { error }
+    }
+
+    // For local Supabase, email confirmation is usually disabled
+    // so the user should be logged in immediately
+    if (data?.session) {
+      await handleAuthSuccess(data.session)
+    }
+
+    return { data, error: null }
+  }
+
+  // Email/Password sign in (for local development)
+  const signInWithEmail = async (email, password) => {
+    if (!supabase) {
+      alert('Demo mode: Sign in requires Supabase configuration')
+      return { error: new Error('Demo mode') }
+    }
+
+    console.log('🔑 Starting email sign in...')
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) {
+      console.error('Sign in error:', error)
+      return { error }
+    }
+
+    if (data?.session) {
+      await handleAuthSuccess(data.session)
+    }
+
+    return { data, error: null }
+  }
+
   const signOut = async () => {
     if (!supabase) {
       setUser(null)
@@ -316,6 +374,8 @@ export function AuthProvider({ children }) {
       demoMode,
       profileReady,
       signInWithGoogle,
+      signInWithEmail,
+      signUpWithEmail,
       signOut,
       isAuthenticated: !!user
     }}>

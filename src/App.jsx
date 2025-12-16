@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext, useRef } from 'react'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
 import { 
@@ -42,12 +42,37 @@ const saveLocal = (data) => {
 // LOGIN PAGE
 // ============================================
 function LoginPage() {
-  const { signInWithGoogle, demoMode } = useAuth()
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, demoMode } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
 
   const handleGoogleLogin = async () => {
     setLoading(true)
+    setError('')
     await signInWithGoogle()
+    setLoading(false)
+  }
+
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    if (isSignUp) {
+      const { error } = await signUpWithEmail(email, password, name)
+      if (error) {
+        setError(error.message)
+      }
+    } else {
+      const { error } = await signInWithEmail(email, password)
+      if (error) {
+        setError(error.message)
+      }
+    }
     setLoading(false)
   }
 
@@ -58,7 +83,75 @@ function LoginPage() {
           🔬
         </div>
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">ResearchOS</h1>
-        <p className="text-gray-500 mb-8">Collaborative research project management</p>
+        <p className="text-gray-500 mb-6">Collaborative research project management</p>
+
+        {/* Email/Password Form */}
+        <form onSubmit={handleEmailSubmit} className="mb-4 text-left">
+          {isSignUp && (
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+              />
+            </div>
+          )}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={6}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 mb-4">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+            {isSignUp ? 'Create Account' : 'Sign In'}
+          </button>
+        </form>
+
+        <button
+          onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
+          className="text-sm text-gray-500 hover:text-gray-700 mb-6"
+        >
+          {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+        </button>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-400">or</span>
+          </div>
+        </div>
         
         <button
           onClick={handleGoogleLogin}
@@ -77,6 +170,7 @@ function LoginPage() {
           )}
           Continue with Google
         </button>
+        <p className="text-xs text-gray-400 mt-2">⚠️ Google requires internet access</p>
 
         {demoMode && (
           <p className="mt-4 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
@@ -84,7 +178,7 @@ function LoginPage() {
           </p>
         )}
 
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-400">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
@@ -99,9 +193,165 @@ function LoginPage() {
 }
 
 // ============================================
+// GLOBAL SEARCH COMPONENT
+// ============================================
+function GlobalSearch({ projects, onNavigate }) {
+  const [query, setQuery] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [results, setResults] = useState({ projects: [], tasks: [], subtasks: [] })
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults({ projects: [], tasks: [], subtasks: [] })
+      return
+    }
+
+    const q = query.toLowerCase()
+    const matchedProjects = []
+    const matchedTasks = []
+    const matchedSubtasks = []
+
+    projects.forEach(project => {
+      // Search projects
+      if (project.title.toLowerCase().includes(q)) {
+        matchedProjects.push(project)
+      }
+
+      // Search tasks and subtasks
+      project.stages?.forEach((stage, stageIndex) => {
+        stage.tasks?.forEach(task => {
+          if (task.title.toLowerCase().includes(q)) {
+            matchedTasks.push({ project, stage, stageIndex, task })
+          }
+
+          // Search subtasks
+          task.subtasks?.forEach(subtask => {
+            if (subtask.title.toLowerCase().includes(q)) {
+              matchedSubtasks.push({ project, stage, stageIndex, task, subtask })
+            }
+          })
+        })
+      })
+    })
+
+    setResults({
+      projects: matchedProjects.slice(0, 5),
+      tasks: matchedTasks.slice(0, 5),
+      subtasks: matchedSubtasks.slice(0, 5)
+    })
+  }, [query, projects])
+
+  const hasResults = results.projects.length > 0 || results.tasks.length > 0 || results.subtasks.length > 0
+
+  const handleSelect = (type, item) => {
+    setQuery('')
+    setIsOpen(false)
+    onNavigate(type, item)
+  }
+
+  return (
+    <div className="relative flex-1 max-w-md">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder="Search projects, tasks, subtasks..."
+        value={query}
+        onChange={e => { setQuery(e.target.value); setIsOpen(true) }}
+        onFocus={() => setIsOpen(true)}
+        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-gray-200 transition-all"
+      />
+      
+      {isOpen && query.trim() && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full left-0 right-0 mt-2 glass-card rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto animate-fade-in">
+            {!hasResults ? (
+              <div className="p-4 text-center text-gray-500 text-sm">
+                No results found for "{query}"
+              </div>
+            ) : (
+              <div className="py-2">
+                {/* Projects */}
+                {results.projects.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Projects</div>
+                    {results.projects.map(project => (
+                      <button
+                        key={project.id}
+                        onClick={() => handleSelect('project', { project })}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-xl">{project.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{project.title}</div>
+                          <div className="text-xs text-gray-500">{project.stages?.length || 0} stages</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tasks */}
+                {results.tasks.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-t border-gray-100 mt-2">Tasks</div>
+                    {results.tasks.map(({ project, stage, stageIndex, task }) => (
+                      <button
+                        key={`${project.id}-${task.id}`}
+                        onClick={() => handleSelect('task', { project, task, stageIndex })}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-xl">{project.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{task.title}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                            <span>{project.title}</span>
+                            <span className="tag tag-default text-[9px]">{stage.name}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Subtasks */}
+                {results.subtasks.length > 0 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-t border-gray-100 mt-2">Subtasks</div>
+                    {results.subtasks.map(({ project, stage, stageIndex, task, subtask }) => (
+                      <button
+                        key={`${project.id}-${task.id}-${subtask.id}`}
+                        onClick={() => handleSelect('task', { project, task, stageIndex })}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-xl">{project.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{subtask.title}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                            <span className="truncate">{task.title}</span>
+                            <span>•</span>
+                            <span className="truncate">{project.title}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================
 // HEADER
 // ============================================
-function Header() {
+function Header({ projects, onSearchNavigate }) {
   const { user, signOut, demoMode } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
 
@@ -111,18 +361,21 @@ function Header() {
   return (
     <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-3">
+        <div className="flex justify-between items-center h-16 gap-4">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
               🔬
             </div>
-            <span className="font-bold text-xl text-gray-900">ResearchOS</span>
+            <span className="font-bold text-xl text-gray-900 hidden sm:block">ResearchOS</span>
             {demoMode && (
               <span className="tag tag-warning text-[10px]">DEMO</span>
             )}
           </div>
 
-          <div className="relative">
+          {/* Global Search */}
+          <GlobalSearch projects={projects} onNavigate={onSearchNavigate} />
+
+          <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
@@ -198,7 +451,6 @@ function ProjectsView() {
   const { projects, setProjects, setView, setSelectedProject, loading, reorderProjects } = useApp()
   const { user, demoMode } = useAuth()
   const [showCreate, setShowCreate] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
   const [showReorder, setShowReorder] = useState(false)
@@ -215,12 +467,8 @@ function ProjectsView() {
     }
   }
 
-  const filteredProjects = projects.filter(p => 
-    p.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
   const computeSorted = () => {
-    const sorted = [...filteredProjects]
+    const sorted = [...projects]
     const dir = sortDirection === 'asc' ? 1 : -1
     switch (sortOption) {
       case 'priority':
@@ -287,62 +535,44 @@ function ProjectsView() {
           <h1 className="text-2xl font-bold text-gray-900">My Projects</h1>
           <p className="text-gray-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:max-w-4xl">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="input-sleek pl-10 w-full"
-            />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'name', label: 'Name' }].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => handleSortChange(opt.key)}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                  sortOption === opt.key
+                    ? 'bg-gray-200 text-gray-900 font-medium'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {opt.label}
+                {sortOption === opt.key && (
+                  sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-1">
-              {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'name', label: 'Name' }].map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => handleSortChange(opt.key)}
-                  className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                    sortOption === opt.key
-                      ? 'bg-gray-200 text-gray-900 font-medium'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {opt.label}
-                  {sortOption === opt.key && (
-                    sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                  )}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
-              <MoreVertical className="w-4 h-4" />
-              <span className="hidden sm:inline">Reorder</span>
-            </button>
-            <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Project</span>
-            </button>
-          </div>
+          <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
+            <MoreVertical className="w-4 h-4" />
+            <span className="hidden sm:inline">Reorder</span>
+          </button>
+          <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New Project</span>
+          </button>
         </div>
       </div>
 
       {sortedProjects.length === 0 ? (
         <div className="glass-card rounded-2xl p-12 text-center">
           <div className="text-6xl mb-4">🔬</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            {searchQuery ? 'No projects found' : 'No projects yet'}
-          </h2>
-          <p className="text-gray-500 mb-6">
-            {searchQuery ? 'Try a different search term' : 'Create your first research project to get started'}
-          </p>
-          {!searchQuery && (
-            <button onClick={() => setShowCreate(true)} className="btn-gradient">
-              Create Project
-            </button>
-          )}
+          <h2 className="text-xl font-bold text-gray-900 mb-2">No projects yet</h2>
+          <p className="text-gray-500 mb-6">Create your first research project to get started</p>
+          <button onClick={() => setShowCreate(true)} className="btn-gradient">
+            Create Project
+          </button>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -1859,6 +2089,18 @@ export default function App() {
     return <LoginPage />
   }
 
+  // Handle search navigation
+  const handleSearchNavigate = (type, item) => {
+    if (type === 'project') {
+      setSelectedProject(item.project)
+      setView('project')
+    } else if (type === 'task') {
+      setSelectedProject(item.project)
+      setSelectedTask({ task: item.task, stageIndex: item.stageIndex })
+      setView('task')
+    }
+  }
+
   const ctx = {
     projects, setProjects,
     selectedProject, setSelectedProject,
@@ -1873,7 +2115,7 @@ export default function App() {
       <div className="min-h-screen pb-8">
         {view === 'main' && (
           <>
-            <Header />
+            <Header projects={projects} onSearchNavigate={handleSearchNavigate} />
             <TabNav tab={activeTab} setTab={setActiveTab} />
             {activeTab === 'projects' ? <ProjectsView /> : <AllTasksView />}
           </>
