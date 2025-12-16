@@ -503,11 +503,12 @@ function ProjectCard({ project, index, onSelect, onDelete }) {
 // ============================================
 function CreateProjectModal({ onClose }) {
   const { projects, setProjects } = useApp()
-  const { user, demoMode } = useAuth()
+  const { user, demoMode, profileReady } = useAuth()
   const [title, setTitle] = useState('')
   const [emoji, setEmoji] = useState('🧪')
   const [stages, setStages] = useState(['Ideation', 'Experiments', 'Analysis', 'Writing', 'Publication'])
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const [draggedIndex, setDraggedIndex] = useState(null)
 
   const handleDragStart = (e, index) => {
@@ -539,6 +540,7 @@ function CreateProjectModal({ onClose }) {
   const handleCreate = async () => {
     if (!title.trim() || stages.length === 0) return
     setLoading(true)
+    setErrorMsg('')
 
     const newProject = {
       id: uuid(),
@@ -561,7 +563,15 @@ function CreateProjectModal({ onClose }) {
       setProjects([newProject, ...projects])
       saveLocal([newProject, ...projects])
     } else {
-      // In real mode, we'd create in Supabase
+      // Check if user profile is ready (required for FK constraint)
+      if (!profileReady) {
+        setErrorMsg('User profile not ready. Please wait a moment and try again.')
+        setLoading(false)
+        return
+      }
+
+      // In real mode, create in Supabase
+      console.log('📝 Creating project in Supabase...')
       const { data, error } = await db.createProject({
         title: newProject.title,
         emoji: newProject.emoji,
@@ -569,19 +579,39 @@ function CreateProjectModal({ onClose }) {
         current_stage_index: 0,
         owner_id: user.id
       })
-      if (!error && data) {
-        // Create stages
-        for (const stage of newProject.stages) {
-          await db.createStage({
-            project_id: data.id,
-            name: stage.name,
-            order_index: stage.order_index
-          })
-        }
-        // Refresh projects
-        const { data: refreshed } = await db.getProjects(user.id)
-        if (refreshed) setProjects(refreshed)
+
+      if (error || !data) {
+        console.error('❌ Create project failed:', error)
+        setErrorMsg(error?.message || 'Failed to create project in Supabase.')
+        setLoading(false)
+        return
       }
+
+      console.log('✅ Project created:', data.id)
+
+      // Create stages
+      for (const stage of newProject.stages) {
+        const { error: stageError } = await db.createStage({
+          project_id: data.id,
+          name: stage.name,
+          order_index: stage.order_index,
+        })
+        if (stageError) {
+          console.error('❌ Create stage failed:', stageError)
+          setErrorMsg(stageError?.message || `Failed to create stage: ${stage.name}`)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Refresh projects
+      const { data: refreshed, error: refreshError } = await db.getProjects(user.id)
+      if (refreshError) {
+        setErrorMsg(refreshError?.message || 'Project created, but failed to refresh projects.')
+        setLoading(false)
+        return
+      }
+      if (refreshed) setProjects(refreshed)
     }
 
     setLoading(false)
@@ -602,6 +632,11 @@ function CreateProjectModal({ onClose }) {
         </div>
 
         <div className="p-6 space-y-6">
+          {errorMsg && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+              {errorMsg}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Project Title</label>
             <input
@@ -1546,9 +1581,11 @@ export default function App() {
       saveLocal(updatedProjects)
     } else {
       // In real mode, update each project's priority_rank
-      updatedProjects.forEach(async (project, index) => {
-        await db.updateProject(project.id, { priority_rank: index + 1 })
-      })
+      Promise.all(
+        updatedProjects.map((project, index) =>
+          db.updateProject(project.id, { priority_rank: index + 1 })
+        )
+      ).catch((e) => console.error('❌ Failed to persist priority order:', e))
     }
   }
 

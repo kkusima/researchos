@@ -526,18 +526,43 @@ CREATE POLICY "Users can create projects" ON public.projects
   FOR INSERT TO authenticated
   WITH CHECK (owner_id = (SELECT auth.uid()));
 
--- Temporary permissive test policy (remove after testing)
+-- Ensure a public.users row exists for every auth user.
+-- Without this, `projects.owner_id REFERENCES public.users(id)` will reject inserts.
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name,
+    avatar_url = EXCLUDED.avatar_url,
+    updated_at = NOW();
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_policy p
-    JOIN pg_class c ON p.polrelid = c.oid
+    SELECT 1
+    FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
     JOIN pg_namespace n ON c.relnamespace = n.oid
-    WHERE p.polname = 'Temporary allow insert projects' AND n.nspname = 'public' AND c.relname = 'projects'
+    WHERE t.tgname = 'on_auth_user_created'
+      AND n.nspname = 'auth' AND c.relname = 'users'
   ) THEN
-    CREATE POLICY "Temporary allow insert projects" ON public.projects
-      FOR INSERT TO authenticated
-      WITH CHECK (true);
+    EXECUTE $sql$
+      CREATE TRIGGER on_auth_user_created
+        AFTER INSERT ON auth.users
+        FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+    $sql$;
   END IF;
 END;
 $$;
