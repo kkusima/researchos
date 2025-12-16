@@ -1240,6 +1240,12 @@ function ShareModal({ project, onClose, onUpdate }) {
       setSuccess(`${email} hasn't joined ResearchOS yet. Share the invite link below!`)
       setPendingInvites(prev => [...prev, result.data])
       setEmail('')
+    } else if (result.type === 'existing') {
+      // Invitation already exists - show the link again
+      const link = `${window.location.origin}?invite=${result.data.token}`
+      setInviteLink(link)
+      setSuccess(result.message || `Invitation already sent! Here's the link:`)
+      setEmail('')
     } else {
       // User exists - added directly
       setSuccess(`${email} has been added to the project!`)
@@ -1365,15 +1371,29 @@ function ShareModal({ project, onClose, onUpdate }) {
                         <div className="text-xs text-amber-600">Pending invite</div>
                       </div>
                     </div>
-                    {isOwner && (
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleCancelInvite(invite.id)}
-                        className="p-1 hover:bg-amber-100 rounded text-gray-400 hover:text-red-500"
-                        title="Cancel invitation"
+                        onClick={() => {
+                          const link = `${window.location.origin}?invite=${invite.token}`
+                          navigator.clipboard.writeText(link)
+                          setSuccess('Invite link copied!')
+                          setTimeout(() => setSuccess(''), 2000)
+                        }}
+                        className="p-1.5 hover:bg-amber-100 rounded text-amber-600 hover:text-amber-700"
+                        title="Copy invite link"
                       >
-                        <X className="w-4 h-4" />
+                        <Copy className="w-4 h-4" />
                       </button>
-                    )}
+                      {isOwner && (
+                        <button
+                          onClick={() => handleCancelInvite(invite.id)}
+                          className="p-1.5 hover:bg-amber-100 rounded text-gray-400 hover:text-red-500"
+                          title="Cancel invitation"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

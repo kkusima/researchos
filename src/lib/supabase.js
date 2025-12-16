@@ -488,14 +488,20 @@ export const db = {
       // Check if invitation already exists
       const { data: existingInvite } = await supabase
         .from('project_invitations')
-        .select('id, status')
+        .select('*')
         .eq('project_id', projectId)
         .ilike('email', normalizedEmail)
         .maybeSingle()
 
       if (existingInvite) {
         if (existingInvite.status === 'pending') {
-          return { data: null, error: { message: 'An invitation has already been sent to this email.' } }
+          // Return the existing invitation so user can copy the link
+          return { 
+            data: existingInvite, 
+            error: null, 
+            type: 'existing',
+            message: `An invitation was already sent to ${email}. Here's the link again!`
+          }
         }
         // If expired or other status, delete and create new
         await supabase
