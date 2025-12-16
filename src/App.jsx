@@ -1870,7 +1870,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <div className="min-h-screen">
+      <div className="min-h-screen pb-8">
         {view === 'main' && (
           <>
             <Header />
@@ -1880,6 +1880,10 @@ export default function App() {
         )}
         {view === 'project' && <ProjectDetail />}
         {view === 'task' && <TaskDetail />}
+        
+        <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-[10px] text-gray-400 bg-white/80 backdrop-blur-sm border-t border-gray-100">
+          © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+        </footer>
       </div>
     </AppContext.Provider>
   )
