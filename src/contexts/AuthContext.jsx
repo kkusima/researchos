@@ -355,6 +355,103 @@ export function AuthProvider({ children }) {
     return { data, error: null }
   }
 
+  // Update user profile (name)
+  const updateProfile = async (updates) => {
+    if (!supabase) {
+      // Demo mode - update local state
+      setUser(prev => ({
+        ...prev,
+        user_metadata: { ...prev.user_metadata, ...updates }
+      }))
+      return { error: null }
+    }
+
+    const { data, error } = await supabase.auth.updateUser({
+      data: updates
+    })
+
+    if (error) {
+      console.error('Profile update error:', error)
+      return { error }
+    }
+
+    // Update local user state
+    if (data?.user) {
+      setUser(data.user)
+    }
+
+    // Also update the public users table
+    if (user?.id) {
+      await supabase.from('users').update({
+        name: updates.full_name || updates.name,
+        avatar_url: updates.avatar_url
+      }).eq('id', user.id)
+    }
+
+    return { data, error: null }
+  }
+
+  // Update email (requires confirmation)
+  const updateEmail = async (newEmail) => {
+    if (!supabase) {
+      return { error: new Error('Demo mode: Cannot change email') }
+    }
+
+    const { data, error } = await supabase.auth.updateUser({
+      email: newEmail
+    })
+
+    if (error) {
+      console.error('Email update error:', error)
+      return { error }
+    }
+
+    return { data, error: null, confirmationRequired: true }
+  }
+
+  // Update password
+  const updatePassword = async (newPassword) => {
+    if (!supabase) {
+      return { error: new Error('Demo mode: Cannot change password') }
+    }
+
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
+
+    if (error) {
+      console.error('Password update error:', error)
+      return { error }
+    }
+
+    return { data, error: null }
+  }
+
+  // Send password reset email
+  const sendPasswordReset = async (email) => {
+    if (!supabase) {
+      return { error: new Error('Demo mode: Cannot reset password') }
+    }
+
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+
+    if (error) {
+      console.error('Password reset error:', error)
+      return { error }
+    }
+
+    return { data, error: null }
+  }
+
+  // Check if user is using email auth (not OAuth)
+  const isEmailAuth = () => {
+    if (!user) return false
+    const provider = user.app_metadata?.provider
+    return provider === 'email' || !provider
+  }
+
   const signOut = async () => {
     if (!supabase) {
       setUser(null)
@@ -384,6 +481,11 @@ export function AuthProvider({ children }) {
       signInWithEmail,
       signUpWithEmail,
       signOut,
+      updateProfile,
+      updateEmail,
+      updatePassword,
+      sendPasswordReset,
+      isEmailAuth,
       isAuthenticated: !!user
     }}>
       {children}
