@@ -3,16 +3,29 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-console.log('🔧 Supabase Config:', {
-  url: supabaseUrl ? '✅ Set' : '❌ Missing',
-  key: supabaseAnonKey ? `✅ Set (${supabaseAnonKey.substring(0, 20)}...)` : '❌ Missing'
-})
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️ Supabase credentials not found. Running in demo mode.')
+// Validate that the anon key looks like a real JWT (starts with eyJ and is long enough)
+const isValidSupabaseKey = (key) => {
+  return key && key.startsWith('eyJ') && key.length > 100
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey 
+const hasValidConfig = supabaseUrl && supabaseAnonKey && isValidSupabaseKey(supabaseAnonKey)
+
+console.log('🔧 Supabase Config:', {
+  url: supabaseUrl ? '✅ Set' : '❌ Missing',
+  key: supabaseAnonKey ? (isValidSupabaseKey(supabaseAnonKey) ? '✅ Valid JWT' : '❌ Invalid format (not a JWT)') : '❌ Missing',
+  mode: hasValidConfig ? 'LIVE' : 'DEMO'
+})
+
+if (!hasValidConfig) {
+  console.warn('⚠️ Supabase credentials missing or invalid. Running in demo mode.')
+  if (supabaseAnonKey && !isValidSupabaseKey(supabaseAnonKey)) {
+    console.warn('⚠️ Your VITE_SUPABASE_ANON_KEY does not look like a valid Supabase key.')
+    console.warn('   Valid keys start with "eyJ" and are ~200+ characters long.')
+    console.warn('   Get your key from: https://supabase.com/dashboard/project/_/settings/api')
+  }
+}
+
+export const supabase = hasValidConfig
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         flowType: 'pkce',
