@@ -434,70 +434,214 @@ export const db = {
   },
 
   // Project sharing - share by email
-  // The user must have signed in at least once to exist in the users table
-  async shareProject(projectId, email, role = 'editor') {
+  // If user exists, add them directly. If not, create an invitation.
+  async shareProject(projectId, email, role = 'editor', invitedBy = null) {
     if (!supabase) return { data: null, error: null }
     
     try {
-      // Find user by email using RPC function (bypasses RLS)
-      // First try direct lookup (will work if policies allow)
-      let userId = null
+      const normalizedEmail = email.toLowerCase().trim()
       
-      // Try to find the user - we need to use a function or service role for this
-      // For now, we'll try the direct query which may work depending on RLS setup
+      // Try to find existing user
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, email, name')
-        .eq('email', email.toLowerCase())
+        .ilike('email', normalizedEmail)
         .maybeSingle()
       
-      if (userError) {
+      if (userError && userError.code !== 'PGRST116') {
         console.error('Error looking up user:', userError)
-        return { data: null, error: { message: 'Unable to look up user. They may need to sign in first.' } }
       }
 
-      if (!user) {
-        return { 
-          data: null, 
-          error: { 
-            message: 'User not found. They need to sign in to ResearchOS at least once before they can be invited.' 
-          } 
+      // If user exists, add them directly
+      if (user) {
+        // Check if already a member
+        const { data: existingMember } = await supabase
+          .from('project_members')
+          .select('id')
+          .eq('project_id', projectId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (existingMember) {
+          return { data: null, error: { message: 'This user is already a member of this project.' } }
         }
+
+        // Add as project member
+        const { data, error } = await supabase
+          .from('project_members')
+          .insert({ project_id: projectId, user_id: user.id, role })
+          .select(`
+            *,
+            user:users(id, email, name, avatar_url)
+          `)
+          .single()
+        
+        if (error) {
+          logError('shareProject', error)
+          return { data: null, error: { message: 'Failed to add member. Please try again.' } }
+        }
+        
+        return { data, error: null, type: 'added' }
       }
 
-      userId = user.id
-
-      // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('project_members')
-        .select('id')
+      // User doesn't exist - create an invitation
+      // Check if invitation already exists
+      const { data: existingInvite } = await supabase
+        .from('project_invitations')
+        .select('id, status')
         .eq('project_id', projectId)
-        .eq('user_id', userId)
+        .ilike('email', normalizedEmail)
         .maybeSingle()
 
-      if (existingMember) {
-        return { data: null, error: { message: 'This user is already a member of this project.' } }
+      if (existingInvite) {
+        if (existingInvite.status === 'pending') {
+          return { data: null, error: { message: 'An invitation has already been sent to this email.' } }
+        }
+        // If expired or other status, delete and create new
+        await supabase
+          .from('project_invitations')
+          .delete()
+          .eq('id', existingInvite.id)
       }
 
-      // Add as project member
-      const { data, error } = await supabase
-        .from('project_members')
-        .insert({ project_id: projectId, user_id: userId, role })
-        .select(`
-          *,
-          user:users(id, email, name, avatar_url)
-        `)
+      // Create invitation
+      const { data: invitation, error: inviteError } = await supabase
+        .from('project_invitations')
+        .insert({
+          project_id: projectId,
+          email: normalizedEmail,
+          role,
+          invited_by: invitedBy
+        })
+        .select()
         .single()
-      
-      if (error) {
-        logError('shareProject', error)
-        return { data: null, error: { message: 'Failed to add member. Please try again.' } }
+
+      if (inviteError) {
+        logError('createInvitation', inviteError)
+        return { data: null, error: { message: 'Failed to create invitation.' } }
       }
-      
-      return { data, error: null }
+
+      return { 
+        data: invitation, 
+        error: null, 
+        type: 'invited',
+        message: `Invitation created! Share this link with ${email}`
+      }
     } catch (error) {
       logError('shareProject:catch', error)
       return { data: null, error: { message: 'An unexpected error occurred.' } }
+    }
+  },
+
+  // Get pending invitations for a project
+  async getProjectInvitations(projectId) {
+    if (!supabase) return { data: [], error: null }
+    
+    try {
+      const { data, error } = await supabase
+        .from('project_invitations')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      if (error) logError('getProjectInvitations', error)
+      return { data: data || [], error }
+    } catch (error) {
+      logError('getProjectInvitations:catch', error)
+      return { data: [], error }
+    }
+  },
+
+  // Cancel a pending invitation
+  async cancelInvitation(invitationId) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('project_invitations')
+        .delete()
+        .eq('id', invitationId)
+
+      if (error) logError('cancelInvitation', error)
+      return { error }
+    } catch (error) {
+      logError('cancelInvitation:catch', error)
+      return { error }
+    }
+  },
+
+  // Accept a specific invitation by token
+  async acceptInvitationByToken(token, userId) {
+    if (!supabase) return { data: null, error: null }
+    
+    try {
+      // First, get the invitation
+      const { data: invitation, error: fetchError } = await supabase
+        .from('project_invitations')
+        .select('*')
+        .eq('token', token)
+        .eq('status', 'pending')
+        .single()
+
+      if (fetchError || !invitation) {
+        return { data: null, error: fetchError || new Error('Invitation not found or expired') }
+      }
+
+      // Check if invitation is expired
+      if (new Date(invitation.expires_at) < new Date()) {
+        return { data: null, error: new Error('Invitation has expired') }
+      }
+
+      // Add user as project member
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .upsert({
+          project_id: invitation.project_id,
+          user_id: userId,
+          role: invitation.role
+        }, { onConflict: 'project_id,user_id' })
+
+      if (memberError) {
+        logError('acceptInvitationByToken:addMember', memberError)
+        return { data: null, error: memberError }
+      }
+
+      // Mark invitation as accepted
+      await supabase
+        .from('project_invitations')
+        .update({ status: 'accepted' })
+        .eq('id', invitation.id)
+
+      return { data: { projectId: invitation.project_id, role: invitation.role }, error: null }
+    } catch (error) {
+      logError('acceptInvitationByToken:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  // Check and accept pending invitations for current user
+  async acceptPendingInvitations(userEmail) {
+    if (!supabase) return { data: [], error: null }
+    
+    try {
+      // Get pending invitations for this email
+      const { data: invitations, error: fetchError } = await supabase
+        .from('project_invitations')
+        .select('*')
+        .ilike('email', userEmail.toLowerCase())
+        .eq('status', 'pending')
+
+      if (fetchError || !invitations?.length) {
+        return { data: [], error: fetchError }
+      }
+
+      // The database trigger should have already handled this on sign-up
+      // But we'll also check here for cases where the trigger didn't fire
+      return { data: invitations, error: null }
+    } catch (error) {
+      logError('acceptPendingInvitations:catch', error)
+      return { data: [], error }
     }
   },
 

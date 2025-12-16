@@ -1197,13 +1197,31 @@ function ShareModal({ project, onClose, onUpdate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
   const [members, setMembers] = useState(project.project_members || [])
+  const [pendingInvites, setPendingInvites] = useState([])
+  const [loadingInvites, setLoadingInvites] = useState(true)
+
+  // Load pending invitations
+  useEffect(() => {
+    const loadInvites = async () => {
+      if (demoMode) {
+        setLoadingInvites(false)
+        return
+      }
+      const { data } = await db.getProjectInvitations(project.id)
+      setPendingInvites(data || [])
+      setLoadingInvites(false)
+    }
+    loadInvites()
+  }, [project.id, demoMode])
 
   const handleShare = async () => {
     if (!email.trim()) return
     setLoading(true)
     setError('')
     setSuccess('')
+    setInviteLink('')
 
     if (demoMode) {
       setError('Sharing requires Supabase to be configured')
@@ -1211,18 +1229,38 @@ function ShareModal({ project, onClose, onUpdate }) {
       return
     }
 
-    const { data, error: shareError } = await db.shareProject(project.id, email.trim())
-    if (shareError) {
-      setError(shareError.message || 'Failed to share project')
+    const result = await db.shareProject(project.id, email.trim(), 'editor', user?.id)
+    
+    if (result.error) {
+      setError(result.error.message || 'Failed to share project')
+    } else if (result.type === 'invited') {
+      // User doesn't exist - invitation created
+      const link = `${window.location.origin}?invite=${result.data.token}`
+      setInviteLink(link)
+      setSuccess(`${email} hasn't joined ResearchOS yet. Share the invite link below!`)
+      setPendingInvites(prev => [...prev, result.data])
+      setEmail('')
     } else {
+      // User exists - added directly
       setSuccess(`${email} has been added to the project!`)
       setEmail('')
-      // Add new member to local state
-      if (data) {
-        setMembers(prev => [...prev, data])
+      if (result.data) {
+        setMembers(prev => [...prev, result.data])
       }
     }
     setLoading(false)
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLink)
+    setSuccess('Invite link copied to clipboard!')
+  }
+
+  const handleCancelInvite = async (inviteId) => {
+    const { error } = await db.cancelInvitation(inviteId)
+    if (!error) {
+      setPendingInvites(prev => prev.filter(i => i.id !== inviteId))
+    }
   }
 
   const handleRemoveMember = async (userId) => {
@@ -1239,10 +1277,10 @@ function ShareModal({ project, onClose, onUpdate }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div 
-        className="glass-card rounded-2xl w-full max-w-md animate-fade-in"
+        className="glass-card rounded-2xl w-full max-w-md animate-fade-in max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white/90 backdrop-blur">
           <h2 className="text-xl font-bold text-gray-900">Share Project</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5 text-gray-500" />
@@ -1286,6 +1324,61 @@ function ShareModal({ project, onClose, onUpdate }) {
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</p>}
           {success && <p className="text-sm text-green-600 bg-green-50 rounded-lg p-3 mb-4">{success}</p>}
+          
+          {inviteLink && (
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 font-medium mb-2">📧 Share this invite link:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inviteLink}
+                  readOnly
+                  className="input-sleek text-xs flex-1 bg-white"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-blue-600 mt-2">
+                When they sign in with this link, they'll automatically join the project.
+              </p>
+            </div>
+          )}
+
+          {/* Pending Invitations */}
+          {pendingInvites.length > 0 && (
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Pending Invitations</h3>
+              <div className="space-y-2">
+                {pendingInvites.map(invite => (
+                  <div key={invite.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center text-amber-700 text-xs">
+                        ✉️
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm text-gray-900">{invite.email}</div>
+                        <div className="text-xs text-amber-600">Pending invite</div>
+                      </div>
+                    </div>
+                    {isOwner && (
+                      <button
+                        onClick={() => handleCancelInvite(invite.id)}
+                        className="p-1 hover:bg-amber-100 rounded text-gray-400 hover:text-red-500"
+                        title="Cancel invitation"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Team</h3>
@@ -1332,10 +1425,6 @@ function ShareModal({ project, onClose, onUpdate }) {
               ))}
             </div>
           </div>
-
-          <p className="text-xs text-gray-400 mt-4">
-            Note: Users must sign in to ResearchOS at least once before they can be invited.
-          </p>
         </div>
       </div>
     </div>
@@ -1668,6 +1757,33 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('projects')
   const [view, setView] = useState('main')
   const [loading, setLoading] = useState(true)
+
+  // Reload projects function
+  const reloadProjects = async () => {
+    if (demoMode) {
+      const local = loadLocal()
+      setProjects(local)
+      return
+    }
+
+    if (user) {
+      const { data, error } = await db.getProjects(user.id)
+      if (!error && data) {
+        setProjects(data)
+      }
+    }
+  }
+
+  // Listen for invitation-accepted event to reload projects
+  useEffect(() => {
+    const handleInvitationAccepted = (e) => {
+      console.log('🎉 Invitation accepted, reloading projects...', e.detail)
+      reloadProjects()
+    }
+
+    window.addEventListener('invitation-accepted', handleInvitationAccepted)
+    return () => window.removeEventListener('invitation-accepted', handleInvitationAccepted)
+  }, [user, demoMode])
 
   // Load projects
   useEffect(() => {

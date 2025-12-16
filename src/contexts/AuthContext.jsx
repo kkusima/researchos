@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, db } from '../lib/supabase'
 
 const AuthContext = createContext({})
 
@@ -13,11 +13,36 @@ const withTimeout = (promise, ms, errorMsg = 'Operation timed out') => {
   ])
 }
 
+// Helper: Get and store invite token from URL
+const getInviteToken = () => {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const invite = params.get('invite')
+    if (invite) {
+      // Store in sessionStorage so it persists through OAuth redirect
+      sessionStorage.setItem('pendingInviteToken', invite)
+      // Clean the invite param from URL
+      params.delete('invite')
+      const newUrl = params.toString() 
+        ? `${window.location.pathname}?${params.toString()}` 
+        : window.location.pathname
+      window.history.replaceState({}, document.title, newUrl)
+      return invite
+    }
+    // Check if we have a stored invite token
+    return sessionStorage.getItem('pendingInviteToken')
+  } catch (e) {
+    return null
+  }
+}
+
 // Helper: Clean URL of OAuth artifacts
 const cleanUrl = () => {
   try {
     const url = new URL(window.location.href)
     if (url.searchParams.has('code') || url.searchParams.has('error') || url.hash.includes('access_token')) {
+      // Preserve invite token if present
+      const invite = url.searchParams.get('invite')
       url.searchParams.delete('code')
       url.searchParams.delete('state')
       url.searchParams.delete('error')
@@ -83,13 +108,41 @@ export function AuthProvider({ children }) {
     setUser(session.user)
     
     // Profile sync in background - don't block UI
-    ensureUserProfile(session.user).then(setProfileReady)
+    ensureUserProfile(session.user).then(async (ready) => {
+      setProfileReady(ready)
+      
+      // Check for pending invite token after profile is ready
+      const inviteToken = sessionStorage.getItem('pendingInviteToken')
+      if (inviteToken && ready) {
+        console.log('🎫 Processing invite token...')
+        try {
+          const { data, error } = await db.acceptInvitationByToken(inviteToken, session.user.id)
+          if (error) {
+            console.error('Failed to accept invitation:', error)
+          } else if (data) {
+            console.log('✅ Joined project:', data.projectId)
+            // Could dispatch an event here to reload projects
+            window.dispatchEvent(new CustomEvent('invitation-accepted', { 
+              detail: { projectId: data.projectId, role: data.role }
+            }))
+          }
+        } catch (e) {
+          console.error('Invite processing error:', e)
+        } finally {
+          // Clear the token regardless of outcome
+          sessionStorage.removeItem('pendingInviteToken')
+        }
+      }
+    })
   }, [ensureUserProfile])
 
   useEffect(() => {
     // Prevent double initialization in React StrictMode
     if (initRef.current) return
     initRef.current = true
+
+    // Capture invite token from URL first (before any redirects)
+    getInviteToken()
 
     // Demo mode - no Supabase
     if (!supabase) {

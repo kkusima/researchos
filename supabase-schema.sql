@@ -78,10 +78,25 @@ CREATE TABLE IF NOT EXISTS public.comments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Project invitations (for inviting users who haven't signed up yet)
+CREATE TABLE IF NOT EXISTS public.project_invitations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT DEFAULT 'editor',
+  invited_by UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  token TEXT UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'expired'
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+  UNIQUE(project_id, email)
+);
+
 -- Enable Row Level Security on tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subtasks ENABLE ROW LEVEL SECURITY;
@@ -590,6 +605,7 @@ CREATE POLICY "Users can create projects" ON public.projects
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- Create user profile
   INSERT INTO public.users (id, email, name, avatar_url)
   VALUES (
     NEW.id,
@@ -602,6 +618,21 @@ BEGIN
     name = EXCLUDED.name,
     avatar_url = EXCLUDED.avatar_url,
     updated_at = NOW();
+
+  -- Auto-accept any pending project invitations for this email
+  INSERT INTO public.project_members (project_id, user_id, role)
+  SELECT project_id, NEW.id, role
+  FROM public.project_invitations
+  WHERE LOWER(email) = LOWER(NEW.email)
+    AND status = 'pending'
+    AND expires_at > NOW()
+  ON CONFLICT (project_id, user_id) DO NOTHING;
+
+  -- Mark invitations as accepted
+  UPDATE public.project_invitations
+  SET status = 'accepted'
+  WHERE LOWER(email) = LOWER(NEW.email)
+    AND status = 'pending';
 
   RETURN NEW;
 END;
@@ -622,6 +653,41 @@ BEGIN
         AFTER INSERT ON auth.users
         FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
     $sql$;
+  END IF;
+END;
+$$;
+
+-- Project Invitations policies
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Project owners can manage invitations'
+      AND n.nspname = 'public' AND c.relname = 'project_invitations'
+  ) THEN
+    CREATE POLICY "Project owners can manage invitations" ON public.project_invitations
+      FOR ALL TO authenticated USING (
+        project_id IN (SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid()))
+      );
+  END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can view their own invitations'
+      AND n.nspname = 'public' AND c.relname = 'project_invitations'
+  ) THEN
+    CREATE POLICY "Users can view their own invitations" ON public.project_invitations
+      FOR SELECT TO authenticated USING (
+        LOWER(email) = LOWER((SELECT email FROM auth.users WHERE id = (SELECT auth.uid())))
+      );
   END IF;
 END;
 $$;
