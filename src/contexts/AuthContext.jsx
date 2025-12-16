@@ -122,15 +122,25 @@ export function AuthProvider({ children }) {
 
     const initAuth = async () => {
       try {
-        const hasCode = window.location.search.includes('code=') || 
-                        window.location.hash.includes('access_token=')
+        const hasCode = window.location.search.includes('code=')
+        const hasTokens = window.location.hash.includes('access_token=')
         
-        if (hasCode) console.log('🔄 OAuth callback detected')
+        if (hasCode || hasTokens) {
+          console.log('🔄 OAuth callback detected, exchanging code...')
+        }
+
+        // For PKCE flow with code in URL, we need to let Supabase exchange it first
+        // The exchangeCodeForSession is handled automatically by detectSessionInUrl
+        // but we should give it a moment to complete
+        if (hasCode) {
+          // Small delay to allow Supabase to process the code
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
 
         // Get current session with timeout
         const sessionPromise = supabase.auth.getSession()
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timed out')), 8000)
+          setTimeout(() => reject(new Error('Session fetch timed out')), 10000)
         )
         
         const { data: { session }, error: sessionError } = await Promise.race([
@@ -138,10 +148,13 @@ export function AuthProvider({ children }) {
           timeoutPromise
         ])
         
-        if (sessionError) throw sessionError
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError)
+          throw sessionError
+        }
 
         if (session?.user) {
-          console.log('📋 Session restored:', session.user.email)
+          console.log('✅ Session found:', session.user.email)
           stripOAuthArtifacts()
           const profileOk = await ensureUserProfile(session.user)
           
@@ -151,17 +164,18 @@ export function AuthProvider({ children }) {
             setLoading(false)
           }
         } else {
-          // No session yet
+          console.log('ℹ️ No session found')
+          // No session - if we had a code, wait for auth state change
           if (hasCode) {
-            console.log('⏳ Waiting for OAuth exchange...')
-            // Don't stop loading yet, wait for onAuthStateChange
-            // But add a fallback timeout
+            console.log('⏳ Code present but no session yet, waiting for exchange...')
+            // The onAuthStateChange will handle it
             setTimeout(() => {
-              if (!cancelled) {
-                console.log('⚠️ OAuth wait timed out')
+              if (!cancelled && !user) {
+                console.log('⚠️ OAuth exchange timed out')
+                stripOAuthArtifacts()
                 setLoading(false)
               }
-            }, 10000)
+            }, 8000)
           } else {
             if (!cancelled) {
               setUser(null)
@@ -172,6 +186,7 @@ export function AuthProvider({ children }) {
         }
       } catch (e) {
         console.error('❌ Auth init error:', e)
+        stripOAuthArtifacts()
         if (!cancelled) {
           setUser(null)
           setProfileReady(false)
@@ -221,20 +236,19 @@ export function AuthProvider({ children }) {
 
     console.log('🚀 Starting Google Sign-In...')
 
-    // Determine redirect URL based on environment
-    let redirectTo = window.location.origin
-    try {
-      const configured = import.meta.env.VITE_AUTH_REDIRECT_URL
-      if (configured && configured.trim()) {
-        redirectTo = configured.trim().replace(/\/$/, '')
-      }
-    } catch {}
-
+    // Always use current origin for redirect (works for both localhost and production)
+    const redirectTo = window.location.origin
     console.log('🔗 Redirect URL:', redirectTo)
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo }
+      options: { 
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
+      }
     })
 
     if (error) {

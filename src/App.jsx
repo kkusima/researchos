@@ -84,11 +84,6 @@ function LoginPage() {
           </p>
         )}
 
-        {/* Debug info - remove after fixing */}
-        <p className="mt-2 text-xs text-gray-400">
-          Mode: {demoMode ? 'Demo' : 'Live'} | URL has code: {typeof window !== 'undefined' && window.location.search.includes('code') ? 'Yes' : 'No'}
-        </p>
-
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-400">
             By continuing, you agree to our Terms of Service and Privacy Policy
