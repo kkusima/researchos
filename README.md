@@ -2,7 +2,7 @@
 
 A modern, collaborative research project management application designed for researchers, academics, and teams working on complex projects.
 
-![ResearchOS](https://img.shields.io/badge/version-1.0.1-blue)
+![ResearchOS](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 🔗 **Live App**: [researchos.vercel.app](https://researchos.vercel.app/)
