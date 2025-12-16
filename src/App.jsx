@@ -90,6 +90,10 @@ function LoginPage() {
           </p>
         </div>
       </div>
+      
+      <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
+        © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+      </p>
     </div>
   )
 }
