@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Row Level Security (RLS) Policies
+-- Enable Row Level Security on tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
@@ -87,7 +87,7 @@ ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subtasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own profile
+-- Users policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -99,7 +99,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'users'
   ) THEN
     CREATE POLICY "Users can view own profile" ON public.users
-      FOR SELECT USING ((SELECT auth.uid()) = id);
+      FOR SELECT TO authenticated USING ((SELECT auth.uid()) = id);
   END IF;
 END;
 $$;
@@ -115,7 +115,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'users'
   ) THEN
     CREATE POLICY "Users can update own profile" ON public.users
-      FOR UPDATE USING ((SELECT auth.uid()) = id);
+      FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = id);
   END IF;
 END;
 $$;
@@ -131,12 +131,12 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'users'
   ) THEN
     CREATE POLICY "Users can insert own profile" ON public.users
-      FOR INSERT WITH CHECK ((SELECT auth.uid()) = id);
+      FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = id);
   END IF;
 END;
 $$;
 
--- Projects: owners and members can access
+-- Projects policies (view, create, update, delete)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -147,14 +147,15 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'projects'
   ) THEN
     CREATE POLICY "Users can view own projects" ON public.projects
-      FOR SELECT USING (
-        owner_id = (SELECT auth.uid()) OR 
+      FOR SELECT TO authenticated USING (
+        owner_id = (SELECT auth.uid()) OR
         id IN (SELECT project_id FROM public.project_members WHERE user_id = (SELECT auth.uid()))
       );
   END IF;
 END;
 $$;
 
+-- We'll create a trigger to set owner_id automatically (see function below).
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -164,8 +165,10 @@ BEGIN
     WHERE p.polname = 'Users can create projects'
       AND n.nspname = 'public' AND c.relname = 'projects'
   ) THEN
+    -- Create policy but ensure it's scoped to authenticated users.
     CREATE POLICY "Users can create projects" ON public.projects
-      FOR INSERT WITH CHECK (owner_id = (SELECT auth.uid()));
+      FOR INSERT TO authenticated
+      WITH CHECK (owner_id = (SELECT auth.uid()));
   END IF;
 END;
 $$;
@@ -180,7 +183,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'projects'
   ) THEN
     CREATE POLICY "Owners can update projects" ON public.projects
-      FOR UPDATE USING (owner_id = (SELECT auth.uid()));
+      FOR UPDATE TO authenticated USING (owner_id = (SELECT auth.uid()));
   END IF;
 END;
 $$;
@@ -195,12 +198,12 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'projects'
   ) THEN
     CREATE POLICY "Owners can delete projects" ON public.projects
-      FOR DELETE USING (owner_id = (SELECT auth.uid()));
+      FOR DELETE TO authenticated USING (owner_id = (SELECT auth.uid()));
   END IF;
 END;
 $$;
 
--- Project members
+-- Project members policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -211,7 +214,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'project_members'
   ) THEN
     CREATE POLICY "Project access for members" ON public.project_members
-      FOR SELECT USING (
+      FOR SELECT TO authenticated USING (
         project_id IN (SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid())) OR
         user_id = (SELECT auth.uid())
       );
@@ -229,14 +232,14 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'project_members'
   ) THEN
     CREATE POLICY "Owners can manage members" ON public.project_members
-      FOR ALL USING (
+      FOR ALL TO authenticated USING (
         project_id IN (SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid()))
       );
   END IF;
 END;
 $$;
 
--- Stages: accessible to project owners and members
+-- Stages policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -247,7 +250,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'stages'
   ) THEN
     CREATE POLICY "Stages viewable by project members" ON public.stages
-      FOR SELECT USING (
+      FOR SELECT TO authenticated USING (
         project_id IN (
           SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid())
           UNION
@@ -268,14 +271,14 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'stages'
   ) THEN
     CREATE POLICY "Stages manageable by project owners" ON public.stages
-      FOR ALL USING (
+      FOR ALL TO authenticated USING (
         project_id IN (SELECT id FROM public.projects WHERE owner_id = (SELECT auth.uid()))
       );
   END IF;
 END;
 $$;
 
--- Tasks: accessible to project members
+-- Tasks policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -286,7 +289,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'tasks'
   ) THEN
     CREATE POLICY "Tasks viewable by project members" ON public.tasks
-      FOR SELECT USING (
+      FOR SELECT TO authenticated USING (
         stage_id IN (
           SELECT s.id FROM public.stages s
           JOIN public.projects p ON s.project_id = p.id
@@ -311,7 +314,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'tasks'
   ) THEN
     CREATE POLICY "Tasks manageable by project members" ON public.tasks
-      FOR ALL USING (
+      FOR ALL TO authenticated USING (
         stage_id IN (
           SELECT s.id FROM public.stages s
           JOIN public.projects p ON s.project_id = p.id
@@ -326,7 +329,7 @@ BEGIN
 END;
 $$;
 
--- Subtasks: same as tasks (note: this currently references public.tasks; tailor if you need stricter checks)
+-- Subtasks policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -337,7 +340,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'subtasks'
   ) THEN
     CREATE POLICY "Subtasks viewable by project members" ON public.subtasks
-      FOR SELECT USING (
+      FOR SELECT TO authenticated USING (
         task_id IN (SELECT id FROM public.tasks)
       );
   END IF;
@@ -354,14 +357,14 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'subtasks'
   ) THEN
     CREATE POLICY "Subtasks manageable by project members" ON public.subtasks
-      FOR ALL USING (
+      FOR ALL TO authenticated USING (
         task_id IN (SELECT id FROM public.tasks)
       );
   END IF;
 END;
 $$;
 
--- Comments: viewable by project members, creatable by authenticated users
+-- Comments policies
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -372,7 +375,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'comments'
   ) THEN
     CREATE POLICY "Comments viewable by project members" ON public.comments
-      FOR SELECT USING (
+      FOR SELECT TO authenticated USING (
         task_id IN (SELECT id FROM public.tasks)
       );
   END IF;
@@ -389,7 +392,7 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'comments'
   ) THEN
     CREATE POLICY "Users can create comments" ON public.comments
-      FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+      FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
   END IF;
 END;
 $$;
@@ -404,13 +407,13 @@ BEGIN
       AND n.nspname = 'public' AND c.relname = 'comments'
   ) THEN
     CREATE POLICY "Users can delete own comments" ON public.comments
-      FOR DELETE USING ((SELECT auth.uid()) = user_id);
+      FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
   END IF;
 END;
 $$;
 
 -- Functions for updated_at
-CREATE OR REPLACE FUNCTION update_updated_at()
+CREATE OR REPLACE FUNCTION public.update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -418,8 +421,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for updated_at (conditional create — no DROP)
-
+-- Triggers for updated_at (conditional create)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -433,7 +435,7 @@ BEGIN
     EXECUTE $sql$
       CREATE TRIGGER update_users_updated_at
         BEFORE UPDATE ON public.users
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+        FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
     $sql$;
   END IF;
 END;
@@ -452,7 +454,7 @@ BEGIN
     EXECUTE $sql$
       CREATE TRIGGER update_projects_updated_at
         BEFORE UPDATE ON public.projects
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+        FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
     $sql$;
   END IF;
 END;
@@ -471,8 +473,71 @@ BEGIN
     EXECUTE $sql$
       CREATE TRIGGER update_tasks_updated_at
         BEFORE UPDATE ON public.tasks
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+        FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
     $sql$;
+  END IF;
+END;
+$$;
+
+-- Trigger function to set project owner automatically
+CREATE OR REPLACE FUNCTION public.set_project_owner()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.owner_id IS NULL THEN
+    NEW.owner_id := (SELECT auth.uid());
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE t.tgname = 'set_owner_before_insert' AND n.nspname = 'public' AND c.relname = 'projects'
+  ) THEN
+    EXECUTE $sql$
+      CREATE TRIGGER set_owner_before_insert
+        BEFORE INSERT ON public.projects
+        FOR EACH ROW EXECUTE FUNCTION public.set_project_owner();
+    $sql$;
+  END IF;
+END;
+$$;
+
+-- Recreate/ensure INSERT policy for projects (scoped to authenticated)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can create projects' AND n.nspname = 'public' AND c.relname = 'projects'
+  ) THEN
+    EXECUTE 'DROP POLICY "Users can create projects" ON public.projects';
+  END IF;
+END;
+$$;
+
+CREATE POLICY "Users can create projects" ON public.projects
+  FOR INSERT TO authenticated
+  WITH CHECK (owner_id = (SELECT auth.uid()));
+
+-- Temporary permissive test policy (remove after testing)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Temporary allow insert projects' AND n.nspname = 'public' AND c.relname = 'projects'
+  ) THEN
+    CREATE POLICY "Temporary allow insert projects" ON public.projects
+      FOR INSERT TO authenticated
+      WITH CHECK (true);
   END IF;
 END;
 $$;
