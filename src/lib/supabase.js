@@ -680,5 +680,112 @@ export const db = {
         filter: `project_id=eq.${projectId}` 
       }, callback)
       .subscribe()
+  },
+
+  // Notifications
+  async getNotifications(userId) {
+    if (!supabase) return { data: [], error: null }
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) logError('getNotifications', error)
+      return { data: data || [], error }
+    } catch (error) {
+      logError('getNotifications:catch', error)
+      return { data: [], error }
+    }
+  },
+
+  async createNotification(notification) {
+    if (!supabase) return { data: null, error: null }
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert(notification)
+        .select()
+        .single()
+
+      if (error) logError('createNotification', error)
+      return { data, error }
+    } catch (error) {
+      logError('createNotification:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  async markNotificationRead(id) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id)
+
+      if (error) logError('markNotificationRead', error)
+      return { error }
+    } catch (error) {
+      logError('markNotificationRead:catch', error)
+      return { error }
+    }
+  },
+
+  async markAllNotificationsRead(userId) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+
+      if (error) logError('markAllNotificationsRead', error)
+      return { error }
+    } catch (error) {
+      logError('markAllNotificationsRead:catch', error)
+      return { error }
+    }
+  },
+
+  async deleteNotification(id) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id)
+
+      if (error) logError('deleteNotification', error)
+      return { error }
+    } catch (error) {
+      logError('deleteNotification:catch', error)
+      return { error }
+    }
+  },
+
+  async clearAllNotifications(userId) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
+
+      if (error) logError('clearAllNotifications', error)
+      return { error }
+    } catch (error) {
+      logError('clearAllNotifications:catch', error)
+      return { error }
+    }
   }
 }

@@ -5,7 +5,7 @@ import {
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
-  LayoutGrid, List
+  LayoutGrid, List, Bell, Calendar, AlertCircle
 } from 'lucide-react'
 
 // App Context
@@ -24,6 +24,45 @@ const STORAGE_KEY = 'researchos_local'
 // Helpers
 const uuid = () => crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
 const getProgress = (p) => p.stages?.length ? (p.current_stage_index + 1) / p.stages.length : 0
+
+// Check if a task/subtask is overdue
+const isOverdue = (reminderDate) => {
+  if (!reminderDate) return false
+  return new Date(reminderDate) < new Date()
+}
+
+// Format date for input field
+const formatDateForInput = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm format
+}
+
+// Format reminder date for display
+const formatReminderDate = (dateString) => {
+  if (!dateString) return null
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = date - now
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMs < 0) {
+    // Overdue
+    const absDays = Math.abs(diffDays)
+    const absHours = Math.abs(diffHours)
+    if (absDays >= 1) return `${absDays}d overdue`
+    if (absHours >= 1) return `${absHours}h overdue`
+    return 'Overdue'
+  }
+  
+  if (diffMins < 60) return `in ${diffMins}m`
+  if (diffHours < 24) return `in ${diffHours}h`
+  if (diffDays < 7) return `in ${diffDays}d`
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 // Format relative date (e.g., "2h ago", "3d ago", "Jan 5")
 const formatRelativeDate = (dateString) => {
@@ -505,6 +544,184 @@ function GlobalSearch({ projects, onNavigate }) {
 }
 
 // ============================================
+// NOTIFICATION PANE
+// ============================================
+function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, onClear, onNavigate, onClose }) {
+  const unreadCount = notifications.filter(n => !n.is_read).length
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'task_reminder':
+      case 'subtask_reminder':
+        return <Clock className="w-4 h-4 text-amber-500" />
+      case 'project_shared':
+      case 'project_invite':
+        return <Users className="w-4 h-4 text-blue-500" />
+      default:
+        return <Bell className="w-4 h-4 text-gray-500" />
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[70vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Notifications</h3>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={onMarkAllRead}
+                className="text-xs text-brand-600 hover:text-brand-700"
+              >
+                Mark all read
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                onClick={onClear}
+                className="text-xs text-gray-400 hover:text-red-500"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No notifications yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {notifications.map(notif => (
+                <div
+                  key={notif.id}
+                  className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer ${
+                    !notif.is_read ? 'bg-blue-50/50' : ''
+                  }`}
+                  onClick={() => {
+                    if (!notif.is_read) onMarkRead(notif.id)
+                    if (notif.project_id) onNavigate(notif)
+                  }}
+                >
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(notif.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${!notif.is_read ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                        {notif.title}
+                      </p>
+                      {notif.message && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{notif.message}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {formatRelativeDate(notif.created_at)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
+                      className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ============================================
+// REMINDER DATE PICKER
+// ============================================
+function ReminderPicker({ value, onChange, compact = false }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const hasReminder = !!value
+  const overdue = isOverdue(value)
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
+          overdue 
+            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+            : hasReminder 
+              ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' 
+              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+        }`}
+        title={hasReminder ? `Reminder: ${new Date(value).toLocaleString()}` : 'Set reminder'}
+      >
+        {overdue ? <AlertCircle className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
+        {!compact && (
+          <span>{hasReminder ? formatReminderDate(value) : 'Remind'}</span>
+        )}
+      </button>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
+          <div 
+            className="absolute top-full left-0 mt-1 glass-card rounded-lg shadow-lg z-50 p-3 min-w-[200px] animate-fade-in"
+            onClick={e => e.stopPropagation()}
+          >
+            <label className="block text-xs font-medium text-gray-700 mb-2">Set Reminder</label>
+            <input
+              type="datetime-local"
+              value={formatDateForInput(value)}
+              onChange={(e) => {
+                onChange(e.target.value ? new Date(e.target.value).toISOString() : null)
+              }}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+            />
+            {hasReminder && (
+              <button
+                onClick={() => { onChange(null); setIsOpen(false); }}
+                className="mt-2 w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                Remove reminder
+              </button>
+            )}
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400">Quick set:</p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {[
+                  { label: '1h', hours: 1 },
+                  { label: '3h', hours: 3 },
+                  { label: 'Tomorrow', hours: 24 },
+                  { label: '1 week', hours: 168 }
+                ].map(opt => (
+                  <button
+                    key={opt.label}
+                    onClick={() => {
+                      const date = new Date()
+                      date.setHours(date.getHours() + opt.hours)
+                      onChange(date.toISOString())
+                      setIsOpen(false)
+                    }}
+                    className="px-2 py-1 text-[10px] bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================
 // PROFILE SETTINGS MODAL
 // ============================================
 function ProfileSettingsModal({ onClose }) {
@@ -764,81 +981,116 @@ function ProfileSettingsModal({ onClose }) {
 // ============================================
 // HEADER
 // ============================================
-function Header({ projects, onSearchNavigate }) {
+function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkAllNotificationsRead, onDeleteNotification, onClearAllNotifications, onNotificationNavigate }) {
   const { user, signOut, demoMode, isEmailAuth } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
+  const unreadCount = notifications?.filter(n => !n.is_read).length || 0
 
   return (
     <>
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 gap-4">
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
+          <div className="flex justify-between items-center h-16 gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
                 🔬
               </div>
-              <span className="font-bold text-xl text-gray-900 hidden sm:block">ResearchOS</span>
+              <span className="font-bold text-lg sm:text-xl text-gray-900 hidden sm:block">ResearchOS</span>
               {demoMode && (
-                <span className="tag tag-warning text-[10px]">DEMO</span>
+                <span className="tag tag-warning text-[10px] hidden sm:inline-flex">DEMO</span>
               )}
             </div>
 
             {/* Global Search */}
             <GlobalSearch projects={projects} onNavigate={onSearchNavigate} />
 
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={userName} className="w-8 h-8 rounded-full" />
-                ) : (
-                  <div className="avatar text-sm">{userName[0]?.toUpperCase()}</div>
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              {/* Notifications Bell */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors relative"
+                >
+                  <Bell className="w-5 h-5 text-gray-500" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                
+                {showNotifications && (
+                  <NotificationPane
+                    notifications={notifications || []}
+                    onMarkRead={onMarkNotificationRead}
+                    onMarkAllRead={onMarkAllNotificationsRead}
+                    onDelete={onDeleteNotification}
+                    onClear={onClearAllNotifications}
+                    onNavigate={(notif) => {
+                      setShowNotifications(false)
+                      onNotificationNavigate(notif)
+                    }}
+                    onClose={() => setShowNotifications(false)}
+                  />
                 )}
-                <span className="font-medium text-gray-700 hidden sm:block">{userName}</span>
-              </button>
+              </div>
 
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-lg z-50 py-2 animate-fade-in">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{userName}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      {!isEmailAuth() && (
-                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                          <svg className="w-3 h-3" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                          </svg>
-                          Signed in with Google
-                        </p>
-                      )}
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="flex items-center gap-2 sm:gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={userName} className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <div className="avatar text-sm">{userName[0]?.toUpperCase()}</div>
+                  )}
+                  <span className="font-medium text-gray-700 hidden md:block">{userName}</span>
+                </button>
+
+                {showMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-lg z-50 py-2 animate-fade-in">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{userName}</p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        {!isEmailAuth() && (
+                          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24">
+                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            Signed in with Google
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { setShowMenu(false); setShowSettings(true); }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Account Settings
+                      </button>
+                      <button
+                        onClick={signOut}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign out
+                      </button>
                     </div>
-                    <button
-                      onClick={() => { setShowMenu(false); setShowSettings(true); }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Account Settings
-                    </button>
-                    <button
-                      onClick={signOut}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign out
-                    </button>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1060,15 +1312,25 @@ function ProjectsView() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Projects</h1>
-          <p className="text-gray-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="flex flex-col gap-4 mb-6 sm:mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">My Projects</h1>
+            <p className="text-gray-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap text-sm sm:text-base px-3 sm:px-6 py-2 sm:py-3">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">New Project</span>
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        
+        {/* Controls row - scrollable on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
           {/* View Toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 flex-shrink-0">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-md transition-colors ${
@@ -1088,12 +1350,14 @@ function ProjectsView() {
               <List className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex items-center gap-1">
+          
+          {/* Sort options */}
+          <div className="flex items-center gap-1 flex-shrink-0">
             {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
               <button
                 key={opt.key}
                 onClick={() => handleSortChange(opt.key)}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
                   sortOption === opt.key
                     ? 'bg-gray-200 text-gray-900 font-medium'
                     : 'text-gray-600 hover:bg-gray-100'
@@ -1106,22 +1370,19 @@ function ProjectsView() {
               </button>
             ))}
           </div>
-          <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
+          
+          <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap flex-shrink-0 text-sm px-3 py-2">
             <MoreVertical className="w-4 h-4" />
             <span className="hidden sm:inline">Reorder</span>
-          </button>
-          <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Project</span>
           </button>
         </div>
       </div>
 
       {sortedProjects.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center">
-          <div className="text-6xl mb-4">🔬</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">No projects yet</h2>
-          <p className="text-gray-500 mb-6">Create your first research project to get started</p>
+        <div className="glass-card rounded-2xl p-8 sm:p-12 text-center">
+          <div className="text-5xl sm:text-6xl mb-4">🔬</div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">No projects yet</h2>
+          <p className="text-gray-500 mb-6 text-sm sm:text-base">Create your first research project to get started</p>
           <button onClick={() => setShowCreate(true)} className="btn-gradient">
             Create Project
           </button>
@@ -1268,9 +1529,11 @@ function PriorityBadge({ rank }) {
 // PROJECT CARD (Grid View)
 // ============================================
 function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
+  const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
+  const isShared = project.owner_id !== user?.id
 
   return (
     <div
@@ -1279,15 +1542,21 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
       onClick={onSelect}
     >
       {/* Priority Badge */}
-      <div className="absolute top-3 left-3">
+      <div className="absolute top-3 left-3 flex items-center gap-2">
         <PriorityBadge rank={project.priority_rank} />
+        {isShared && (
+          <span className="tag bg-blue-100 text-blue-600 text-[9px]">
+            <Share2 className="w-2.5 h-2.5 mr-0.5" />
+            Shared
+          </span>
+        )}
       </div>
       
-      <div className="flex items-start gap-4 mb-4 mt-4">
+      <div className="flex items-start gap-4 mb-4 mt-6">
         <span className="text-4xl">{project.emoji}</span>
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-lg text-gray-900 truncate">{project.title}</h3>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="tag tag-default">{currentStage?.name || 'No stage'}</span>
             {project.project_members?.length > 0 && (
               <span className="tag tag-primary flex items-center gap-1">
@@ -1358,43 +1627,56 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
 // PROJECT LIST ITEM (List View)
 // ============================================
 function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
+  const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
   const totalStages = project.stages?.length || 0
   const completedStages = project.current_stage_index || 0
+  const isShared = project.owner_id !== user?.id
 
   return (
     <div
-      className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative animate-fade-in overflow-visible"
+      className="glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer relative animate-fade-in overflow-visible"
       style={{ animationDelay: `${index * 30}ms` }}
       onClick={onSelect}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Priority Badge */}
         <PriorityBadge rank={project.priority_rank} />
         
         {/* Emoji */}
-        <span className="text-2xl flex-shrink-0">{project.emoji}</span>
+        <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
         
         {/* Title and Stage - Takes most space */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900">{project.title}</h3>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-gray-900 truncate">{project.title}</h3>
+            {isShared && (
+              <span className="tag bg-blue-100 text-blue-600 text-[9px] hidden sm:inline-flex">
+                <Share2 className="w-2.5 h-2.5 mr-0.5" />
+                Shared
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-xs text-gray-500">{currentStage?.name || 'No stage'}</span>
+            {isShared && (
+              <span className="text-[9px] text-blue-500 sm:hidden">Shared</span>
+            )}
             {project.project_members?.length > 0 && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Users className="w-3 h-3" />
                 {project.project_members.length + 1}
               </span>
             )}
-            <span className="text-[10px] text-gray-300">•</span>
+            <span className="text-[10px] text-gray-300 hidden sm:inline">•</span>
             {project.updated_at ? (
-              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
                 {formatRelativeDate(project.updated_at)}
               </span>
             ) : project.created_at && (
-              <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
                 {formatRelativeDate(project.created_at)}
               </span>
             )}
@@ -1404,7 +1686,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
         {/* Progress - Compact display */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Stage Progress Dots */}
-          <div className="hidden sm:flex items-center gap-1" title={`Stage ${completedStages + 1} of ${totalStages}`}>
+          <div className="hidden lg:flex items-center gap-1" title={`Stage ${completedStages + 1} of ${totalStages}`}>
             {project.stages?.slice(0, 7).map((stage, i) => (
               <div
                 key={stage.id}
@@ -1424,7 +1706,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
           </div>
           
           {/* Percentage */}
-          <div className="flex items-center gap-2 min-w-[60px]">
+          <div className="hidden sm:flex items-center gap-2 min-w-[60px]">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
@@ -1726,6 +2008,7 @@ function ProjectDetail() {
   const stageIndex = previewIndex ?? currentStageIndex
   const stage = project.stages?.[stageIndex]
   const progress = getProgress(project)
+  const isShared = project.owner_id !== user?.id
 
   const updateProject = (updated) => {
     const newProjects = projects.map(p => p.id === updated.id ? updated : p)
@@ -1810,28 +2093,70 @@ function ProjectDetail() {
     }
   }
 
+  const updateTaskReminder = async (taskId, reminderDate) => {
+    const now = new Date().toISOString()
+    const updated = {
+      ...project,
+      stages: project.stages.map((s, i) => 
+        i === stageIndex 
+          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, reminder_date: reminderDate, updated_at: now } : t) }
+          : s
+      )
+    }
+    updateProject(updated)
+
+    if (!demoMode) {
+      await db.updateTask(taskId, { reminder_date: reminderDate })
+    }
+  }
+
+  // Sort tasks: overdue first, then by reminder date, then others
+  const sortedTasks = [...(stage?.tasks || [])].sort((a, b) => {
+    const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
+    const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
+    
+    if (aOverdue && !bOverdue) return -1
+    if (!aOverdue && bOverdue) return 1
+    
+    if (a.reminder_date && b.reminder_date) {
+      return new Date(a.reminder_date) - new Date(b.reminder_date)
+    }
+    if (a.reminder_date) return -1
+    if (b.reminder_date) return 1
+    
+    return 0
+  })
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button 
               onClick={() => { setView('main'); setSelectedProject(null); }}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-4xl">{project.emoji}</span>
+            <span className="text-2xl sm:text-4xl">{project.emoji}</span>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-gray-900 truncate">{project.title}</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="tag tag-default">{project.stages?.[currentStageIndex]?.name}</span>
-                <span className="text-sm text-gray-500">{Math.round(progress * 100)}% complete</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{project.title}</h1>
+                {isShared && (
+                  <span className="tag bg-blue-100 text-blue-600 text-[9px]">
+                    <Share2 className="w-2.5 h-2.5 mr-0.5" />
+                    Shared
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="tag tag-default text-[10px] sm:text-[11px]">{project.stages?.[currentStageIndex]?.name}</span>
+                <span className="text-xs sm:text-sm text-gray-500">{Math.round(progress * 100)}% complete</span>
               </div>
             </div>
             {/* Timestamps */}
-            <div className="hidden sm:flex flex-col items-end text-[10px] text-gray-400 mr-2">
+            <div className="hidden md:flex flex-col items-end text-[10px] text-gray-400 mr-2">
               {project.created_at && (
                 <span title={new Date(project.created_at).toLocaleString()}>
                   Created {formatRelativeDate(project.created_at)}
@@ -1891,28 +2216,28 @@ function ProjectDetail() {
       </div>
 
       {/* Tasks */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="mb-4 sm:mb-6">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Tasks for {stage?.name}
           </h2>
         </div>
 
         {/* Add Task Input */}
-        <div className="glass-card rounded-xl p-4 mb-6 flex items-center gap-3">
-          <Plus className="w-5 h-5 text-gray-400" />
+        <div className="glass-card rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+          <Plus className="w-5 h-5 text-gray-400 flex-shrink-0" />
           <input
             type="text"
             placeholder="Add a new task..."
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addTask()}
-            className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-400"
+            className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-400 min-w-0"
           />
           <button
             onClick={addTask}
             disabled={!newTask.trim()}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white disabled:opacity-30"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}
           >
             <Plus className="w-4 h-4" />
@@ -1921,70 +2246,76 @@ function ProjectDetail() {
 
         {/* Task List */}
         <div className="space-y-3">
-          {!stage?.tasks?.length ? (
+          {sortedTasks.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               No tasks yet. Add one above!
             </div>
           ) : (
-            stage.tasks.map((task, i) => (
-              <div
-                key={task.id}
-                className="glass-card glass-card-hover rounded-xl p-4 animate-fade-in"
-                style={{ animationDelay: `${i * 30}ms` }}
-              >
-                <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => toggleTask(task.id)}
-                    className={`checkbox-custom mt-0.5 ${task.is_completed ? 'checked' : ''}`}
-                  >
-                    {task.is_completed && <Check className="w-3 h-3" />}
-                  </button>
-                  <div 
-                    className="flex-1 cursor-pointer"
-                    onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
-                  >
-                    <div className={`font-medium ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      {task.title}
+            sortedTasks.map((task, i) => {
+              const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
+              return (
+                <div
+                  key={task.id}
+                  className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 animate-fade-in transition-all ${
+                    taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
+                  }`}
+                  style={{ animationDelay: `${i * 30}ms` }}
+                >
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <button
+                      onClick={() => toggleTask(task.id)}
+                      className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
+                    >
+                      {task.is_completed && <Check className="w-3 h-3" />}
+                    </button>
+                    <div 
+                      className="flex-1 cursor-pointer min-w-0"
+                      onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
+                    >
+                      <div className={`font-medium ${task.is_completed ? 'line-through text-gray-400' : taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>
+                        {task.title}
+                      </div>
+                      <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+                        {task.subtasks?.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            {task.subtasks.filter(s => s.is_completed).length}/{task.subtasks.length}
+                          </span>
+                        )}
+                        {task.comments?.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" />
+                            {task.comments.length}
+                          </span>
+                        )}
+                        {task.updated_at ? (
+                          <span className="text-gray-300 hidden sm:inline" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
+                            {formatRelativeDate(task.updated_at)}
+                          </span>
+                        ) : task.created_at && (
+                          <span className="text-gray-300 hidden sm:inline" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
+                            {formatRelativeDate(task.created_at)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
-                      {task.subtasks?.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <FileText className="w-3 h-3" />
-                          {task.subtasks.filter(s => s.is_completed).length}/{task.subtasks.length}
-                        </span>
-                      )}
-                      {task.comments?.length > 0 && (
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" />
-                          {task.comments.length}
-                        </span>
-                      )}
-                      {task.reminder_date && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(task.reminder_date).toLocaleDateString()}
-                        </span>
-                      )}
-                      {task.updated_at ? (
-                        <span className="text-gray-300" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
-                          {formatRelativeDate(task.updated_at)}
-                        </span>
-                      ) : task.created_at && (
-                        <span className="text-gray-300" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
-                          {formatRelativeDate(task.created_at)}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <ReminderPicker
+                        value={task.reminder_date}
+                        onChange={(date) => updateTaskReminder(task.id, date)}
+                        compact
+                      />
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>
@@ -2515,6 +2846,8 @@ function TaskDetail() {
   const currentTask = project.stages[stageIndex]?.tasks?.find(t => t.id === task.id)
   if (!currentTask) return null
 
+  const taskOverdue = isOverdue(currentTask.reminder_date) && !currentTask.is_completed
+
   const updateTask = (updates) => {
     const now = new Date().toISOString()
     const updated = {
@@ -2531,9 +2864,16 @@ function TaskDetail() {
     if (demoMode) saveLocal(newProjects)
   }
 
+  const updateTaskReminder = async (reminderDate) => {
+    updateTask({ reminder_date: reminderDate })
+    if (!demoMode) {
+      await db.updateTask(task.id, { reminder_date: reminderDate })
+    }
+  }
+
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
-    const subtask = { id: uuid(), title: newSubtask.trim(), is_completed: false }
+    const subtask = { id: uuid(), title: newSubtask.trim(), is_completed: false, reminder_date: null }
     updateTask({ subtasks: [...(currentTask.subtasks || []), subtask] })
     setNewSubtask('')
 
@@ -2552,6 +2892,18 @@ function TaskDetail() {
 
     if (!demoMode) {
       await db.updateSubtask(subtaskId, { is_completed: !subtask.is_completed })
+    }
+  }
+
+  const updateSubtaskReminder = async (subtaskId, reminderDate) => {
+    updateTask({
+      subtasks: currentTask.subtasks.map(s => 
+        s.id === subtaskId ? { ...s, reminder_date: reminderDate } : s
+      )
+    })
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
     }
   }
 
@@ -2592,47 +2944,61 @@ function TaskDetail() {
     setView('project')
   }
 
+  // Sort subtasks: overdue first
+  const sortedSubtasks = [...(currentTask.subtasks || [])].sort((a, b) => {
+    const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
+    const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
+    
+    if (aOverdue && !bOverdue) return -1
+    if (!aOverdue && bOverdue) return 1
+    return 0
+  })
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
       <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-3xl mx-auto px-4 py-4">
+        <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <button 
             onClick={() => { setSelectedTask(null); setView('project'); }}
             className="flex items-center gap-2 text-gray-500 hover:text-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span className="text-sm font-medium">Back to {project.title}</span>
+            <span className="text-sm font-medium truncate">Back to {project.title}</span>
           </button>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
         {/* Task Header */}
-        <div className="flex items-start gap-4">
+        <div className={`flex items-start gap-3 sm:gap-4 p-4 rounded-xl ${taskOverdue ? 'bg-red-50 border border-red-200' : ''}`}>
           <button
             onClick={() => updateTask({ is_completed: !currentTask.is_completed })}
-            className={`checkbox-custom mt-1 ${currentTask.is_completed ? 'checked' : ''}`}
+            className={`checkbox-custom mt-1 flex-shrink-0 ${currentTask.is_completed ? 'checked' : ''}`}
             style={{ width: 28, height: 28 }}
           >
             {currentTask.is_completed && <Check className="w-4 h-4" />}
           </button>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <input
               type="text"
               value={currentTask.title}
               onChange={e => updateTask({ title: e.target.value })}
-              className="w-full text-2xl font-bold bg-transparent outline-none"
+              className={`w-full text-xl sm:text-2xl font-bold bg-transparent outline-none ${taskOverdue ? 'text-red-700' : ''}`}
             />
-            {/* Timestamps */}
-            <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+            {/* Timestamps and Reminder */}
+            <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+              <ReminderPicker
+                value={currentTask.reminder_date}
+                onChange={updateTaskReminder}
+              />
               {currentTask.created_at && (
-                <span className="flex items-center gap-1" title={new Date(currentTask.created_at).toLocaleString()}>
+                <span className="flex items-center gap-1 hidden sm:flex" title={new Date(currentTask.created_at).toLocaleString()}>
                   <Clock className="w-3 h-3" />
                   Created {formatRelativeDate(currentTask.created_at)}
                 </span>
               )}
               {currentTask.updated_at && currentTask.updated_at !== currentTask.created_at && (
-                <span title={new Date(currentTask.updated_at).toLocaleString()}>
+                <span className="hidden sm:inline" title={new Date(currentTask.updated_at).toLocaleString()}>
                   • Modified {formatRelativeDate(currentTask.updated_at)}
                 </span>
               )}
@@ -2641,7 +3007,7 @@ function TaskDetail() {
         </div>
 
         {/* Description */}
-        <div className="glass-card rounded-xl p-5">
+        <div className="glass-card rounded-xl p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Description</h3>
           <textarea
             value={currentTask.description || ''}
@@ -2652,26 +3018,39 @@ function TaskDetail() {
         </div>
 
         {/* Subtasks */}
-        <div className="glass-card rounded-xl p-5">
+        <div className="glass-card rounded-xl p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Subtasks</h3>
           <div className="space-y-2 mb-4">
-            {currentTask.subtasks?.map(s => (
-              <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <button
-                  onClick={() => toggleSubtask(s.id)}
-                  className={`checkbox-custom ${s.is_completed ? 'checked' : ''}`}
-                  style={{ width: 20, height: 20 }}
+            {sortedSubtasks.map(s => {
+              const subtaskOverdue = isOverdue(s.reminder_date) && !s.is_completed
+              return (
+                <div 
+                  key={s.id} 
+                  className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors ${
+                    subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
+                  }`}
                 >
-                  {s.is_completed && <Check className="w-3 h-3" />}
-                </button>
-                <span className={`flex-1 text-sm ${s.is_completed ? 'line-through text-gray-400' : ''}`}>
-                  {s.title}
-                </span>
-                <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => toggleSubtask(s.id)}
+                    className={`checkbox-custom flex-shrink-0 ${s.is_completed ? 'checked' : ''}`}
+                    style={{ width: 20, height: 20 }}
+                  >
+                    {s.is_completed && <Check className="w-3 h-3" />}
+                  </button>
+                  <span className={`flex-1 text-sm min-w-0 ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : ''}`}>
+                    {s.title}
+                  </span>
+                  <ReminderPicker
+                    value={s.reminder_date}
+                    onChange={(date) => updateSubtaskReminder(s.id, date)}
+                    compact
+                  />
+                  <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
           <div className="flex gap-2">
             <input
@@ -2756,34 +3135,39 @@ function AllTasksView() {
     })
   })
 
-  // Sort tasks based on selected option and direction
+  // Sort tasks: overdue first, then by selected option
   const dir = sortDirection === 'asc' ? 1 : -1
-  if (sortOption === 'priority') {
-    allTasks.sort((a, b) => (a.project.priority_rank - b.project.priority_rank) * dir)
-  } else if (sortOption === 'created') {
-    allTasks.sort((a, b) => {
+  allTasks.sort((a, b) => {
+    const aOverdue = isOverdue(a.task.reminder_date) && !a.task.is_completed
+    const bOverdue = isOverdue(b.task.reminder_date) && !b.task.is_completed
+    
+    if (aOverdue && !bOverdue) return -1
+    if (!aOverdue && bOverdue) return 1
+    
+    if (sortOption === 'priority') {
+      return (a.project.priority_rank - b.project.priority_rank) * dir
+    } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
       return (dateA - dateB) * dir
-    })
-  } else if (sortOption === 'modified') {
-    allTasks.sort((a, b) => {
+    } else if (sortOption === 'modified') {
       const dateA = new Date(a.task.updated_at || a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.updated_at || b.task.created_at || 0).getTime()
       return (dateA - dateB) * dir
-    })
-  }
+    }
+    return 0
+  })
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">All Tasks</h1>
-        <div className="flex items-center gap-1">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">All Tasks</h1>
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 w-full sm:w-auto">
           {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
             <button
               key={opt.key}
               onClick={() => handleSortChange(opt.key)}
-              className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+              className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
                 sortOption === opt.key
                   ? 'bg-gray-200 text-gray-900 font-medium'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -2799,36 +3183,48 @@ function AllTasksView() {
       </div>
 
       {allTasks.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center">
-          <div className="text-5xl mb-4">📋</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">No tasks yet</h2>
-          <p className="text-gray-500">Create a project and add some tasks!</p>
+        <div className="glass-card rounded-2xl p-8 sm:p-12 text-center">
+          <div className="text-4xl sm:text-5xl mb-4">📋</div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">No tasks yet</h2>
+          <p className="text-gray-500 text-sm sm:text-base">Create a project and add some tasks!</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {allTasks.map(({ project, stage, stageIndex, task }, i) => (
-            <div
-              key={`${project.id}-${task.id}`}
-              className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer animate-fade-in"
-              style={{ animationDelay: `${i * 30}ms` }}
-              onClick={() => {
-                setSelectedProject(project)
-                setSelectedTask({ task, stageIndex })
-                setView('task')
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <span className="text-3xl">{project.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 truncate">{task.title}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-gray-500">{project.title}</span>
-                    <span className="tag tag-default text-[10px]">{stage.name}</span>
+          {allTasks.map(({ project, stage, stageIndex, task }, i) => {
+            const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
+            return (
+              <div
+                key={`${project.id}-${task.id}`}
+                className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer animate-fade-in ${
+                  taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
+                }`}
+                style={{ animationDelay: `${i * 30}ms` }}
+                onClick={() => {
+                  setSelectedProject(project)
+                  setSelectedTask({ task, stageIndex })
+                  setView('task')
+                }}
+              >
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <span className="text-2xl sm:text-3xl">{project.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className={`font-medium truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs sm:text-sm text-gray-500 truncate">{project.title}</span>
+                      <span className="tag tag-default text-[9px] sm:text-[10px]">{stage.name}</span>
+                      {task.reminder_date && (
+                        <span className={`text-[10px] flex items-center gap-0.5 ${taskOverdue ? 'text-red-600' : 'text-amber-600'}`}>
+                          <Clock className="w-3 h-3" />
+                          {formatReminderDate(task.reminder_date)}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
               </div>
-            </div>
+            )
+          })}
           ))}
         </div>
       )}
@@ -2847,6 +3243,89 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('projects')
   const [view, setView] = useState('main')
   const [loading, setLoading] = useState(true)
+  const [notifications, setNotifications] = useState([])
+
+  // Load notifications
+  const loadNotifications = async () => {
+    if (demoMode) {
+      // Load from localStorage for demo
+      try {
+        const stored = localStorage.getItem('researchos_notifications')
+        setNotifications(stored ? JSON.parse(stored) : [])
+      } catch {
+        setNotifications([])
+      }
+      return
+    }
+
+    if (user) {
+      const { data } = await db.getNotifications(user.id)
+      setNotifications(data || [])
+    }
+  }
+
+  // Notification handlers
+  const handleMarkNotificationRead = async (id) => {
+    if (demoMode) {
+      const updated = notifications.map(n => n.id === id ? { ...n, is_read: true } : n)
+      setNotifications(updated)
+      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+    } else {
+      await db.markNotificationRead(id)
+      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n))
+    }
+  }
+
+  const handleMarkAllNotificationsRead = async () => {
+    if (demoMode) {
+      const updated = notifications.map(n => ({ ...n, is_read: true }))
+      setNotifications(updated)
+      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+    } else {
+      await db.markAllNotificationsRead(user.id)
+      setNotifications(notifications.map(n => ({ ...n, is_read: true })))
+    }
+  }
+
+  const handleDeleteNotification = async (id) => {
+    if (demoMode) {
+      const updated = notifications.filter(n => n.id !== id)
+      setNotifications(updated)
+      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+    } else {
+      await db.deleteNotification(id)
+      setNotifications(notifications.filter(n => n.id !== id))
+    }
+  }
+
+  const handleClearAllNotifications = async () => {
+    if (demoMode) {
+      setNotifications([])
+      localStorage.setItem('researchos_notifications', JSON.stringify([]))
+    } else {
+      await db.clearAllNotifications(user.id)
+      setNotifications([])
+    }
+  }
+
+  const handleNotificationNavigate = (notif) => {
+    const project = projects.find(p => p.id === notif.project_id)
+    if (project) {
+      setSelectedProject(project)
+      if (notif.task_id) {
+        // Find the task and its stage index
+        for (let si = 0; si < project.stages?.length; si++) {
+          const task = project.stages[si].tasks?.find(t => t.id === notif.task_id)
+          if (task) {
+            setSelectedTask({ task, stageIndex: si })
+            setView('task')
+            return
+          }
+        }
+      }
+      setView('project')
+    }
+  }
 
   // Reload projects function
   const reloadProjects = async () => {
@@ -2869,20 +3348,36 @@ export default function App() {
     const handleInvitationAccepted = (e) => {
       console.log('🎉 Invitation accepted, reloading projects...', e.detail)
       reloadProjects()
+      // Add notification for the shared project
+      if (demoMode && e.detail?.projectId) {
+        const newNotif = {
+          id: uuid(),
+          type: 'project_shared',
+          title: 'You were added to a project',
+          message: `You now have access to a shared project`,
+          project_id: e.detail.projectId,
+          is_read: false,
+          created_at: new Date().toISOString()
+        }
+        const updated = [newNotif, ...notifications]
+        setNotifications(updated)
+        localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      }
     }
 
     window.addEventListener('invitation-accepted', handleInvitationAccepted)
     return () => window.removeEventListener('invitation-accepted', handleInvitationAccepted)
-  }, [user, demoMode])
+  }, [user, demoMode, notifications])
 
-  // Load projects
+  // Load projects and notifications
   useEffect(() => {
     if (authLoading) return
 
-    const loadProjects = async () => {
+    const loadData = async () => {
       if (demoMode) {
         const local = loadLocal()
         setProjects(local)
+        loadNotifications()
         setLoading(false)
         return
       }
@@ -2892,11 +3387,12 @@ export default function App() {
         if (!error && data) {
           setProjects(data)
         }
+        loadNotifications()
       }
       setLoading(false)
     }
 
-    loadProjects()
+    loadData()
   }, [user, authLoading, demoMode])
 
   const reorderProjects = (updatedProjects) => {
@@ -2951,7 +3447,16 @@ export default function App() {
       <div className="min-h-screen pb-8">
         {view === 'main' && (
           <>
-            <Header projects={projects} onSearchNavigate={handleSearchNavigate} />
+            <Header 
+              projects={projects} 
+              onSearchNavigate={handleSearchNavigate}
+              notifications={notifications}
+              onMarkNotificationRead={handleMarkNotificationRead}
+              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+              onDeleteNotification={handleDeleteNotification}
+              onClearAllNotifications={handleClearAllNotifications}
+              onNotificationNavigate={handleNotificationNavigate}
+            />
             <TabNav tab={activeTab} setTab={setActiveTab} />
             {activeTab === 'projects' ? <ProjectsView /> : <AllTasksView />}
           </>
