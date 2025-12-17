@@ -939,6 +939,82 @@ function ProjectsView() {
     }
   }
 
+  const duplicateProject = async (projectToDuplicate) => {
+    // Create new IDs for the duplicated project and its stages/tasks
+    const newProjectId = uuid()
+    const newPriorityRank = projects.length + 1
+    
+    const duplicatedProject = {
+      ...projectToDuplicate,
+      id: newProjectId,
+      title: `${projectToDuplicate.title} (Copy)`,
+      priority_rank: newPriorityRank,
+      created_at: new Date().toISOString(),
+      owner_id: user?.id || 'demo',
+      project_members: [],
+      stages: projectToDuplicate.stages?.map(stage => ({
+        ...stage,
+        id: uuid(),
+        tasks: stage.tasks?.map(task => ({
+          ...task,
+          id: uuid(),
+          created_at: new Date().toISOString(),
+          subtasks: task.subtasks?.map(st => ({ ...st, id: uuid() })) || [],
+          comments: []
+        })) || []
+      })) || []
+    }
+
+    if (demoMode) {
+      setProjects([...projects, duplicatedProject])
+      saveLocal([...projects, duplicatedProject])
+    } else {
+      // Create project in Supabase
+      const { data: createdProject, error: projectError } = await db.createProject({
+        title: duplicatedProject.title,
+        emoji: duplicatedProject.emoji,
+        priority_rank: duplicatedProject.priority_rank,
+        current_stage_index: duplicatedProject.current_stage_index,
+        owner_id: user.id
+      })
+
+      if (projectError || !createdProject) {
+        console.error('Failed to duplicate project:', projectError)
+        return
+      }
+
+      // Create stages and tasks
+      for (const stage of duplicatedProject.stages) {
+        const { data: createdStage, error: stageError } = await db.createStage({
+          project_id: createdProject.id,
+          name: stage.name,
+          order_index: stage.order_index
+        })
+
+        if (stageError || !createdStage) {
+          console.error('Failed to create stage:', stageError)
+          continue
+        }
+
+        // Create tasks for this stage
+        for (const task of stage.tasks || []) {
+          await db.createTask({
+            stage_id: createdStage.id,
+            title: task.title,
+            description: task.description || '',
+            is_completed: task.is_completed || false,
+            reminder_date: task.reminder_date,
+            order_index: task.order_index || 0
+          })
+        }
+      }
+
+      // Refresh projects list
+      const { data: refreshed } = await db.getProjects(user.id)
+      if (refreshed) setProjects(refreshed)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -1023,6 +1099,7 @@ function ProjectsView() {
               index={i}
               onSelect={() => { setSelectedProject(project); setView('project'); }}
               onDelete={() => deleteProject(project.id)}
+              onDuplicate={() => duplicateProject(project)}
             />
           ))}
         </div>
@@ -1035,6 +1112,7 @@ function ProjectsView() {
               index={i}
               onSelect={() => { setSelectedProject(project); setView('project'); }}
               onDelete={() => deleteProject(project.id)}
+              onDuplicate={() => duplicateProject(project)}
             />
           ))}
         </div>
@@ -1153,7 +1231,7 @@ function PriorityBadge({ rank }) {
 // ============================================
 // PROJECT CARD (Grid View)
 // ============================================
-function ProjectCard({ project, index, onSelect, onDelete }) {
+function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
@@ -1206,7 +1284,10 @@ function ProjectCard({ project, index, onSelect, onDelete }) {
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
-            <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+            <button 
+              onClick={() => { setShowMenu(false); onDuplicate(); }}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+            >
               <Copy className="w-4 h-4" />
               Duplicate
             </button>
@@ -1227,7 +1308,7 @@ function ProjectCard({ project, index, onSelect, onDelete }) {
 // ============================================
 // PROJECT LIST ITEM (List View)
 // ============================================
-function ProjectListItem({ project, index, onSelect, onDelete }) {
+function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
@@ -1308,7 +1389,10 @@ function ProjectListItem({ project, index, onSelect, onDelete }) {
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
-            <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+            <button 
+              onClick={() => { setShowMenu(false); onDuplicate(); }}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+            >
               <Copy className="w-4 h-4" />
               Duplicate
             </button>
