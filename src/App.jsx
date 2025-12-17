@@ -1534,10 +1534,11 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
   const isShared = project.owner_id !== user?.id
+  const isComplete = progress >= 1
 
   return (
     <div
-      className="glass-card glass-card-hover rounded-xl sm:rounded-2xl p-3 sm:p-5 cursor-pointer relative animate-fade-in"
+      className={`glass-card glass-card-hover rounded-xl sm:rounded-2xl p-3 sm:p-5 cursor-pointer relative animate-fade-in ${isComplete ? 'bg-green-50/80 border-green-200' : ''}`}
       style={{ animationDelay: `${index * 50}ms` }}
       onClick={onSelect}
     >
@@ -1556,11 +1557,11 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <span className="tag tag-default text-[9px] py-0.5 px-1.5">{currentStage?.name || 'No stage'}</span>
-              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-gray-300 to-gray-500 rounded-full" style={{ width: `${progress * 100}%` }} />
+              <span className={`tag text-[9px] py-0.5 px-1.5 ${isComplete ? 'bg-green-100 text-green-700' : 'tag-default'}`}>{isComplete ? '✓ Complete' : currentStage?.name || 'No stage'}</span>
+              <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isComplete ? 'bg-green-200' : 'bg-gray-200'}`}>
+                <div className={`h-full rounded-full ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-gray-300 to-gray-500'}`} style={{ width: `${progress * 100}%` }} />
               </div>
-              <span className="text-[10px] font-medium text-gray-500">{Math.round(progress * 100)}%</span>
+              <span className={`text-[10px] font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>{Math.round(progress * 100)}%</span>
             </div>
           </div>
           <button
@@ -1601,13 +1602,13 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
           </div>
         </div>
 
-        <div className="bg-gray-100 rounded-xl p-4">
+        <div className={`rounded-xl p-4 ${isComplete ? 'bg-green-100' : 'bg-gray-100'}`}>
           <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-medium text-gray-500">Progress</span>
-            <span className="text-sm font-bold text-gray-900">{Math.round(progress * 100)}%</span>
+            <span className={`text-xs font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>{isComplete ? '✓ Complete' : 'Progress'}</span>
+            <span className={`text-sm font-bold ${isComplete ? 'text-green-700' : 'text-gray-900'}`}>{Math.round(progress * 100)}%</span>
           </div>
-          <div className="progress-bar">
-            <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
+          <div className={`progress-bar ${isComplete ? 'bg-green-200' : ''}`}>
+            <div className={isComplete ? 'h-full bg-green-500 rounded' : 'progress-bar-fill'} style={{ width: `${progress * 100}%` }} />
           </div>
           {/* Timestamps */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
@@ -1668,10 +1669,11 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
   const totalStages = project.stages?.length || 0
   const completedStages = project.current_stage_index || 0
   const isShared = project.owner_id !== user?.id
+  const isComplete = progress >= 1
 
   return (
     <div
-      className="glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer relative animate-fade-in overflow-visible"
+      className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer relative animate-fade-in overflow-visible ${isComplete ? 'bg-green-50/80 border-green-200' : ''}`}
       style={{ animationDelay: `${index * 30}ms` }}
       onClick={onSelect}
     >
@@ -1741,13 +1743,13 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
           
           {/* Percentage */}
           <div className="hidden sm:flex items-center gap-2 min-w-[60px]">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`w-12 h-1.5 rounded-full overflow-hidden ${isComplete ? 'bg-green-200' : 'bg-gray-200'}`}>
               <div 
-                className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
+                className={`h-full rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-green-500'}`}
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
-            <span className="text-xs font-medium text-gray-600 w-8">{Math.round(progress * 100)}%</span>
+            <span className={`text-xs font-medium w-8 ${isComplete ? 'text-green-600' : 'text-gray-600'}`}>{Math.round(progress * 100)}%</span>
           </div>
         </div>
         
@@ -2062,8 +2064,9 @@ function ProjectDetail() {
   const addTask = async () => {
     if (!newTask.trim()) return
     const now = new Date().toISOString()
+    const localId = uuid()
     const task = {
-      id: uuid(),
+      id: localId,
       title: newTask.trim(),
       description: '',
       is_completed: false,
@@ -2084,11 +2087,26 @@ function ProjectDetail() {
     setNewTask('')
 
     if (!demoMode) {
-      await db.createTask({
+      const { data: createdTask } = await db.createTask({
         stage_id: stage.id,
         title: task.title,
         order_index: stage.tasks?.length || 0
       })
+      
+      // Update local state with server-generated ID
+      if (createdTask) {
+        const syncedProject = {
+          ...project,
+          stages: project.stages.map((s, i) => 
+            i === stageIndex 
+              ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, id: createdTask.id } : t) }
+              : s
+          )
+        }
+        const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
+        setProjects(newProjects)
+        setSelectedProject(syncedProject)
+      }
     }
   }
 
@@ -2907,12 +2925,32 @@ function TaskDetail() {
 
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
-    const subtask = { id: uuid(), title: newSubtask.trim(), is_completed: false, reminder_date: null }
+    const localId = uuid()
+    const subtask = { id: localId, title: newSubtask.trim(), is_completed: false, reminder_date: null }
     updateTask({ subtasks: [...(currentTask.subtasks || []), subtask] })
     setNewSubtask('')
 
     if (!demoMode) {
-      await db.createSubtask({ task_id: task.id, title: subtask.title })
+      const { data: createdSubtask } = await db.createSubtask({ task_id: task.id, title: subtask.title })
+      
+      // Update local state with server-generated ID
+      if (createdSubtask) {
+        const now = new Date().toISOString()
+        const updated = {
+          ...project,
+          updated_at: now,
+          stages: project.stages.map((s, i) => 
+            i === stageIndex 
+              ? { ...s, tasks: s.tasks.map(t => t.id === task.id 
+                  ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id } : st) }
+                  : t
+                )}
+              : s
+          )
+        }
+        const newProjects = projects.map(p => p.id === project.id ? updated : p)
+        setProjects(newProjects)
+      }
     }
   }
 
