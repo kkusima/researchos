@@ -3225,7 +3225,6 @@ function AllTasksView() {
               </div>
             )
           })}
-          ))}
         </div>
       )}
     </div>
