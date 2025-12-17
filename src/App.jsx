@@ -1830,6 +1830,19 @@ function ProjectDetail() {
                 <span className="text-sm text-gray-500">{Math.round(progress * 100)}% complete</span>
               </div>
             </div>
+            {/* Timestamps */}
+            <div className="hidden sm:flex flex-col items-end text-[10px] text-gray-400 mr-2">
+              {project.created_at && (
+                <span title={new Date(project.created_at).toLocaleString()}>
+                  Created {formatRelativeDate(project.created_at)}
+                </span>
+              )}
+              {project.updated_at && project.updated_at !== project.created_at && (
+                <span title={new Date(project.updated_at).toLocaleString()}>
+                  Modified {formatRelativeDate(project.updated_at)}
+                </span>
+              )}
+            </div>
             <button onClick={() => setShowShare(true)} className="p-2 hover:bg-gray-100 rounded-lg">
               <Share2 className="w-5 h-5 text-gray-500" />
             </button>
