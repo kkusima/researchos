@@ -896,9 +896,18 @@ function ProjectsView() {
           return (a.priority_rank - b.priority_rank) * dir
         })
       case 'progress':
-        return sorted.sort((a, b) => (b.progress - a.progress) * dir)
+        return sorted.sort((a, b) => {
+          const progressA = getProgress(a)
+          const progressB = getProgress(b)
+          if (progressA === progressB) return a.title.localeCompare(b.title)
+          return (progressA - progressB) * dir
+        })
       case 'name':
-        return sorted.sort((a, b) => a.title.localeCompare(b.title) * dir)
+        return sorted.sort((a, b) => {
+          const nameA = (a.title || '').toLowerCase()
+          const nameB = (b.title || '').toLowerCase()
+          return nameA.localeCompare(nameB) * dir
+        })
       default:
         return sorted
     }
