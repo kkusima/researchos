@@ -25,6 +25,24 @@ const STORAGE_KEY = 'researchos_local'
 const uuid = () => crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
 const getProgress = (p) => p.stages?.length ? (p.current_stage_index + 1) / p.stages.length : 0
 
+// Format relative date (e.g., "2h ago", "3d ago", "Jan 5")
+const formatRelativeDate = (dateString) => {
+  if (!dateString) return null
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 // Local storage helpers for demo mode
 const loadLocal = () => {
   try {
@@ -902,11 +920,17 @@ function ProjectsView() {
           if (progressA === progressB) return a.title.localeCompare(b.title)
           return (progressA - progressB) * dir
         })
-      case 'name':
+      case 'created':
         return sorted.sort((a, b) => {
-          const nameA = (a.title || '').toLowerCase()
-          const nameB = (b.title || '').toLowerCase()
-          return nameA.localeCompare(nameB) * dir
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return (dateA - dateB) * dir
+        })
+      case 'modified':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+          const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+          return (dateA - dateB) * dir
         })
       default:
         return sorted
@@ -952,13 +976,15 @@ function ProjectsView() {
     // Create new IDs for the duplicated project and its stages/tasks
     const newProjectId = uuid()
     const newPriorityRank = projects.length + 1
+    const now = new Date().toISOString()
     
     const duplicatedProject = {
       ...projectToDuplicate,
       id: newProjectId,
       title: `${projectToDuplicate.title} (Copy)`,
       priority_rank: newPriorityRank,
-      created_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
       owner_id: user?.id || 'demo',
       project_members: [],
       stages: projectToDuplicate.stages?.map(stage => ({
@@ -967,7 +993,8 @@ function ProjectsView() {
         tasks: stage.tasks?.map(task => ({
           ...task,
           id: uuid(),
-          created_at: new Date().toISOString(),
+          created_at: now,
+          updated_at: now,
           subtasks: task.subtasks?.map(st => ({ ...st, id: uuid() })) || [],
           comments: []
         })) || []
@@ -1062,7 +1089,7 @@ function ProjectsView() {
             </button>
           </div>
           <div className="flex items-center gap-1">
-            {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'name', label: 'Name' }].map(opt => (
+            {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
               <button
                 key={opt.key}
                 onClick={() => handleSortChange(opt.key)}
@@ -1280,6 +1307,19 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
         <div className="progress-bar">
           <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
         </div>
+        {/* Timestamps */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+          {project.created_at && (
+            <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
+              Created {formatRelativeDate(project.created_at)}
+            </span>
+          )}
+          {project.updated_at && project.updated_at !== project.created_at && (
+            <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
+              Modified {formatRelativeDate(project.updated_at)}
+            </span>
+          )}
+        </div>
       </div>
 
       <button
@@ -1346,6 +1386,16 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Users className="w-3 h-3" />
                 {project.project_members.length + 1}
+              </span>
+            )}
+            <span className="text-[10px] text-gray-300">•</span>
+            {project.updated_at ? (
+              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
+                {formatRelativeDate(project.updated_at)}
+              </span>
+            ) : project.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
+                {formatRelativeDate(project.created_at)}
               </span>
             )}
           </div>
@@ -1465,6 +1515,7 @@ function CreateProjectModal({ onClose }) {
 
     // New projects get lowest priority (highest number = added to end)
     const newPriorityRank = projects.length + 1
+    const now = new Date().toISOString()
 
     const newProject = {
       id: uuid(),
@@ -1473,7 +1524,8 @@ function CreateProjectModal({ onClose }) {
       priority_rank: newPriorityRank,
       current_stage_index: 0,
       owner_id: user?.id || 'demo',
-      created_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
       stages: stages.map((name, i) => ({
         id: uuid(),
         name,
@@ -1692,6 +1744,7 @@ function ProjectDetail() {
 
   const addTask = async () => {
     if (!newTask.trim()) return
+    const now = new Date().toISOString()
     const task = {
       id: uuid(),
       title: newTask.trim(),
@@ -1700,7 +1753,8 @@ function ProjectDetail() {
       reminder_date: null,
       subtasks: [],
       comments: [],
-      created_at: new Date().toISOString()
+      created_at: now,
+      updated_at: now
     }
 
     const updated = {
@@ -1725,11 +1779,13 @@ function ProjectDetail() {
     const task = stage.tasks.find(t => t.id === taskId)
     if (!task) return
     
+    const now = new Date().toISOString()
     const updated = {
       ...project,
+      updated_at: now,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, is_completed: !t.is_completed } : t) }
+          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, is_completed: !t.is_completed, updated_at: now } : t) }
           : s
       )
     }
@@ -1894,6 +1950,15 @@ function ProjectDetail() {
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {new Date(task.reminder_date).toLocaleDateString()}
+                        </span>
+                      )}
+                      {task.updated_at ? (
+                        <span className="text-gray-300" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
+                          {formatRelativeDate(task.updated_at)}
+                        </span>
+                      ) : task.created_at && (
+                        <span className="text-gray-300" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
+                          {formatRelativeDate(task.created_at)}
                         </span>
                       )}
                     </div>
@@ -2438,11 +2503,13 @@ function TaskDetail() {
   if (!currentTask) return null
 
   const updateTask = (updates) => {
+    const now = new Date().toISOString()
     const updated = {
       ...project,
+      updated_at: now,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => t.id === task.id ? { ...t, ...updates } : t) }
+          ? { ...s, tasks: s.tasks.map(t => t.id === task.id ? { ...t, ...updates, updated_at: now } : t) }
           : s
       )
     }
@@ -2536,12 +2603,28 @@ function TaskDetail() {
           >
             {currentTask.is_completed && <Check className="w-4 h-4" />}
           </button>
-          <input
-            type="text"
-            value={currentTask.title}
-            onChange={e => updateTask({ title: e.target.value })}
-            className="flex-1 text-2xl font-bold bg-transparent outline-none"
-          />
+          <div className="flex-1">
+            <input
+              type="text"
+              value={currentTask.title}
+              onChange={e => updateTask({ title: e.target.value })}
+              className="w-full text-2xl font-bold bg-transparent outline-none"
+            />
+            {/* Timestamps */}
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+              {currentTask.created_at && (
+                <span className="flex items-center gap-1" title={new Date(currentTask.created_at).toLocaleString()}>
+                  <Clock className="w-3 h-3" />
+                  Created {formatRelativeDate(currentTask.created_at)}
+                </span>
+              )}
+              {currentTask.updated_at && currentTask.updated_at !== currentTask.created_at && (
+                <span title={new Date(currentTask.updated_at).toLocaleString()}>
+                  • Modified {formatRelativeDate(currentTask.updated_at)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Description */}
@@ -2670,6 +2753,12 @@ function AllTasksView() {
       const dateB = new Date(b.task.created_at || 0).getTime()
       return (dateA - dateB) * dir
     })
+  } else if (sortOption === 'modified') {
+    allTasks.sort((a, b) => {
+      const dateA = new Date(a.task.updated_at || a.task.created_at || 0).getTime()
+      const dateB = new Date(b.task.updated_at || b.task.created_at || 0).getTime()
+      return (dateA - dateB) * dir
+    })
   }
 
   return (
@@ -2677,7 +2766,7 @@ function AllTasksView() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">All Tasks</h1>
         <div className="flex items-center gap-1">
-          {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Date Created' }].map(opt => (
+          {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
             <button
               key={opt.key}
               onClick={() => handleSortChange(opt.key)}
