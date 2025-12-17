@@ -251,3 +251,51 @@ body {
   background: #fef3c7;
   color: #d97706;
 }
+
+/* Shared tag */
+.tag-shared {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* Overdue styling */
+.tag-overdue {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .glass-card {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .btn-gradient {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+  
+  .input-sleek {
+    padding: 10px 14px;
+  }
+  
+  /* Improve touch targets */
+  button, a {
+    min-height: 44px;
+  }
+  
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area for notch devices */
+@supports(padding: max(0px)) {
+  .modal-overlay {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

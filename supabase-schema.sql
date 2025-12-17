@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS public.subtasks (
   task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   is_completed BOOLEAN DEFAULT FALSE,
+  reminder_date TIMESTAMPTZ,
   order_index INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -75,6 +76,21 @@ CREATE TABLE IF NOT EXISTS public.comments (
   task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL, -- 'task_reminder', 'subtask_reminder', 'project_shared', 'project_invite'
+  title TEXT NOT NULL,
+  message TEXT,
+  project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES public.tasks(id) ON DELETE CASCADE,
+  subtask_id UUID REFERENCES public.subtasks(id) ON DELETE CASCADE,
+  is_read BOOLEAN DEFAULT FALSE,
+  reminder_date TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -101,6 +117,38 @@ ALTER TABLE public.stages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subtasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- Notifications policies
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can view own notifications'
+      AND n.nspname = 'public' AND c.relname = 'notifications'
+  ) THEN
+    CREATE POLICY "Users can view own notifications" ON public.notifications
+      FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+  END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can manage own notifications'
+      AND n.nspname = 'public' AND c.relname = 'notifications'
+  ) THEN
+    CREATE POLICY "Users can manage own notifications" ON public.notifications
+      FOR ALL TO authenticated USING (user_id = (SELECT auth.uid()));
+  END IF;
+END;
+$$;
 
 -- Users policies
 DO $$
