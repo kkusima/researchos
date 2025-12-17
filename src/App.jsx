@@ -1661,7 +1661,8 @@ function ProjectDetail() {
   if (!selectedProject) return null
   
   const project = projects.find(p => p.id === selectedProject.id) || selectedProject
-  const stageIndex = previewIndex ?? project.current_stage_index
+  const currentStageIndex = project.current_stage_index ?? 0
+  const stageIndex = previewIndex ?? currentStageIndex
   const stage = project.stages?.[stageIndex]
   const progress = getProgress(project)
 
@@ -1672,11 +1673,11 @@ function ProjectDetail() {
     if (demoMode) saveLocal(newProjects)
   }
 
-  const setCurrentStage = async () => {
-    if (previewIndex === null) return
-    const updated = { ...project, current_stage_index: previewIndex }
+  const setCurrentStage = async (indexToSet = previewIndex) => {
+    if (indexToSet === null || indexToSet === undefined) return
+    const updated = { ...project, current_stage_index: indexToSet }
     updateProject(updated)
-    if (!demoMode) await db.updateProject(project.id, { current_stage_index: previewIndex })
+    if (!demoMode) await db.updateProject(project.id, { current_stage_index: indexToSet })
     setPreviewIndex(null)
   }
 
@@ -1760,7 +1761,7 @@ function ProjectDetail() {
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold text-gray-900 truncate">{project.title}</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className="tag tag-default">{project.stages?.[project.current_stage_index]?.name}</span>
+                <span className="tag tag-default">{project.stages?.[currentStageIndex]?.name}</span>
                 <span className="text-sm text-gray-500">{Math.round(progress * 100)}% complete</span>
               </div>
             </div>
@@ -1777,29 +1778,35 @@ function ProjectDetail() {
       {/* Stage Selector */}
       <div className="bg-white/60 backdrop-blur-sm border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center mb-3">
+          <div className="mb-3">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Stages</span>
-            {previewIndex !== null && previewIndex !== project.current_stage_index && (
-              <button onClick={setCurrentStage} className="text-xs font-semibold text-brand-600 hover:text-brand-700">
-                Set as Current →
-              </button>
-            )}
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2">
             {project.stages?.map((s, i) => (
-              <button
-                key={s.id}
-                onClick={() => setPreviewIndex(i)}
-                className={`stage-pill ${
-                  i === project.current_stage_index ? 'active' : 
-                  previewIndex === i ? 'preview' : ''
-                }`}
-              >
-                {s.name}
-                {i === project.current_stage_index && (
-                  <span className="block text-[10px] opacity-70 mt-0.5">Current</span>
-                )}
-              </button>
+              <div key={s.id} className="flex flex-col items-center">
+                <button
+                  onClick={() => {
+                    if (previewIndex === i && i !== currentStageIndex) {
+                      // Second click on previewed non-current stage - set as current
+                      setCurrentStage(i)
+                    } else {
+                      setPreviewIndex(i)
+                    }
+                  }}
+                  className={`stage-pill ${
+                    i === currentStageIndex ? 'active' : 
+                    previewIndex === i ? 'preview' : ''
+                  }`}
+                >
+                  {s.name}
+                  {i === currentStageIndex && (
+                    <span className="block text-[10px] opacity-70 mt-0.5">Current</span>
+                  )}
+                  {previewIndex === i && i !== currentStageIndex && (
+                    <span className="block text-[10px] text-brand-600 font-semibold mt-0.5">Click to set current</span>
+                  )}
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -1971,17 +1978,27 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
       ...stage,
       order_index: index
     }))
+    
+    // Find the new index of the stage that was previously current
+    // We track by stage ID to maintain the current stage even after reordering
+    const previousCurrentStage = project.stages[project.current_stage_index ?? 0]
+    let newCurrentStageIndex = updatedStages.findIndex(s => s.id === previousCurrentStage?.id)
+    if (newCurrentStageIndex === -1) {
+      // If the current stage was deleted, default to 0
+      newCurrentStageIndex = 0
+    }
+    
     const updated = {
       ...project,
       title,
       emoji,
       stages: updatedStages,
-      current_stage_index: Math.min(project.current_stage_index, stages.length - 1)
+      current_stage_index: newCurrentStageIndex
     }
     onUpdate(updated)
 
     if (!demoMode) {
-      await db.updateProject(project.id, { title, emoji })
+      await db.updateProject(project.id, { title, emoji, current_stage_index: newCurrentStageIndex })
     }
 
     setLoading(false)
