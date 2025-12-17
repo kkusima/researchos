@@ -1388,7 +1388,7 @@ function ProjectsView() {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {sortedProjects.map((project, i) => (
             <ProjectCard 
               key={project.id} 
@@ -1537,71 +1537,105 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
 
   return (
     <div
-      className="glass-card glass-card-hover rounded-2xl p-5 cursor-pointer relative animate-fade-in"
+      className="glass-card glass-card-hover rounded-xl sm:rounded-2xl p-3 sm:p-5 cursor-pointer relative animate-fade-in"
       style={{ animationDelay: `${index * 50}ms` }}
       onClick={onSelect}
     >
-      {/* Priority Badge */}
-      <div className="absolute top-3 left-3 flex items-center gap-2">
-        <PriorityBadge rank={project.priority_rank} />
-        {isShared && (
-          <span className="tag bg-blue-100 text-blue-600 text-[9px]">
-            <Share2 className="w-2.5 h-2.5 mr-0.5" />
-            Shared
-          </span>
-        )}
+      {/* Mobile: Compact horizontal layout */}
+      <div className="sm:hidden">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{project.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-gray-900 truncate">{project.title}</h3>
+              <PriorityBadge rank={project.priority_rank} />
+              {isShared && (
+                <span className="tag bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5">
+                  <Share2 className="w-2 h-2" />
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="tag tag-default text-[9px] py-0.5 px-1.5">{currentStage?.name || 'No stage'}</span>
+              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-gray-300 to-gray-500 rounded-full" style={{ width: `${progress * 100}%` }} />
+              </div>
+              <span className="text-[10px] font-medium text-gray-500">{Math.round(progress * 100)}%</span>
+            </div>
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+          >
+            <MoreVertical className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
       </div>
-      
-      <div className="flex items-start gap-4 mb-4 mt-6">
-        <span className="text-4xl">{project.emoji}</span>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-lg text-gray-900 truncate">{project.title}</h3>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="tag tag-default">{currentStage?.name || 'No stage'}</span>
-            {project.project_members?.length > 0 && (
-              <span className="tag tag-primary flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {project.project_members.length + 1}
+
+      {/* Desktop: Original layout */}
+      <div className="hidden sm:block">
+        {/* Priority Badge */}
+        <div className="absolute top-3 left-3 flex items-center gap-2">
+          <PriorityBadge rank={project.priority_rank} />
+          {isShared && (
+            <span className="tag bg-blue-100 text-blue-600 text-[9px]">
+              <Share2 className="w-2.5 h-2.5 mr-0.5" />
+              Shared
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-start gap-4 mb-4 mt-6">
+          <span className="text-4xl">{project.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-lg text-gray-900 truncate">{project.title}</h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="tag tag-default">{currentStage?.name || 'No stage'}</span>
+              {project.project_members?.length > 0 && (
+                <span className="tag tag-primary flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {project.project_members.length + 1}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-100 rounded-xl p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-medium text-gray-500">Progress</span>
+            <span className="text-sm font-bold text-gray-900">{Math.round(progress * 100)}%</span>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
+          </div>
+          {/* Timestamps */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+            {project.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
+                Created {formatRelativeDate(project.created_at)}
+              </span>
+            )}
+            {project.updated_at && project.updated_at !== project.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
+                Modified {formatRelativeDate(project.updated_at)}
               </span>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="bg-gray-100 rounded-xl p-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs font-medium text-gray-500">Progress</span>
-          <span className="text-sm font-bold text-gray-900">{Math.round(progress * 100)}%</span>
-        </div>
-        <div className="progress-bar">
-          <div className="progress-bar-fill" style={{ width: `${progress * 100}%` }} />
-        </div>
-        {/* Timestamps */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
-          {project.created_at && (
-            <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
-              Created {formatRelativeDate(project.created_at)}
-            </span>
-          )}
-          {project.updated_at && project.updated_at !== project.created_at && (
-            <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
-              Modified {formatRelativeDate(project.updated_at)}
-            </span>
-          )}
-        </div>
+        <button
+          onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <MoreVertical className="w-4 h-4 text-gray-400" />
+        </button>
       </div>
-
-      <button
-        onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
-        className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-      >
-        <MoreVertical className="w-4 h-4 text-gray-400" />
-      </button>
 
       {showMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
-          <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-8 sm:top-12 right-2 sm:right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
             <button 
               onClick={() => { setShowMenu(false); onDuplicate(); }}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
