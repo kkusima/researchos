@@ -327,6 +327,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
+      console.log('📝 Updating task:', id, updates)
       const { data, error } = await supabase
         .from('tasks')
         .update(updates)
@@ -334,7 +335,11 @@ export const db = {
         .select()
         .single()
       
-      if (error) logError('updateTask', error)
+      if (error) {
+        logError('updateTask', error)
+      } else {
+        console.log('✅ Task updated:', data?.id, 'reminder_date:', data?.reminder_date)
+      }
       return { data, error }
     } catch (error) {
       logError('updateTask:catch', error)
@@ -382,6 +387,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
+      console.log('📝 Updating subtask:', id, updates)
       const { data, error } = await supabase
         .from('subtasks')
         .update(updates)
@@ -389,7 +395,11 @@ export const db = {
         .select()
         .single()
       
-      if (error) logError('updateSubtask', error)
+      if (error) {
+        logError('updateSubtask', error)
+      } else {
+        console.log('✅ Subtask updated:', data?.id)
+      }
       return { data, error }
     } catch (error) {
       logError('updateSubtask:catch', error)
