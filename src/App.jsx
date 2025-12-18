@@ -560,10 +560,11 @@ function GlobalSearch({ projects, onNavigate }) {
 // ============================================
 // NOTIFICATION PANE
 // ============================================
-function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, onDeleteMultiple, onClear, onNavigate, onClose }) {
+function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRead, onDelete, onDeleteMultiple, onClear, onNavigate, onClose }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const unreadCount = notifications.filter(n => !n.is_read).length
+  const readCount = notifications.filter(n => n.is_read).length
 
   const toggleSelection = (id, e) => {
     e.stopPropagation()
@@ -729,12 +730,28 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
                       </p>
                     </div>
                     {!isSelectionMode && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
-                        className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            notif.is_read ? onMarkUnread(notif.id) : onMarkRead(notif.id);
+                          }}
+                          className="p-1 text-gray-300 hover:text-blue-500"
+                          title={notif.is_read ? 'Mark as unread' : 'Mark as read'}
+                        >
+                          {notif.is_read ? (
+                            <Mail className="w-3 h-3" />
+                          ) : (
+                            <CheckCircle className="w-3 h-3" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
+                          className="p-1 text-gray-300 hover:text-red-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1173,7 +1190,7 @@ function ProfileSettingsModal({ onClose }) {
 // ============================================
 // HEADER
 // ============================================
-function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate }) {
+function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkNotificationUnread, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate }) {
   const { user, signOut, demoMode, isEmailAuth } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -1220,6 +1237,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                   <NotificationPane
                     notifications={notifications || []}
                     onMarkRead={onMarkNotificationRead}
+                    onMarkUnread={onMarkNotificationUnread}
                     onMarkAllRead={onMarkAllNotificationsRead}
                     onDelete={onDeleteNotification}
                     onDeleteMultiple={onDeleteMultipleNotifications}
@@ -4400,6 +4418,17 @@ export default function App() {
     }
   }
 
+  const handleMarkNotificationUnread = async (id) => {
+    if (demoMode) {
+      const updated = notifications.map(n => n.id === id ? { ...n, is_read: false } : n)
+      setNotifications(updated)
+      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+    } else {
+      await db.markNotificationUnread(id)
+      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: false } : n))
+    }
+  }
+
   const handleMarkAllNotificationsRead = async () => {
     if (demoMode) {
       const updated = notifications.map(n => ({ ...n, is_read: true }))
@@ -4592,6 +4621,7 @@ export default function App() {
               onSearchNavigate={handleSearchNavigate}
               notifications={notifications}
               onMarkNotificationRead={handleMarkNotificationRead}
+              onMarkNotificationUnread={handleMarkNotificationUnread}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onDeleteNotification={handleDeleteNotification}
               onDeleteMultipleNotifications={handleDeleteMultipleNotifications}

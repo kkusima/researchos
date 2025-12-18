@@ -747,6 +747,23 @@ export const db = {
     }
   },
 
+  async markNotificationUnread(id) {
+    if (!supabase) return { error: null }
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: false })
+        .eq('id', id)
+
+      if (error) logError('markNotificationUnread', error)
+      return { error }
+    } catch (error) {
+      logError('markNotificationUnread:catch', error)
+      return { error }
+    }
+  },
+
   async markAllNotificationsRead(userId) {
     if (!supabase) return { error: null }
     
