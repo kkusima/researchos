@@ -285,69 +285,21 @@ export const db = {
   async updateProject(id, updates) {
     if (!supabase) return { data: null, error: null }
     try {
-      console.log('📝 Updating task:', id, updates)
+      console.log('📝 Updating project:', id, updates)
       const { data, error } = await supabase
-        .from('tasks')
+        .from('projects')
         .update(updates)
         .eq('id', id)
         .select()
         .single()
       if (error) {
-        logError('updateTask', error)
+        logError('updateProject', error)
       } else {
-        console.log('✅ Task updated:', data?.id)
-        // Notify collaborators if not self
-        if (data && updates.modified_by) {
-          // Get project_id for this task
-          const { data: stage } = await supabase
-            .from('stages')
-            .select('project_id')
-            .eq('id', data.stage_id)
-            .single()
-          if (stage && stage.project_id) {
-            // Get all project members except the modifier
-            const { data: members } = await supabase
-              .from('project_members')
-              .select('user_id')
-              .eq('project_id', stage.project_id)
-            const notifyIds = (members || []).map(m => m.user_id).filter(uid => uid !== updates.modified_by)
-            // Also notify owner if not the modifier
-            const { data: project } = await supabase
-              .from('projects')
-              .select('owner_id, title, emoji')
-              .eq('id', stage.project_id)
-              .single()
-            if (project && project.owner_id && project.owner_id !== updates.modified_by && !notifyIds.includes(project.owner_id)) {
-              notifyIds.push(project.owner_id)
-            }
-            // Get modifier's name
-            let modifierName = ''
-            if (updates.modified_by) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('name, email')
-                .eq('id', updates.modified_by)
-                .single()
-              modifierName = userData?.name || userData?.email || 'Someone'
-            }
-            // Create notifications
-            for (const uid of notifyIds) {
-              await supabase.from('notifications').insert({
-                user_id: uid,
-                type: 'task_modified',
-                title: 'Task modified',
-                message: `${project?.emoji || ''} ${project?.title || ''}: ${data.title} (by ${modifierName})`,
-                project_id: stage.project_id,
-                task_id: data.id,
-                is_read: false
-              })
-            }
-          }
-        }
+        console.log('✅ Project updated:', data?.id)
       }
       return { data, error }
     } catch (error) {
-      logError('updateTask:catch', error)
+      logError('updateProject:catch', error)
       return { data: null, error }
     }
   },
