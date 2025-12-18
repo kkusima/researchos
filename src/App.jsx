@@ -3529,7 +3529,7 @@ function TaskDetail() {
 function AllTasksView() {
   const { projects, setProjects, setSelectedProject, setSelectedTask, setView } = useApp()
   const { demoMode } = useAuth()
-  const [activeSubTab, setActiveSubTab] = useState('all') // 'all' or 'scheduled'
+  const [activeSubTab, setActiveSubTab] = useState('active') // 'active', 'scheduled', 'complete', 'all'
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -3557,7 +3557,11 @@ function AllTasksView() {
 
   // Filter based on active sub-tab
   const filteredTasks = activeSubTab === 'scheduled' 
-    ? allTasks.filter(({ task }) => task.reminder_date)
+    ? allTasks.filter(({ task }) => task.reminder_date && !task.is_completed)
+    : activeSubTab === 'active'
+    ? allTasks.filter(({ task }) => !task.is_completed)
+    : activeSubTab === 'complete'
+    ? allTasks.filter(({ task }) => task.is_completed)
     : allTasks
 
   // Sort tasks: overdue first, then by selected option
@@ -3641,6 +3645,43 @@ function AllTasksView() {
               }
             }
           }
+        }
+      }
+    }
+    
+    setSelectedTaskIds(new Set())
+    setIsSelectionMode(false)
+  }
+
+  const handleBulkReopen = async () => {
+    if (selectedTaskIds.size === 0) return
+    
+    const now = new Date().toISOString()
+    const newProjects = projects.map(project => ({
+      ...project,
+      updated_at: now,
+      stages: project.stages?.map(stage => ({
+        ...stage,
+        tasks: stage.tasks?.map(task => {
+          if (selectedTaskIds.has(task.id)) {
+            return {
+              ...task,
+              is_completed: false,
+              updated_at: now
+            }
+          }
+          return task
+        }) || []
+      })) || []
+    }))
+    
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+    
+    if (!demoMode) {
+      for (const { task } of filteredTasks) {
+        if (selectedTaskIds.has(task.id)) {
+          await db.updateTask(task.id, { is_completed: false })
         }
       }
     }
@@ -3744,7 +3785,9 @@ function AllTasksView() {
     }
   }
 
-  const scheduledCount = allTasks.filter(({ task }) => task.reminder_date).length
+  const activeCount = allTasks.filter(({ task }) => !task.is_completed).length
+  const scheduledCount = allTasks.filter(({ task }) => task.reminder_date && !task.is_completed).length
+  const completeCount = allTasks.filter(({ task }) => task.is_completed).length
   const allCount = allTasks.length
 
   return (
@@ -3754,15 +3797,15 @@ function AllTasksView() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 border-b border-gray-200 pb-2 sm:pb-0">
           <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <button
-              onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
+              onClick={() => { setActiveSubTab('active'); setSelectedTaskIds(new Set()) }}
               className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeSubTab === 'all'
+                activeSubTab === 'active'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               <List className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
-              All ({allCount})
+              Active ({activeCount})
             </button>
             <button
               onClick={() => { setActiveSubTab('scheduled'); setSelectedTaskIds(new Set()) }}
@@ -3775,6 +3818,28 @@ function AllTasksView() {
               <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
               Scheduled ({scheduledCount})
             </button>
+            <button
+              onClick={() => { setActiveSubTab('complete'); setSelectedTaskIds(new Set()) }}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeSubTab === 'complete'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              Complete ({completeCount})
+            </button>
+            <button
+              onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeSubTab === 'all'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              All ({allCount})
+            </button>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             {isSelectionMode ? (
@@ -3785,14 +3850,25 @@ function AllTasksView() {
                 >
                   {selectedTaskIds.size === filteredTasks.length ? 'Deselect' : 'Select All'}
                 </button>
-                <button
-                  onClick={handleBulkComplete}
-                  disabled={selectedTaskIds.size === 0}
-                  className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 flex items-center gap-1"
-                >
-                  <CheckCircle className="w-3 h-3" />
-                  <span className="hidden sm:inline">Complete</span> ({selectedTaskIds.size})
-                </button>
+                {activeSubTab === 'complete' ? (
+                  <button
+                    onClick={handleBulkReopen}
+                    disabled={selectedTaskIds.size === 0}
+                    className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-amber-100 text-amber-600 hover:bg-amber-200 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <ChevronUp className="w-3 h-3" />
+                    <span className="hidden sm:inline">Reopen</span> ({selectedTaskIds.size})
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleBulkComplete}
+                    disabled={selectedTaskIds.size === 0}
+                    className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    <span className="hidden sm:inline">Complete</span> ({selectedTaskIds.size})
+                  </button>
+                )}
                 <button
                   onClick={handleBulkDelete}
                   disabled={selectedTaskIds.size === 0}
@@ -3844,11 +3920,18 @@ function AllTasksView() {
       {filteredTasks.length === 0 ? (
         <div className="glass-card rounded-2xl p-6 sm:p-12 text-center">
           <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2">
-            {activeSubTab === 'scheduled' ? 'No scheduled tasks' : 'No tasks yet'}
+            {activeSubTab === 'scheduled' ? 'No scheduled tasks' 
+              : activeSubTab === 'complete' ? 'No completed tasks'
+              : activeSubTab === 'active' ? 'No active tasks'
+              : 'No tasks yet'}
           </h2>
           <p className="text-gray-500 text-sm sm:text-base">
             {activeSubTab === 'scheduled' 
               ? 'Tasks with reminders will appear here'
+              : activeSubTab === 'complete'
+              ? 'Completed tasks will appear here'
+              : activeSubTab === 'active'
+              ? 'Active tasks will appear here'
               : 'Create a project and add some tasks!'}
           </p>
         </div>
@@ -3859,12 +3942,13 @@ function AllTasksView() {
             const isSelected = selectedTaskIds.has(task.id)
             const isExpanded = expandedTasks.has(task.id)
             const hasSubtasks = task.subtasks?.length > 0
+            const isCompleted = task.is_completed
             return (
               <div
                 key={`${project.id}-${task.id}`}
                 className={`glass-card glass-card-hover rounded-xl animate-fade-in ${
                   taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
-                } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
+                } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
                 <div 
@@ -3894,7 +3978,10 @@ function AllTasksView() {
                     )}
                     <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <div className={`font-medium text-sm sm:text-base truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
+                      <div className="flex items-center gap-2">
+                        {isCompleted && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                        <span className={`font-medium text-sm sm:text-base truncate ${isCompleted ? 'line-through text-gray-500' : taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</span>
+                      </div>
                       <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
                         <span className="flex items-center gap-1">
                           <PriorityBadge rank={project.priority_rank} />
@@ -3931,23 +4018,26 @@ function AllTasksView() {
                       return (
                         <div 
                           key={subtask.id}
-                          className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''}`}
+                          className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
                         >
                           <button
-                            onClick={() => toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
-                            className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''}`}
+                            onClick={() => !isCompleted && toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
+                            className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''} ${isCompleted ? 'cursor-not-allowed' : ''}`}
                             style={{ width: 16, height: 16 }}
+                            disabled={isCompleted}
                           >
                             {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
                           </button>
                           <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
                             {subtask.title}
                           </span>
-                          <ReminderPicker
-                            value={subtask.reminder_date}
-                            onChange={(date) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date)}
-                            compact
-                          />
+                          {!isCompleted && (
+                            <ReminderPicker
+                              value={subtask.reminder_date}
+                              onChange={(date) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date)}
+                              compact
+                            />
+                          )}
                         </div>
                       )
                     })}
