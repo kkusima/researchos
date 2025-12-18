@@ -18,7 +18,10 @@ const PRIORITIES = [
   { name: 'Medium', rank: 2, color: '#f59e0b' },
   { name: 'Low', rank: 3, color: '#6b7280' }
 ]
-const EMOJIS = ['🧪', '🔬', '📊', '🧬', '🔥', '💡', '🌱', '⚗️', '🔭', '💻', '📝', '🎯', '🚀', '⚡', '🧠', '🌍']
+const EMOJIS = [
+  '🧪', '🔬', '📊', '🧬', '🔥', '💡', '🌱', '⚗️', '🔭', '💻', '📝', '🎯', '🚀', '⚡', '🧠', '🌍',
+  '📚', '✨', '🎨', '🔧', '📈', '🏆', '💎', '🌟', '🎓', '📱', '🖥️', '🔐', '📡', '🛠️', '🏗️', '💼'
+]
 const STORAGE_KEY = 'researchos_local'
 
 // Helpers
@@ -3406,7 +3409,7 @@ function TaskDetail() {
 function AllTasksView() {
   const { projects, setProjects, setSelectedProject, setSelectedTask, setView } = useApp()
   const { demoMode } = useAuth()
-  const [activeSubTab, setActiveSubTab] = useState('scheduled') // 'scheduled' or 'all'
+  const [activeSubTab, setActiveSubTab] = useState('all') // 'all' or 'scheduled'
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -3508,54 +3511,54 @@ function AllTasksView() {
   const allCount = allTasks.length
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <div className="flex flex-col gap-4 mb-6">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
         {/* Sub-tabs for Scheduled vs All with selection controls */}
-        <div className="flex items-center justify-between border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setActiveSubTab('scheduled'); setSelectedTaskIds(new Set()) }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeSubTab === 'scheduled'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Clock className="w-4 h-4 inline mr-1.5" />
-              Scheduled ({scheduledCount})
-            </button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 border-b border-gray-200 pb-2 sm:pb-0">
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <button
               onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeSubTab === 'all'
                   ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <List className="w-4 h-4 inline mr-1.5" />
-              All Tasks ({allCount})
+              <List className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              All ({allCount})
+            </button>
+            <button
+              onClick={() => { setActiveSubTab('scheduled'); setSelectedTaskIds(new Set()) }}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeSubTab === 'scheduled'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              Scheduled ({scheduledCount})
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {isSelectionMode ? (
               <>
                 <button
                   onClick={selectAllTasks}
-                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                  className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
                 >
-                  {selectedTaskIds.size === filteredTasks.length ? 'Deselect All' : 'Select All'}
+                  {selectedTaskIds.size === filteredTasks.length ? 'Deselect' : 'Select All'}
                 </button>
                 <button
                   onClick={handleBulkDelete}
                   disabled={selectedTaskIds.size === 0}
-                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
+                  className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
                 >
                   <Trash2 className="w-3 h-3" />
-                  Delete ({selectedTaskIds.size})
+                  <span className="hidden sm:inline">Delete</span> ({selectedTaskIds.size})
                 </button>
                 <button
                   onClick={() => { setIsSelectionMode(false); setSelectedTaskIds(new Set()) }}
-                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                  className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
                 >
                   Cancel
                 </button>
@@ -3563,7 +3566,7 @@ function AllTasksView() {
             ) : (
               <button
                 onClick={() => setIsSelectionMode(true)}
-                className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
+                className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
               >
                 <Check className="w-3 h-3" />
                 Select
@@ -3578,7 +3581,7 @@ function AllTasksView() {
             <button
               key={opt.key}
               onClick={() => handleSortChange(opt.key)}
-              className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
                 sortOption === opt.key
                   ? 'bg-gray-200 text-gray-900 font-medium'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -3594,9 +3597,8 @@ function AllTasksView() {
       </div>
 
       {filteredTasks.length === 0 ? (
-        <div className="glass-card rounded-2xl p-8 sm:p-12 text-center">
-          <div className="text-4xl sm:text-5xl mb-4">{activeSubTab === 'scheduled' ? '📅' : '📋'}</div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+        <div className="glass-card rounded-2xl p-6 sm:p-12 text-center">
+          <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2">
             {activeSubTab === 'scheduled' ? 'No scheduled tasks' : 'No tasks yet'}
           </h2>
           <p className="text-gray-500 text-sm sm:text-base">
@@ -3627,7 +3629,7 @@ function AllTasksView() {
                   }
                 }}
               >
-                <div className="flex items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3">
                   {isSelectionMode && (
                     <button
                       onClick={(e) => toggleTaskSelection(task.id, e)}
@@ -3640,21 +3642,24 @@ function AllTasksView() {
                       {isSelected && <Check className="w-3 h-3" />}
                     </button>
                   )}
-                  <span className="text-2xl sm:text-3xl">{project.emoji}</span>
+                  <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <div className={`font-medium truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs sm:text-sm text-gray-500 truncate">{project.title}</span>
-                      <span className="tag tag-default text-[9px] sm:text-[10px]">{stage.name}</span>
+                    <div className={`font-medium text-sm sm:text-base truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <PriorityBadge rank={project.priority_rank} />
+                        <span className="text-xs sm:text-sm text-gray-600 truncate max-w-[120px] sm:max-w-none">{project.title}</span>
+                      </span>
+                      <span className="tag tag-default text-[8px] sm:text-[9px] px-1.5 py-0.5">{stage.name}</span>
                       {task.reminder_date && (
-                        <span className={`text-[10px] flex items-center gap-0.5 ${taskOverdue ? 'text-red-600' : 'text-amber-600'}`}>
-                          <Clock className="w-3 h-3" />
+                        <span className={`text-[9px] sm:text-[10px] flex items-center gap-0.5 ${taskOverdue ? 'text-red-600' : 'text-amber-600'}`}>
+                          <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                           {formatReminderDate(task.reminder_date)}
                         </span>
                       )}
                     </div>
                   </div>
-                  {!isSelectionMode && <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+                  {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                 </div>
               </div>
             )
