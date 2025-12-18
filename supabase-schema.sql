@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.project_members (
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   role TEXT DEFAULT 'editor', -- 'viewer', 'editor', 'admin'
+  priority_rank INTEGER DEFAULT 999, -- User-specific priority for this shared project
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(project_id, user_id)
 );

@@ -62,10 +62,10 @@ export const db = {
         logError('getOwnedProjects', ownedError)
       }
 
-      // Then get projects where user is a member
+      // Then get projects where user is a member (including their personal priority)
       const { data: membershipData, error: memberError } = await supabase
         .from('project_members')
-        .select('project_id')
+        .select('project_id, priority_rank')
         .eq('user_id', userId)
       
       if (memberError) {
@@ -89,11 +89,22 @@ export const db = {
       }
 
       // Combine and deduplicate
+      // Build a map of member priorities for shared projects
+      const memberPriorityMap = new Map()
+      if (membershipData) {
+        membershipData.forEach(m => memberPriorityMap.set(m.project_id, m.priority_rank))
+      }
+      
       const allProjectsMap = new Map()
       ;(ownedProjects || []).forEach(p => allProjectsMap.set(p.id, { ...p, isOwner: true }))
       sharedProjects.forEach(p => {
         if (!allProjectsMap.has(p.id)) {
-          allProjectsMap.set(p.id, { ...p, isOwner: false })
+          // Use member's personal priority if set, otherwise use project's priority
+          const memberPriority = memberPriorityMap.get(p.id)
+          const effectivePriority = (memberPriority !== null && memberPriority !== undefined && memberPriority !== 999) 
+            ? memberPriority 
+            : p.priority_rank
+          allProjectsMap.set(p.id, { ...p, isOwner: false, priority_rank: effectivePriority, _memberPriority: memberPriority })
         }
       })
       
@@ -675,6 +686,31 @@ export const db = {
       return { error }
     } catch (error) {
       logError('removeProjectMember:catch', error)
+      return { error }
+    }
+  },
+
+  // Update member's personal priority for a shared project
+  async updateMemberPriority(projectId, userId, priorityRank) {
+    if (!supabase) return { error: null }
+    
+    try {
+      console.log('📝 Updating member priority:', { projectId, userId, priorityRank })
+      const { error } = await supabase
+        .from('project_members')
+        .update({ priority_rank: priorityRank })
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+      
+      if (error) {
+        logError('updateMemberPriority', error)
+        return { error }
+      }
+      
+      console.log('✅ Member priority updated')
+      return { error: null }
+    } catch (error) {
+      logError('updateMemberPriority:catch', error)
       return { error }
     }
   },
