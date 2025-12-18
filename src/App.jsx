@@ -4259,6 +4259,12 @@ export default function App() {
   const [view, setView] = useState('main')
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState([])
+  const notificationsRef = useRef(notifications)
+  
+  // Keep ref in sync
+  useEffect(() => {
+    notificationsRef.current = notifications
+  }, [notifications])
 
   // Load notifications
   const loadNotifications = async () => {
@@ -4355,21 +4361,32 @@ export default function App() {
     return newNotifications
   }
 
-  // Effect to check for overdue tasks when projects change
+  // Effect to check for overdue tasks when projects change AND periodically
   useEffect(() => {
     if (projects.length === 0) return
     
-    const newOverdueNotifications = checkOverdueTasks(projects, notifications)
-    
-    if (newOverdueNotifications.length > 0) {
-      const allNotifications = [...newOverdueNotifications, ...notifications]
-      setNotifications(allNotifications)
+    const runOverdueCheck = () => {
+      const currentNotifications = notificationsRef.current
+      const newOverdueNotifications = checkOverdueTasks(projects, currentNotifications)
       
-      if (demoMode) {
-        localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
+      if (newOverdueNotifications.length > 0) {
+        const allNotifications = [...newOverdueNotifications, ...currentNotifications]
+        setNotifications(allNotifications)
+        
+        if (demoMode) {
+          localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
+        }
       }
     }
-  }, [projects])
+    
+    // Run immediately
+    runOverdueCheck()
+    
+    // Also run every 30 seconds to catch newly overdue items
+    const interval = setInterval(runOverdueCheck, 30000)
+    
+    return () => clearInterval(interval)
+  }, [projects, demoMode])
 
   // Notification handlers
   const handleMarkNotificationRead = async (id) => {
