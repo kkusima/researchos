@@ -4696,6 +4696,37 @@ export default function App() {
     loadData()
   }, [user, authLoading, demoMode])
 
+  // Real-time sync subscription
+  useEffect(() => {
+    if (demoMode || !user || projects.length === 0) return
+    
+    const projectIds = projects.map(p => p.id)
+    let debounceTimer = null
+    
+    const handleRealtimeChange = (payload) => {
+      console.log('🔄 Realtime change detected:', payload.table, payload.eventType)
+      
+      // Debounce to avoid multiple rapid reloads
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(async () => {
+        console.log('🔄 Reloading projects due to realtime change...')
+        const { data, error } = await db.getProjects(user.id)
+        if (!error && data) {
+          setProjects(data)
+        }
+        // Also reload notifications in case new ones were created
+        loadNotifications()
+      }, 500)
+    }
+    
+    const channel = db.subscribeToUserProjects(user.id, projectIds, handleRealtimeChange)
+    
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (channel) db.unsubscribe(channel)
+    }
+  }, [user, demoMode, projects.length > 0]) // Only re-subscribe when user changes or projects go from 0 to non-zero
+
   const reorderProjects = (updatedProjects) => {
     setProjects(updatedProjects)
     if (demoMode) {

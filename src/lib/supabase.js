@@ -117,7 +117,9 @@ export const db = {
       }
       
       const allProjectsMap = new Map()
-      ;(ownedProjects || []).forEach(p => allProjectsMap.set(p.id, { ...p, isOwner: true }))
+      ;(ownedProjects || []).forEach(p => {
+        allProjectsMap.set(p.id, { ...p, isOwner: true })
+      })
       sharedProjects.forEach(p => {
         if (!allProjectsMap.has(p.id)) {
           // Use member's personal priority if set, otherwise use project's priority
@@ -188,10 +190,61 @@ export const db = {
               user:users(id, email, name, avatar_url)
             `)
             .eq('project_id', project.id)
+          
+          // Build a map of user IDs to names for looking up modified_by names
+          const userMap = new Map()
+          if (members) {
+            members.forEach(m => {
+              if (m.user) userMap.set(m.user.id, m.user.name || m.user.email)
+            })
+          }
+          // Also add the owner
+          if (project.owner_id) {
+            const { data: ownerData } = await supabase
+              .from('users')
+              .select('id, name, email')
+              .eq('id', project.owner_id)
+              .single()
+            if (ownerData) {
+              userMap.set(ownerData.id, ownerData.name || ownerData.email)
+            }
+          }
+          
+          // Add modified_by_name to tasks and subtasks
+          const stagesWithNames = stagesWithTasks.map(stage => ({
+            ...stage,
+            tasks: stage.tasks.map(task => ({
+              ...task,
+              created_by_name: task.created_by ? userMap.get(task.created_by) : null,
+              modified_by_name: task.modified_by ? userMap.get(task.modified_by) : null,
+              subtasks: task.subtasks.map(st => ({
+                ...st,
+                created_by_name: st.created_by ? userMap.get(st.created_by) : null,
+                modified_by_name: st.modified_by ? userMap.get(st.modified_by) : null
+              }))
+            }))
+          }))
+          
+          // Get project modified_by_name
+          let projectModifiedByName = null
+          if (project.modified_by) {
+            projectModifiedByName = userMap.get(project.modified_by)
+            if (!projectModifiedByName) {
+              const { data: modifierData } = await supabase
+                .from('users')
+                .select('id, name, email')
+                .eq('id', project.modified_by)
+                .single()
+              if (modifierData) {
+                projectModifiedByName = modifierData.name || modifierData.email
+              }
+            }
+          }
 
           return { 
             ...project, 
-            stages: stagesWithTasks,
+            modified_by_name: projectModifiedByName,
+            stages: stagesWithNames,
             project_members: members || []
           }
         })
@@ -790,6 +843,77 @@ export const db = {
         filter: `project_id=eq.${projectId}` 
       }, callback)
       .subscribe()
+  },
+
+  // Subscribe to all changes for a user's projects (for real-time sync)
+  subscribeToUserProjects(userId, projectIds, callback) {
+    if (!supabase || !projectIds || projectIds.length === 0) return null
+    
+    const channel = supabase.channel(`user-projects:${userId}`)
+    
+    // Subscribe to project changes
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'projects'
+    }, (payload) => {
+      if (projectIds.includes(payload.new?.id) || projectIds.includes(payload.old?.id)) {
+        callback(payload)
+      }
+    })
+    
+    // Subscribe to stage changes  
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'stages'
+    }, (payload) => {
+      if (projectIds.includes(payload.new?.project_id) || projectIds.includes(payload.old?.project_id)) {
+        callback(payload)
+      }
+    })
+    
+    // Subscribe to task changes
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'tasks'
+    }, callback)
+    
+    // Subscribe to subtask changes
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'subtasks'
+    }, callback)
+    
+    // Subscribe to project_members changes (for sharing updates)
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'project_members'
+    }, (payload) => {
+      if (payload.new?.user_id === userId || payload.old?.user_id === userId || 
+          projectIds.includes(payload.new?.project_id) || projectIds.includes(payload.old?.project_id)) {
+        callback(payload)
+      }
+    })
+    
+    // Subscribe to notification changes
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${userId}`
+    }, callback)
+    
+    return channel.subscribe()
+  },
+
+  // Unsubscribe from a channel
+  unsubscribe(channel) {
+    if (!supabase || !channel) return
+    supabase.removeChannel(channel)
   },
 
   // Notifications
