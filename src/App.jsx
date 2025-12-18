@@ -44,17 +44,21 @@ const formatReminderDate = (dateString) => {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = date - now
+  const absDiffMs = Math.abs(diffMs)
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
   
   if (diffMs < 0) {
-    // Overdue
-    const absDays = Math.abs(diffDays)
-    const absHours = Math.abs(diffHours)
+    // Overdue - calculate absolute values properly
+    const absMins = Math.floor(absDiffMs / 60000)
+    const absHours = Math.floor(absDiffMs / 3600000)
+    const absDays = Math.floor(absDiffMs / 86400000)
+    
     if (absDays >= 1) return `${absDays}d overdue`
     if (absHours >= 1) return `${absHours}h overdue`
-    return 'Overdue'
+    if (absMins >= 1) return `${absMins}m overdue`
+    return 'Just overdue'
   }
   
   if (diffMins < 60) return `in ${diffMins}m`
@@ -554,6 +558,9 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
       case 'task_reminder':
       case 'subtask_reminder':
         return <Clock className="w-4 h-4 text-amber-500" />
+      case 'task_overdue':
+      case 'subtask_overdue':
+        return <AlertCircle className="w-4 h-4 text-red-500" />
       case 'project_shared':
       case 'project_invite':
         return <Users className="w-4 h-4 text-blue-500" />
@@ -1111,7 +1118,7 @@ function TabNav({ tab, setTab }) {
         <nav className="flex gap-1">
           {[
             { id: 'projects', label: 'Projects', icon: '◫' },
-            { id: 'tasks', label: 'All Tasks', icon: '✓' }
+            { id: 'tasks', label: 'Tasks', icon: '✓' }
           ].map(t => (
             <button
               key={t.id}
@@ -1311,6 +1318,25 @@ function ProjectsView() {
     )
   }
 
+  const toggleProjectSelection = (projectId, e) => {
+    e?.stopPropagation()
+    const newSelected = new Set(selectedProjectIDs)
+    if (newSelected.has(projectId)) {
+      newSelected.delete(projectId)
+    } else {
+      newSelected.add(projectId)
+    }
+    setSelectedProjectIDs(newSelected)
+  }
+
+  const selectAllProjects = () => {
+    if (selectedProjectIDs.size === sortedProjects.length) {
+      setSelectedProjectIDs(new Set())
+    } else {
+      setSelectedProjectIDs(new Set(sortedProjects.map(p => p.id)))
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="flex flex-col gap-4 mb-6 sm:mb-8">
@@ -1320,10 +1346,44 @@ function ProjectsView() {
             <p className="text-gray-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap text-sm sm:text-base px-3 sm:px-6 py-2 sm:py-3">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Project</span>
-            </button>
+            {isSelectionMode ? (
+              <>
+                <button
+                  onClick={selectAllProjects}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  {selectedProjectIDs.size === sortedProjects.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedProjectIDs.size === 0}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete ({selectedProjectIDs.size})
+                </button>
+                <button
+                  onClick={() => { setIsSelectionMode(false); setSelectedProjectIDs(new Set()) }}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsSelectionMode(true)}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
+                >
+                  <Check className="w-3 h-3" />
+                  <span className="hidden sm:inline">Select</span>
+                </button>
+                <button onClick={() => setShowCreate(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap text-sm sm:text-base px-3 sm:px-6 py-2 sm:py-3">
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New Project</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
         
@@ -1394,7 +1454,16 @@ function ProjectsView() {
               key={project.id} 
               project={project} 
               index={i}
-              onSelect={() => { setSelectedProject(project); setView('project'); }}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedProjectIDs.has(project.id)}
+              onToggleSelect={(e) => toggleProjectSelection(project.id, e)}
+              onSelect={() => { 
+                if (isSelectionMode) {
+                  toggleProjectSelection(project.id)
+                } else {
+                  setSelectedProject(project); setView('project'); 
+                }
+              }}
               onDelete={() => deleteProject(project.id)}
               onDuplicate={() => duplicateProject(project)}
             />
@@ -1407,7 +1476,16 @@ function ProjectsView() {
               key={project.id} 
               project={project} 
               index={i}
-              onSelect={() => { setSelectedProject(project); setView('project'); }}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedProjectIDs.has(project.id)}
+              onToggleSelect={(e) => toggleProjectSelection(project.id, e)}
+              onSelect={() => { 
+                if (isSelectionMode) {
+                  toggleProjectSelection(project.id)
+                } else {
+                  setSelectedProject(project); setView('project'); 
+                }
+              }}
               onDelete={() => deleteProject(project.id)}
               onDuplicate={() => duplicateProject(project)}
             />
@@ -1528,7 +1606,7 @@ function PriorityBadge({ rank }) {
 // ============================================
 // PROJECT CARD (Grid View)
 // ============================================
-function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
+function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
@@ -1538,20 +1616,33 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
 
   return (
     <div
-      className={`glass-card glass-card-hover rounded-xl sm:rounded-2xl p-3 sm:p-5 cursor-pointer relative animate-fade-in ${isComplete ? 'bg-green-50/80 border-green-200' : ''}`}
+      className={`glass-card glass-card-hover rounded-xl sm:rounded-2xl p-3 sm:p-5 cursor-pointer relative animate-fade-in ${isComplete ? 'bg-green-50/80 border-green-200' : ''} ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
       style={{ animationDelay: `${index * 50}ms` }}
       onClick={onSelect}
     >
-      {/* Mobile: Compact horizontal layout */}
+      {/* Mobile: Compact horizontal layout with priority FIRST */}
       <div className="sm:hidden">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{project.emoji}</span>
+        <div className="flex items-center gap-2">
+          {/* Priority badge first on mobile for long project titles */}
+          <PriorityBadge rank={project.priority_rank} />
+          {isSelectionMode && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+              className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                isSelected 
+                  ? 'bg-brand-600 border-brand-600 text-white' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {isSelected && <Check className="w-3 h-3" />}
+            </button>
+          )}
+          <span className="text-2xl flex-shrink-0">{project.emoji}</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-gray-900 truncate">{project.title}</h3>
-              <PriorityBadge rank={project.priority_rank} />
               {isShared && (
-                <span className="tag bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5">
+                <span className="tag bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 flex-shrink-0">
                   <Share2 className="w-2 h-2" />
                 </span>
               )}
@@ -1564,17 +1655,33 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
               <span className={`text-[10px] font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>{Math.round(progress * 100)}%</span>
             </div>
           </div>
-          <button
-            onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
-          >
-            <MoreVertical className="w-4 h-4 text-gray-400" />
-          </button>
+          {!isSelectionMode && (
+            <button
+              onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+            >
+              <MoreVertical className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Desktop: Original layout */}
       <div className="hidden sm:block">
+        {/* Selection checkbox for desktop */}
+        {isSelectionMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+            className={`absolute top-3 right-3 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors z-10 ${
+              isSelected 
+                ? 'bg-brand-600 border-brand-600 text-white' 
+                : 'border-gray-300 hover:border-gray-400 bg-white'
+            }`}
+          >
+            {isSelected && <Check className="w-4 h-4" />}
+          </button>
+        )}
+        
         {/* Priority Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-2">
           <PriorityBadge rank={project.priority_rank} />
@@ -1625,15 +1732,17 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
           </div>
         </div>
 
-        <button
-          onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <MoreVertical className="w-4 h-4 text-gray-400" />
-        </button>
+        {!isSelectionMode && (
+          <button
+            onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <MoreVertical className="w-4 h-4 text-gray-400" />
+          </button>
+        )}
       </div>
 
-      {showMenu && (
+      {showMenu && !isSelectionMode && (
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-8 sm:top-12 right-2 sm:right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
@@ -1661,7 +1770,7 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate }) {
 // ============================================
 // PROJECT LIST ITEM (List View)
 // ============================================
-function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
+function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
@@ -1673,11 +1782,25 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
 
   return (
     <div
-      className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer relative animate-fade-in overflow-visible ${isComplete ? 'bg-green-50/80 border-green-200' : ''}`}
+      className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer relative animate-fade-in overflow-visible ${isComplete ? 'bg-green-50/80 border-green-200' : ''} ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
       style={{ animationDelay: `${index * 30}ms` }}
       onClick={onSelect}
     >
       <div className="flex items-center gap-2 sm:gap-4">
+        {/* Selection checkbox */}
+        {isSelectionMode && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+              isSelected 
+                ? 'bg-brand-600 border-brand-600 text-white' 
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            {isSelected && <Check className="w-3 h-3" />}
+          </button>
+        )}
+        
         {/* Priority Badge */}
         <PriorityBadge rank={project.priority_rank} />
         
@@ -1754,15 +1877,17 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate }) {
         </div>
         
         {/* Menu Button */}
-        <button
-          onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
-        >
-          <MoreVertical className="w-4 h-4 text-gray-400" />
-        </button>
+        {!isSelectionMode && (
+          <button
+            onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+          >
+            <MoreVertical className="w-4 h-4 text-gray-400" />
+          </button>
+        )}
       </div>
 
-      {showMenu && (
+      {showMenu && !isSelectionMode && (
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
@@ -2888,6 +3013,8 @@ function TaskDetail() {
   const { demoMode, user } = useAuth()
   const [newSubtask, setNewSubtask] = useState('')
   const [newComment, setNewComment] = useState('')
+  const [isSubtaskSelectionMode, setIsSubtaskSelectionMode] = useState(false)
+  const [selectedSubtaskIds, setSelectedSubtaskIds] = useState(new Set())
 
   if (!selectedTask || !selectedProject) return null
 
@@ -2921,6 +3048,42 @@ function TaskDetail() {
     if (!demoMode) {
       await db.updateTask(task.id, { reminder_date: reminderDate })
     }
+  }
+
+  const toggleSubtaskSelection = (subtaskId, e) => {
+    e?.stopPropagation()
+    const newSelected = new Set(selectedSubtaskIds)
+    if (newSelected.has(subtaskId)) {
+      newSelected.delete(subtaskId)
+    } else {
+      newSelected.add(subtaskId)
+    }
+    setSelectedSubtaskIds(newSelected)
+  }
+
+  const selectAllSubtasks = () => {
+    if (selectedSubtaskIds.size === (currentTask.subtasks?.length || 0)) {
+      setSelectedSubtaskIds(new Set())
+    } else {
+      setSelectedSubtaskIds(new Set(currentTask.subtasks?.map(s => s.id) || []))
+    }
+  }
+
+  const handleBulkDeleteSubtasks = async () => {
+    if (selectedSubtaskIds.size === 0) return
+    if (!window.confirm(`Delete ${selectedSubtaskIds.size} subtask(s)?`)) return
+    
+    const remaining = currentTask.subtasks.filter(s => !selectedSubtaskIds.has(s.id))
+    updateTask({ subtasks: remaining })
+    
+    if (!demoMode) {
+      for (const subtaskId of selectedSubtaskIds) {
+        await db.deleteSubtask(subtaskId)
+      }
+    }
+    
+    setSelectedSubtaskIds(new Set())
+    setIsSubtaskSelectionMode(false)
   }
 
   const addSubtask = async () => {
@@ -3091,35 +3254,91 @@ function TaskDetail() {
 
         {/* Subtasks */}
         <div className="glass-card rounded-xl p-4 sm:p-5">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Subtasks</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Subtasks</h3>
+            {(currentTask.subtasks?.length || 0) > 0 && (
+              <div className="flex items-center gap-2">
+                {isSubtaskSelectionMode ? (
+                  <>
+                    <button
+                      onClick={selectAllSubtasks}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    >
+                      {selectedSubtaskIds.size === (currentTask.subtasks?.length || 0) ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <button
+                      onClick={handleBulkDeleteSubtasks}
+                      disabled={selectedSubtaskIds.size === 0}
+                      className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete ({selectedSubtaskIds.size})
+                    </button>
+                    <button
+                      onClick={() => { setIsSubtaskSelectionMode(false); setSelectedSubtaskIds(new Set()) }}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsSubtaskSelectionMode(true)}
+                    className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
+                  >
+                    <Check className="w-3 h-3" />
+                    Select
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="space-y-2 mb-4">
             {sortedSubtasks.map(s => {
               const subtaskOverdue = isOverdue(s.reminder_date) && !s.is_completed
+              const isSelected = selectedSubtaskIds.has(s.id)
               return (
                 <div 
                   key={s.id} 
                   className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors ${
                     subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
-                  }`}
+                  } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
                 >
-                  <button
-                    onClick={() => toggleSubtask(s.id)}
-                    className={`checkbox-custom flex-shrink-0 ${s.is_completed ? 'checked' : ''}`}
-                    style={{ width: 20, height: 20 }}
-                  >
-                    {s.is_completed && <Check className="w-3 h-3" />}
-                  </button>
+                  {isSubtaskSelectionMode ? (
+                    <button
+                      onClick={(e) => toggleSubtaskSelection(s.id, e)}
+                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                        isSelected 
+                          ? 'bg-brand-600 border-brand-600 text-white' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toggleSubtask(s.id)}
+                      className={`checkbox-custom flex-shrink-0 ${s.is_completed ? 'checked' : ''}`}
+                      style={{ width: 20, height: 20 }}
+                    >
+                      {s.is_completed && <Check className="w-3 h-3" />}
+                    </button>
+                  )}
                   <span className={`flex-1 text-sm min-w-0 ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : ''}`}>
                     {s.title}
                   </span>
-                  <ReminderPicker
-                    value={s.reminder_date}
-                    onChange={(date) => updateSubtaskReminder(s.id, date)}
-                    compact
-                  />
-                  <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {!isSubtaskSelectionMode && (
+                    <>
+                      <ReminderPicker
+                        value={s.reminder_date}
+                        onChange={(date) => updateSubtaskReminder(s.id, date)}
+                        compact
+                      />
+                      <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               )
             })}
@@ -3185,9 +3404,13 @@ function TaskDetail() {
 // ALL TASKS VIEW
 // ============================================
 function AllTasksView() {
-  const { projects, setSelectedProject, setSelectedTask, setView } = useApp()
+  const { projects, setProjects, setSelectedProject, setSelectedTask, setView } = useApp()
+  const { demoMode } = useAuth()
+  const [activeSubTab, setActiveSubTab] = useState('scheduled') // 'scheduled' or 'all'
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
 
   const handleSortChange = (newOption) => {
     if (newOption === sortOption) {
@@ -3198,6 +3421,7 @@ function AllTasksView() {
     }
   }
 
+  // Collect all tasks
   const allTasks = []
   projects.forEach(p => {
     p.stages?.forEach((s, si) => {
@@ -3207,9 +3431,14 @@ function AllTasksView() {
     })
   })
 
+  // Filter based on active sub-tab
+  const filteredTasks = activeSubTab === 'scheduled' 
+    ? allTasks.filter(({ task }) => task.reminder_date)
+    : allTasks
+
   // Sort tasks: overdue first, then by selected option
   const dir = sortDirection === 'asc' ? 1 : -1
-  allTasks.sort((a, b) => {
+  filteredTasks.sort((a, b) => {
     const aOverdue = isOverdue(a.task.reminder_date) && !a.task.is_completed
     const bOverdue = isOverdue(b.task.reminder_date) && !b.task.is_completed
     
@@ -3230,11 +3459,121 @@ function AllTasksView() {
     return 0
   })
 
+  const toggleTaskSelection = (taskId, e) => {
+    e.stopPropagation()
+    const newSelected = new Set(selectedTaskIds)
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId)
+    } else {
+      newSelected.add(taskId)
+    }
+    setSelectedTaskIds(newSelected)
+  }
+
+  const selectAllTasks = () => {
+    if (selectedTaskIds.size === filteredTasks.length) {
+      setSelectedTaskIds(new Set())
+    } else {
+      setSelectedTaskIds(new Set(filteredTasks.map(({ task }) => task.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return
+    if (!window.confirm(`Delete ${selectedTaskIds.size} task(s)?`)) return
+    
+    // Delete each selected task
+    const newProjects = projects.map(project => ({
+      ...project,
+      stages: project.stages?.map(stage => ({
+        ...stage,
+        tasks: stage.tasks?.filter(task => !selectedTaskIds.has(task.id)) || []
+      })) || []
+    }))
+    
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+    
+    if (!demoMode) {
+      for (const taskId of selectedTaskIds) {
+        await db.deleteTask(taskId)
+      }
+    }
+    
+    setSelectedTaskIds(new Set())
+    setIsSelectionMode(false)
+  }
+
+  const scheduledCount = allTasks.filter(({ task }) => task.reminder_date).length
+  const allCount = allTasks.length
+
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">All Tasks</h1>
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 w-full sm:w-auto">
+      <div className="flex flex-col gap-4 mb-6">
+        {/* Sub-tabs for Scheduled vs All with selection controls */}
+        <div className="flex items-center justify-between border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setActiveSubTab('scheduled'); setSelectedTaskIds(new Set()) }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeSubTab === 'scheduled'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Clock className="w-4 h-4 inline mr-1.5" />
+              Scheduled ({scheduledCount})
+            </button>
+            <button
+              onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeSubTab === 'all'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <List className="w-4 h-4 inline mr-1.5" />
+              All Tasks ({allCount})
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {isSelectionMode ? (
+              <>
+                <button
+                  onClick={selectAllTasks}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  {selectedTaskIds.size === filteredTasks.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedTaskIds.size === 0}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete ({selectedTaskIds.size})
+                </button>
+                <button
+                  onClick={() => { setIsSelectionMode(false); setSelectedTaskIds(new Set()) }}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsSelectionMode(true)}
+                className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
+              >
+                <Check className="w-3 h-3" />
+                Select
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sort options */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
           {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
             <button
               key={opt.key}
@@ -3254,30 +3593,53 @@ function AllTasksView() {
         </div>
       </div>
 
-      {allTasks.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <div className="glass-card rounded-2xl p-8 sm:p-12 text-center">
-          <div className="text-4xl sm:text-5xl mb-4">📋</div>
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">No tasks yet</h2>
-          <p className="text-gray-500 text-sm sm:text-base">Create a project and add some tasks!</p>
+          <div className="text-4xl sm:text-5xl mb-4">{activeSubTab === 'scheduled' ? '📅' : '📋'}</div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+            {activeSubTab === 'scheduled' ? 'No scheduled tasks' : 'No tasks yet'}
+          </h2>
+          <p className="text-gray-500 text-sm sm:text-base">
+            {activeSubTab === 'scheduled' 
+              ? 'Tasks with reminders will appear here'
+              : 'Create a project and add some tasks!'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {allTasks.map(({ project, stage, stageIndex, task }, i) => {
+          {filteredTasks.map(({ project, stage, stageIndex, task }, i) => {
             const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
+            const isSelected = selectedTaskIds.has(task.id)
             return (
               <div
                 key={`${project.id}-${task.id}`}
                 className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer animate-fade-in ${
                   taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
-                }`}
+                } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
                 style={{ animationDelay: `${i * 30}ms` }}
                 onClick={() => {
-                  setSelectedProject(project)
-                  setSelectedTask({ task, stageIndex })
-                  setView('task')
+                  if (isSelectionMode) {
+                    toggleTaskSelection(task.id, { stopPropagation: () => {} })
+                  } else {
+                    setSelectedProject(project)
+                    setSelectedTask({ task, stageIndex })
+                    setView('task')
+                  }
                 }}
               >
                 <div className="flex items-center gap-2 sm:gap-4">
+                  {isSelectionMode && (
+                    <button
+                      onClick={(e) => toggleTaskSelection(task.id, e)}
+                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                        isSelected 
+                          ? 'bg-brand-600 border-brand-600 text-white' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                    </button>
+                  )}
                   <span className="text-2xl sm:text-3xl">{project.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <div className={`font-medium truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
@@ -3292,7 +3654,7 @@ function AllTasksView() {
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  {!isSelectionMode && <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />}
                 </div>
               </div>
             )
@@ -3334,6 +3696,96 @@ export default function App() {
       setNotifications(data || [])
     }
   }
+
+  // Check for overdue tasks and create notifications
+  const checkOverdueTasks = (projectsList, existingNotifications) => {
+    const overdueTasks = []
+    const overdueSubtasks = []
+    
+    projectsList.forEach(project => {
+      project.stages?.forEach((stage, stageIndex) => {
+        stage.tasks?.forEach(task => {
+          // Check if task is overdue
+          if (task.reminder_date && isOverdue(task.reminder_date) && !task.is_completed) {
+            overdueTasks.push({
+              project,
+              stage,
+              stageIndex,
+              task
+            })
+          }
+          
+          // Check subtasks
+          task.subtasks?.forEach(subtask => {
+            if (subtask.reminder_date && isOverdue(subtask.reminder_date) && !subtask.is_completed) {
+              overdueSubtasks.push({
+                project,
+                stage,
+                stageIndex,
+                task,
+                subtask
+              })
+            }
+          })
+        })
+      })
+    })
+    
+    // Create notifications for overdue items that don't already have one
+    const newNotifications = []
+    const existingNotifKeys = new Set(existingNotifications.map(n => `${n.type}-${n.task_id || ''}-${n.subtask_id || ''}`))
+    
+    overdueTasks.forEach(({ project, task }) => {
+      const key = `task_overdue-${task.id}-`
+      if (!existingNotifKeys.has(key)) {
+        newNotifications.push({
+          id: uuid(),
+          type: 'task_overdue',
+          title: `Task overdue: ${task.title}`,
+          message: `${project.emoji} ${project.title} - ${formatReminderDate(task.reminder_date)}`,
+          project_id: project.id,
+          task_id: task.id,
+          is_read: false,
+          created_at: new Date().toISOString()
+        })
+      }
+    })
+    
+    overdueSubtasks.forEach(({ project, task, subtask }) => {
+      const key = `subtask_overdue--${subtask.id}`
+      if (!existingNotifKeys.has(key)) {
+        newNotifications.push({
+          id: uuid(),
+          type: 'subtask_overdue',
+          title: `Subtask overdue: ${subtask.title}`,
+          message: `${project.emoji} ${task.title} - ${formatReminderDate(subtask.reminder_date)}`,
+          project_id: project.id,
+          task_id: task.id,
+          subtask_id: subtask.id,
+          is_read: false,
+          created_at: new Date().toISOString()
+        })
+      }
+    })
+    
+    return newNotifications
+  }
+
+  // Effect to check for overdue tasks when projects change
+  useEffect(() => {
+    if (projects.length === 0) return
+    
+    const newOverdueNotifications = checkOverdueTasks(projects, notifications)
+    
+    if (newOverdueNotifications.length > 0) {
+      const allNotifications = [...newOverdueNotifications, ...notifications]
+      setNotifications(allNotifications)
+      
+      if (demoMode) {
+        localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
+      }
+    }
+  }, [projects])
 
   // Notification handlers
   const handleMarkNotificationRead = async (id) => {
