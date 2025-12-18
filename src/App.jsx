@@ -2808,12 +2808,12 @@ function ProjectDetail() {
                             </span>
                           )}
                           {task.updated_at ? (
-                            <span className="text-gray-300 hidden sm:inline" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
-                              {formatRelativeDate(task.updated_at)}
+                            <span className="text-gray-300 hidden sm:inline" title={`Modified: ${new Date(task.updated_at).toLocaleString()}${task.modified_by_name ? ` by ${task.modified_by_name}` : ''}`}>
+                              {formatRelativeDate(task.updated_at)}{isShared && task.modified_by_name && ` by ${task.modified_by === user?.id ? 'you' : task.modified_by_name}`}
                             </span>
                           ) : task.created_at && (
-                            <span className="text-gray-300 hidden sm:inline" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
-                              {formatRelativeDate(task.created_at)}
+                            <span className="text-gray-300 hidden sm:inline" title={`Created: ${new Date(task.created_at).toLocaleString()}${task.created_by_name ? ` by ${task.created_by_name}` : ''}`}>
+                              {formatRelativeDate(task.created_at)}{isShared && task.created_by_name && ` by ${task.created_by === user?.id ? 'you' : task.created_by_name}`}
                             </span>
                           )}
                         </div>
@@ -3675,14 +3675,14 @@ function TaskDetail() {
                 onChange={updateTaskReminder}
               />
               {currentTask.created_at && (
-                <span className="flex items-center gap-1 hidden sm:flex" title={new Date(currentTask.created_at).toLocaleString()}>
+                <span className="flex items-center gap-1 hidden sm:flex" title={`${new Date(currentTask.created_at).toLocaleString()}${currentTask.created_by_name ? ` by ${currentTask.created_by_name}` : ''}`}>
                   <Clock className="w-3 h-3" />
-                  Created {formatRelativeDate(currentTask.created_at)}
+                  Created {formatRelativeDate(currentTask.created_at)}{isShared && currentTask.created_by_name && ` by ${currentTask.created_by === user?.id ? 'you' : currentTask.created_by_name}`}
                 </span>
               )}
               {currentTask.updated_at && currentTask.updated_at !== currentTask.created_at && (
-                <span className="hidden sm:inline" title={new Date(currentTask.updated_at).toLocaleString()}>
-                  • Modified {formatRelativeDate(currentTask.updated_at)}
+                <span className="hidden sm:inline" title={`${new Date(currentTask.updated_at).toLocaleString()}${currentTask.modified_by_name ? ` by ${currentTask.modified_by_name}` : ''}`}>
+                  • Modified {formatRelativeDate(currentTask.updated_at)}{isShared && currentTask.modified_by_name && ` by ${currentTask.modified_by === user?.id ? 'you' : currentTask.modified_by_name}`}
                 </span>
               )}
             </div>
@@ -3772,9 +3772,19 @@ function TaskDetail() {
                       {s.is_completed && <Check className="w-3 h-3" />}
                     </button>
                   )}
-                  <span className={`flex-1 text-sm min-w-0 ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : ''}`}>
-                    {s.title}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : ''}`}>
+                      {s.title}
+                    </span>
+                    {isShared && (s.created_by_name || s.modified_by_name) && (
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {s.modified_by_name && s.updated_at !== s.created_at
+                          ? `Modified ${formatRelativeDate(s.updated_at)} by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`
+                          : s.created_by_name && `Created by ${s.created_by === user?.id ? 'you' : s.created_by_name}`
+                        }
+                      </div>
+                    )}
+                  </div>
                   {!isSubtaskSelectionMode && (
                     <>
                       <ReminderPicker
@@ -3853,7 +3863,7 @@ function TaskDetail() {
 // ============================================
 function AllTasksView() {
   const { projects, setProjects, setSelectedProject, setSelectedTask, setView } = useApp()
-  const { demoMode } = useAuth()
+  const { demoMode, user } = useAuth()
   const [activeSubTab, setActiveSubTab] = useState('active') // 'active', 'scheduled', 'complete', 'all'
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc')
@@ -4341,6 +4351,15 @@ function AllTasksView() {
                             Subtask scheduled
                           </span>
                         )}
+                        {/* Show modified by for shared projects */}
+                        {(project.owner_id !== user?.id || project.project_members?.length > 0) && (task.modified_by_name || task.created_by_name) && (
+                          <span className="text-[9px] sm:text-[10px] text-gray-400 hidden sm:inline">
+                            {task.modified_by_name && task.updated_at !== task.created_at
+                              ? `Modified by ${task.modified_by === user?.id ? 'you' : task.modified_by_name}`
+                              : task.created_by_name && `Created by ${task.created_by === user?.id ? 'you' : task.created_by_name}`
+                            }
+                          </span>
+                        )}
                       </div>
                     </div>
                     {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
@@ -4352,6 +4371,7 @@ function AllTasksView() {
                   <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
                     {task.subtasks.map(subtask => {
                       const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                      const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
                       return (
                         <div 
                           key={subtask.id}
@@ -4365,9 +4385,19 @@ function AllTasksView() {
                           >
                             {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
                           </button>
-                          <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
-                            {subtask.title}
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                              {subtask.title}
+                            </span>
+                            {isSharedProject && (subtask.created_by_name || subtask.modified_by_name) && (
+                              <span className="text-[10px] text-gray-400 ml-2">
+                                {subtask.modified_by_name && subtask.updated_at !== subtask.created_at
+                                  ? `by ${subtask.modified_by === user?.id ? 'you' : subtask.modified_by_name}`
+                                  : subtask.created_by_name && `by ${subtask.created_by === user?.id ? 'you' : subtask.created_by_name}`
+                                }
+                              </span>
+                            )}
+                          </div>
                           {!isCompleted && (
                             <ReminderPicker
                               value={subtask.reminder_date}
