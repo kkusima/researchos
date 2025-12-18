@@ -5,7 +5,7 @@ import {
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
-  LayoutGrid, List, Bell, Calendar, AlertCircle
+  LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle
 } from 'lucide-react'
 
 // App Context
@@ -3602,6 +3602,53 @@ function AllTasksView() {
     }
   }
 
+  const handleBulkComplete = async () => {
+    if (selectedTaskIds.size === 0) return
+    
+    const now = new Date().toISOString()
+    const newProjects = projects.map(project => ({
+      ...project,
+      updated_at: now,
+      stages: project.stages?.map(stage => ({
+        ...stage,
+        tasks: stage.tasks?.map(task => {
+          if (selectedTaskIds.has(task.id)) {
+            // Mark task complete and all its subtasks
+            return {
+              ...task,
+              is_completed: true,
+              updated_at: now,
+              subtasks: task.subtasks?.map(s => ({ ...s, is_completed: true })) || []
+            }
+          }
+          return task
+        }) || []
+      })) || []
+    }))
+    
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+    
+    if (!demoMode) {
+      for (const { task } of filteredTasks) {
+        if (selectedTaskIds.has(task.id)) {
+          await db.updateTask(task.id, { is_completed: true })
+          // Also complete all subtasks
+          if (task.subtasks?.length > 0) {
+            for (const subtask of task.subtasks) {
+              if (!subtask.is_completed) {
+                await db.updateSubtask(subtask.id, { is_completed: true })
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    setSelectedTaskIds(new Set())
+    setIsSelectionMode(false)
+  }
+
   const handleBulkDelete = async () => {
     if (selectedTaskIds.size === 0) return
     if (!window.confirm(`Delete ${selectedTaskIds.size} task(s)?`)) return
@@ -3737,6 +3784,14 @@ function AllTasksView() {
                   className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
                 >
                   {selectedTaskIds.size === filteredTasks.length ? 'Deselect' : 'Select All'}
+                </button>
+                <button
+                  onClick={handleBulkComplete}
+                  disabled={selectedTaskIds.size === 0}
+                  className="text-[10px] sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <CheckCircle className="w-3 h-3" />
+                  <span className="hidden sm:inline">Complete</span> ({selectedTaskIds.size})
                 </button>
                 <button
                   onClick={handleBulkDelete}
