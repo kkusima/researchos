@@ -1421,10 +1421,16 @@ function ProjectsView() {
 
   const sortedProjects = computeSorted()
 
-  const handleReorder = (newOrder) => {
+  const [reorderLoading, setReorderLoading] = useState(false)
+  const handleReorder = async (newOrder) => {
+    setReorderLoading(true)
     const updated = newOrder.map((p, i) => ({ ...p, priority_rank: i + 1 }))
-    reorderProjects(updated)
-    setShowReorder(false)
+    try {
+      await reorderProjects(updated)
+      setShowReorder(false)
+    } finally {
+      setReorderLoading(false)
+    }
   }
 
   const handleBulkDelete = () => {
@@ -1763,6 +1769,7 @@ function ReorderModal({ projects, onReorder, onClose }) {
     setDraggedIndex(null)
   }
 
+  const { reorderLoading } = useApp();
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div 
@@ -1771,7 +1778,7 @@ function ReorderModal({ projects, onReorder, onClose }) {
       >
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Reorder Priorities</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg" disabled={reorderLoading}>
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -1799,11 +1806,11 @@ function ReorderModal({ projects, onReorder, onClose }) {
             ))}
           </div>
           <div className="flex gap-3 mt-6">
-            <button onClick={onClose} className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+            <button onClick={onClose} className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50" disabled={reorderLoading}>
               Cancel
             </button>
-            <button onClick={() => onReorder(workingProjects)} className="flex-1 btn-gradient">
-              Save Order
+            <button onClick={() => onReorder(workingProjects)} className="flex-1 btn-gradient" disabled={reorderLoading}>
+              {reorderLoading ? 'Saving...' : 'Save Order'}
             </button>
           </div>
         </div>
@@ -4803,9 +4810,9 @@ export default function App() {
     }
   }, [user, demoMode, projects.length > 0]) // Only re-subscribe when user changes or projects go from 0 to non-zero
 
-  const reorderProjects = (updatedProjects) => {
-    setProjects(updatedProjects)
+  const reorderProjects = async (updatedProjects) => {
     if (demoMode) {
+      setProjects(updatedProjects)
       saveLocal(updatedProjects)
       // Also save member priorities for demo mode
       const memberPriorities = {}
@@ -4818,27 +4825,30 @@ export default function App() {
       if (Object.keys(memberPriorities).length > 0) {
         localStorage.setItem('researchos_member_priorities', JSON.stringify(memberPriorities))
       }
-    } else {
-      // In real mode, update priorities differently for owned vs shared projects
-      const ownedUpdates = []
-      const sharedUpdates = []
-      
-      updatedProjects.forEach((project, index) => {
-        if (project.owner_id === user?.id) {
-          // Owned projects: update project.priority_rank
-          ownedUpdates.push(
-            db.updateProject(project.id, { priority_rank: index + 1 })
-          )
-        } else {
-          // Shared projects: update project_members.priority_rank for this user
-          sharedUpdates.push(
-            db.updateMemberPriority(project.id, user?.id, index + 1)
-          )
-        }
-      })
-      
-      Promise.all([...ownedUpdates, ...sharedUpdates])
-        .catch((e) => console.error('❌ Failed to persist priority order:', e))
+      return
+    }
+    // In real mode, update priorities differently for owned vs shared projects
+    const ownedUpdates = []
+    const sharedUpdates = []
+    updatedProjects.forEach((project, index) => {
+      if (project.owner_id === user?.id) {
+        // Owned projects: update project.priority_rank
+        ownedUpdates.push(
+          db.updateProject(project.id, { priority_rank: index + 1 })
+        )
+      } else {
+        // Shared projects: update project_members.priority_rank for this user
+        sharedUpdates.push(
+          db.updateMemberPriority(project.id, user?.id, index + 1)
+        )
+      }
+    })
+    try {
+      await Promise.all([...ownedUpdates, ...sharedUpdates])
+      setProjects(updatedProjects)
+    } catch (e) {
+      console.error('❌ Failed to persist priority order:', e)
+      // Optionally show error to user
     }
   }
 
