@@ -3389,6 +3389,8 @@ function TaskDetail() {
   const [newComment, setNewComment] = useState('')
   const [isSubtaskSelectionMode, setIsSubtaskSelectionMode] = useState(false)
   const [selectedSubtaskIds, setSelectedSubtaskIds] = useState(new Set())
+  const [editingSubtaskId, setEditingSubtaskId] = useState(null)
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('')
 
   if (!selectedTask || !selectedProject) return null
 
@@ -3551,6 +3553,25 @@ function TaskDetail() {
         }
       }
     }
+  }
+
+  const updateSubtaskTitle = async (subtaskId, newTitle) => {
+    const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
+    if (!subtask || subtask.title === newTitle) {
+      setEditingSubtaskId(null)
+      return
+    }
+
+    updateTask({
+      subtasks: currentTask.subtasks.map(s =>
+        s.id === subtaskId ? { ...s, title: newTitle } : s
+      )
+    })
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { title: newTitle })
+    }
+    setEditingSubtaskId(null)
   }
 
   const toggleSubtask = async (subtaskId) => {
@@ -3773,9 +3794,34 @@ function TaskDetail() {
                     </button>
                   )}
                   <div className="flex-1 min-w-0">
-                    <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : ''}`}>
-                      {s.title}
-                    </span>
+                    {editingSubtaskId === s.id ? (
+                      <input
+                        type="text"
+                        value={editingSubtaskTitle}
+                        onChange={e => setEditingSubtaskTitle(e.target.value)}
+                        onBlur={() => updateSubtaskTitle(s.id, editingSubtaskTitle)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') updateSubtaskTitle(s.id, editingSubtaskTitle)
+                          if (e.key === 'Escape') setEditingSubtaskId(null)
+                        }}
+                        className="w-full bg-white rounded px-1 py-0.5 border border-gray-300 text-sm"
+                        autoFocus
+                        onClick={e => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        className={`text-sm ${s.is_completed ? 'line-through text-gray-400 cursor-default' : subtaskOverdue ? 'text-red-700' : 'cursor-pointer'}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (!s.is_completed) {
+                            setEditingSubtaskId(s.id)
+                            setEditingSubtaskTitle(s.title)
+                          }
+                        }}
+                      >
+                        {s.title}
+                      </span>
+                    )}
                     {isShared && (s.created_by_name || s.modified_by_name) && (
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         {s.modified_by_name && s.updated_at !== s.created_at
@@ -4778,7 +4824,7 @@ export default function App() {
       const sharedUpdates = []
       
       updatedProjects.forEach((project, index) => {
-        if (project.isOwner) {
+        if (project.owner_id === user?.id) {
           // Owned projects: update project.priority_rank
           ownedUpdates.push(
             db.updateProject(project.id, { priority_rank: index + 1 })
