@@ -560,8 +560,37 @@ function GlobalSearch({ projects, onNavigate }) {
 // ============================================
 // NOTIFICATION PANE
 // ============================================
-function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, onClear, onNavigate, onClose }) {
+function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, onDeleteMultiple, onClear, onNavigate, onClose }) {
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
   const unreadCount = notifications.filter(n => !n.is_read).length
+
+  const toggleSelection = (id, e) => {
+    e.stopPropagation()
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const selectAll = () => {
+    if (selectedIds.size === notifications.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(notifications.map(n => n.id)))
+    }
+  }
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size > 0 && onDeleteMultiple) {
+      onDeleteMultiple(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setIsSelectionMode(false)
+    }
+  }
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -584,8 +613,52 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[70vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">Notifications</h3>
+          <h3 className="font-semibold text-gray-900">
+            Notifications
+            {unreadCount > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </h3>
           <div className="flex items-center gap-2">
+            {notifications.length > 0 && (
+              <button
+                onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()) }}
+                className={`text-xs ${isSelectionMode ? 'text-brand-600 font-medium' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                {isSelectionMode ? 'Cancel' : 'Select'}
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {/* Selection mode toolbar */}
+        {isSelectionMode && notifications.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
+            <button
+              onClick={selectAll}
+              className="text-xs text-brand-600 hover:text-brand-700"
+            >
+              {selectedIds.size === notifications.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{selectedIds.size} selected</span>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleDeleteSelected}
+                  className="text-xs text-red-500 hover:text-red-600 font-medium"
+                >
+                  Delete selected
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Normal mode toolbar */}
+        {!isSelectionMode && notifications.length > 0 && (
+          <div className="flex items-center justify-end gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
             {unreadCount > 0 && (
               <button
                 onClick={onMarkAllRead}
@@ -594,16 +667,14 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
                 Mark all read
               </button>
             )}
-            {notifications.length > 0 && (
-              <button
-                onClick={onClear}
-                className="text-xs text-gray-400 hover:text-red-500"
-              >
-                Clear all
-              </button>
-            )}
+            <button
+              onClick={onClear}
+              className="text-xs text-red-400 hover:text-red-500"
+            >
+              Clear all
+            </button>
           </div>
-        </div>
+        )}
         
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
@@ -618,13 +689,31 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
                   key={notif.id}
                   className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer ${
                     !notif.is_read ? 'bg-blue-50/50' : ''
-                  }`}
+                  } ${selectedIds.has(notif.id) ? 'bg-brand-50 ring-1 ring-brand-200' : ''}`}
                   onClick={() => {
-                    if (!notif.is_read) onMarkRead(notif.id)
-                    if (notif.project_id) onNavigate(notif)
+                    if (isSelectionMode) {
+                      toggleSelection(notif.id, { stopPropagation: () => {} })
+                    } else {
+                      if (!notif.is_read) onMarkRead(notif.id)
+                      if (notif.project_id) onNavigate(notif)
+                    }
                   }}
                 >
                   <div className="flex gap-3">
+                    {isSelectionMode && (
+                      <div className="flex-shrink-0 mt-0.5">
+                        <button
+                          onClick={(e) => toggleSelection(notif.id, e)}
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                            selectedIds.has(notif.id)
+                              ? 'bg-brand-600 border-brand-600 text-white'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {selectedIds.has(notif.id) && <Check className="w-2.5 h-2.5" />}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex-shrink-0 mt-0.5">
                       {getNotificationIcon(notif.type)}
                     </div>
@@ -639,12 +728,14 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
                         {formatRelativeDate(notif.created_at)}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
-                      className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    {!isSelectionMode && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
+                        className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1082,7 +1173,7 @@ function ProfileSettingsModal({ onClose }) {
 // ============================================
 // HEADER
 // ============================================
-function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkAllNotificationsRead, onDeleteNotification, onClearAllNotifications, onNotificationNavigate }) {
+function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate }) {
   const { user, signOut, demoMode, isEmailAuth } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -1131,6 +1222,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                     onMarkRead={onMarkNotificationRead}
                     onMarkAllRead={onMarkAllNotificationsRead}
                     onDelete={onDeleteNotification}
+                    onDeleteMultiple={onDeleteMultipleNotifications}
                     onClear={onClearAllNotifications}
                     onNavigate={(notif) => {
                       setShowNotifications(false)
@@ -3646,9 +3738,14 @@ function AllTasksView() {
     })
   })
 
+  // Helper to check if a task has any scheduled subtasks
+  const hasScheduledSubtasks = (task) => {
+    return task.subtasks?.some(s => s.reminder_date && !s.is_completed) || false
+  }
+
   // Filter based on active sub-tab
   const filteredTasks = activeSubTab === 'scheduled' 
-    ? allTasks.filter(({ task }) => task.reminder_date && !task.is_completed)
+    ? allTasks.filter(({ task }) => (task.reminder_date || hasScheduledSubtasks(task)) && !task.is_completed)
     : activeSubTab === 'active'
     ? allTasks.filter(({ task }) => !task.is_completed)
     : activeSubTab === 'complete'
@@ -3877,7 +3974,7 @@ function AllTasksView() {
   }
 
   const activeCount = allTasks.filter(({ task }) => !task.is_completed).length
-  const scheduledCount = allTasks.filter(({ task }) => task.reminder_date && !task.is_completed).length
+  const scheduledCount = allTasks.filter(({ task }) => (task.reminder_date || hasScheduledSubtasks(task)) && !task.is_completed).length
   const completeCount = allTasks.filter(({ task }) => task.is_completed).length
   const allCount = allTasks.length
 
@@ -4095,6 +4192,13 @@ function AllTasksView() {
                             {formatReminderDate(task.reminder_date)}
                           </span>
                         )}
+                        {/* Show scheduled subtask indicator if task has scheduled subtasks but no task reminder */}
+                        {!task.reminder_date && hasScheduledSubtasks(task) && (
+                          <span className="text-[9px] sm:text-[10px] flex items-center gap-0.5 text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            Subtask scheduled
+                          </span>
+                        )}
                       </div>
                     </div>
                     {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
@@ -4224,13 +4328,14 @@ export default function App() {
           project_id: project.id,
           task_id: task.id,
           is_read: false,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          reminder_date: task.reminder_date
         })
       }
     })
     
     overdueSubtasks.forEach(({ project, task, subtask }) => {
-      const key = `subtask_overdue--${subtask.id}`
+      const key = `subtask_overdue-${task.id}-${subtask.id}`
       if (!existingNotifKeys.has(key)) {
         newNotifications.push({
           id: uuid(),
@@ -4241,7 +4346,8 @@ export default function App() {
           task_id: task.id,
           subtask_id: subtask.id,
           is_read: false,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          reminder_date: subtask.reminder_date
         })
       }
     })
@@ -4296,6 +4402,22 @@ export default function App() {
     } else {
       await db.deleteNotification(id)
       setNotifications(notifications.filter(n => n.id !== id))
+    }
+  }
+
+  const handleDeleteMultipleNotifications = async (ids) => {
+    if (demoMode) {
+      const idsSet = new Set(ids)
+      const updated = notifications.filter(n => !idsSet.has(n.id))
+      setNotifications(updated)
+      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+    } else {
+      // Delete each notification
+      for (const id of ids) {
+        await db.deleteNotification(id)
+      }
+      const idsSet = new Set(ids)
+      setNotifications(notifications.filter(n => !idsSet.has(n.id)))
     }
   }
 
@@ -4455,6 +4577,7 @@ export default function App() {
               onMarkNotificationRead={handleMarkNotificationRead}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onDeleteNotification={handleDeleteNotification}
+              onDeleteMultipleNotifications={handleDeleteMultipleNotifications}
               onClearAllNotifications={handleClearAllNotifications}
               onNotificationNavigate={handleNotificationNavigate}
             />
