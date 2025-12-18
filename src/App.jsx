@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
 import { 
@@ -34,11 +35,17 @@ const isOverdue = (reminderDate) => {
   return new Date(reminderDate) < new Date()
 }
 
-// Format date for input field
+// Format date for input field (using local timezone)
 const formatDateForInput = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
-  return date.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm format
+  // Use local time components instead of UTC (toISOString uses UTC)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
 // Format reminder date for display
@@ -654,11 +661,55 @@ function NotificationPane({ notifications, onMarkRead, onMarkAllRead, onDelete, 
 // ============================================
 function ReminderPicker({ value, onChange, compact = false }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [pendingValue, setPendingValue] = useState('')
+  const buttonRef = useRef(null)
   const hasReminder = !!value
   const overdue = isOverdue(value)
 
+  // Initialize pending value when opening or when value changes
+  useEffect(() => {
+    if (isOpen) {
+      setPendingValue(formatDateForInput(value) || formatDateForInput(new Date().toISOString()))
+    }
+  }, [isOpen, value])
+
+  // Get the user's timezone for display
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  // Quick set helper - uses local time correctly
+  const handleQuickSet = (hours) => {
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + hours * 60 * 60 * 1000)
+    onChange(futureDate.toISOString())
+    setIsOpen(false)
+  }
+
+  // Confirm the pending value
+  const handleConfirm = () => {
+    if (pendingValue) {
+      // Parse the local datetime string and convert to ISO
+      const localDate = new Date(pendingValue)
+      onChange(localDate.toISOString())
+    }
+    setIsOpen(false)
+  }
+
+  // Format time for preview display
+  const formatPreviewTime = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
   return (
-    <div className="relative">
+    <div className="relative" ref={buttonRef}>
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
@@ -676,22 +727,65 @@ function ReminderPicker({ value, onChange, compact = false }) {
         )}
       </button>
       
-      {isOpen && (
+      {isOpen && ReactDOM.createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} />
           <div 
-            className="absolute top-full left-0 mt-1 glass-card rounded-lg shadow-lg z-50 p-3 min-w-[200px] animate-fade-in"
+            className="fixed inset-0" 
+            style={{ zIndex: 9998 }}
+            onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} 
+          />
+          <div 
+            className="fixed bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[280px] animate-fade-in"
+            style={{
+              zIndex: 9999,
+              top: buttonRef.current ? buttonRef.current.getBoundingClientRect().bottom + 8 : 100,
+              left: buttonRef.current ? Math.min(
+                buttonRef.current.getBoundingClientRect().left,
+                window.innerWidth - 300
+              ) : 100,
+              maxHeight: 'calc(100vh - 100px)',
+              overflowY: 'auto'
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <label className="block text-xs font-medium text-gray-700 mb-2">Set Reminder</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-gray-800">Set Reminder</label>
+              <span className="text-[10px] text-gray-400">{userTimezone}</span>
+            </div>
+            
             <input
               type="datetime-local"
-              value={formatDateForInput(value)}
-              onChange={(e) => {
-                onChange(e.target.value ? new Date(e.target.value).toISOString() : null)
-              }}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-400 focus:border-transparent"
+              value={pendingValue}
+              onChange={(e) => setPendingValue(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             />
+            
+            {/* Preview of selected time */}
+            {pendingValue && (
+              <div className="mt-2 px-2 py-1.5 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-700 font-medium">
+                  {formatPreviewTime(pendingValue)}
+                </p>
+              </div>
+            )}
+            
+            {/* Action buttons */}
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={handleConfirm}
+                disabled={!pendingValue}
+                className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Done
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="px-3 py-2 text-gray-600 text-sm hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            
             {hasReminder && (
               <button
                 onClick={() => { onChange(null); setIsOpen(false); }}
@@ -700,9 +794,10 @@ function ReminderPicker({ value, onChange, compact = false }) {
                 Remove reminder
               </button>
             )}
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <p className="text-[10px] text-gray-400">Quick set:</p>
-              <div className="flex flex-wrap gap-1 mt-1">
+            
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 mb-2">Quick set:</p>
+              <div className="flex flex-wrap gap-1.5">
                 {[
                   { label: '1h', hours: 1 },
                   { label: '3h', hours: 3 },
@@ -711,13 +806,8 @@ function ReminderPicker({ value, onChange, compact = false }) {
                 ].map(opt => (
                   <button
                     key={opt.label}
-                    onClick={() => {
-                      const date = new Date()
-                      date.setHours(date.getHours() + opt.hours)
-                      onChange(date.toISOString())
-                      setIsOpen(false)
-                    }}
-                    className="px-2 py-1 text-[10px] bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+                    onClick={() => handleQuickSet(opt.hours)}
+                    className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                   >
                     {opt.label}
                   </button>
@@ -725,7 +815,8 @@ function ReminderPicker({ value, onChange, compact = false }) {
               </div>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
