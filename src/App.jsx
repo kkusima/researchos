@@ -2242,20 +2242,35 @@ function ProjectDetail() {
     const task = stage.tasks.find(t => t.id === taskId)
     if (!task) return
     
+    const newIsCompleted = !task.is_completed
     const now = new Date().toISOString()
+    
+    // If completing the task, also complete all subtasks
+    const updatedSubtasks = newIsCompleted && task.subtasks?.length > 0
+      ? task.subtasks.map(s => ({ ...s, is_completed: true }))
+      : task.subtasks
+    
     const updated = {
       ...project,
       updated_at: now,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, is_completed: !t.is_completed, updated_at: now } : t) }
+          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, is_completed: newIsCompleted, subtasks: updatedSubtasks, updated_at: now } : t) }
           : s
       )
     }
     updateProject(updated)
 
     if (!demoMode) {
-      await db.updateTask(taskId, { is_completed: !task.is_completed })
+      await db.updateTask(taskId, { is_completed: newIsCompleted })
+      // Also update all subtasks in the database if completing parent
+      if (newIsCompleted && task.subtasks?.length > 0) {
+        for (const subtask of task.subtasks) {
+          if (!subtask.is_completed) {
+            await db.updateSubtask(subtask.id, { is_completed: true })
+          }
+        }
+      }
     }
   }
 
@@ -2287,6 +2302,54 @@ function ProjectDetail() {
 
     if (!demoMode) {
       await db.updateTask(taskId, { reminder_date: reminderDate })
+    }
+  }
+
+  const toggleSubtask = async (taskId, subtaskId) => {
+    const task = stage.tasks.find(t => t.id === taskId)
+    if (!task) return
+    const subtask = task.subtasks?.find(s => s.id === subtaskId)
+    if (!subtask) return
+
+    const now = new Date().toISOString()
+    const updated = {
+      ...project,
+      updated_at: now,
+      stages: project.stages.map((s, i) => 
+        i === stageIndex 
+          ? { ...s, tasks: s.tasks.map(t => 
+              t.id === taskId 
+                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: !st.is_completed } : st), updated_at: now }
+                : t
+            )}
+          : s
+      )
+    }
+    updateProject(updated)
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { is_completed: !subtask.is_completed })
+    }
+  }
+
+  const updateSubtaskReminder = async (taskId, subtaskId, reminderDate) => {
+    const now = new Date().toISOString()
+    const updated = {
+      ...project,
+      stages: project.stages.map((s, i) => 
+        i === stageIndex 
+          ? { ...s, tasks: s.tasks.map(t => 
+              t.id === taskId 
+                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate } : st), updated_at: now }
+                : t
+            )}
+          : s
+      )
+    }
+    updateProject(updated)
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
     }
   }
 
@@ -2433,66 +2496,100 @@ function ProjectDetail() {
           ) : (
             sortedTasks.map((task, i) => {
               const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
+              const hasSubtasks = task.subtasks?.length > 0
               return (
                 <div
                   key={task.id}
-                  className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 animate-fade-in transition-all ${
+                  className={`glass-card glass-card-hover rounded-xl animate-fade-in transition-all ${
                     taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
                   }`}
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <button
-                      onClick={() => toggleTask(task.id)}
-                      className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
-                    >
-                      {task.is_completed && <Check className="w-3 h-3" />}
-                    </button>
-                    <div 
-                      className="flex-1 cursor-pointer min-w-0"
-                      onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
-                    >
-                      <div className={`font-medium ${task.is_completed ? 'line-through text-gray-400' : taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>
-                        {task.title}
-                      </div>
-                      <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
-                        {task.subtasks?.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            {task.subtasks.filter(s => s.is_completed).length}/{task.subtasks.length}
-                          </span>
-                        )}
-                        {task.comments?.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3" />
-                            {task.comments.length}
-                          </span>
-                        )}
-                        {task.updated_at ? (
-                          <span className="text-gray-300 hidden sm:inline" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
-                            {formatRelativeDate(task.updated_at)}
-                          </span>
-                        ) : task.created_at && (
-                          <span className="text-gray-300 hidden sm:inline" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
-                            {formatRelativeDate(task.created_at)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <ReminderPicker
-                        value={task.reminder_date}
-                        onChange={(date) => updateTaskReminder(task.id, date)}
-                        compact
-                      />
+                  <div className="p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       <button
-                        onClick={() => deleteTask(task.id)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        onClick={() => toggleTask(task.id)}
+                        className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {task.is_completed && <Check className="w-3 h-3" />}
                       </button>
+                      <div 
+                        className="flex-1 cursor-pointer min-w-0"
+                        onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
+                      >
+                        <div className={`font-medium ${task.is_completed ? 'line-through text-gray-400' : taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>
+                          {task.title}
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+                          {hasSubtasks && (
+                            <span className="flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              {task.subtasks.filter(s => s.is_completed).length}/{task.subtasks.length}
+                            </span>
+                          )}
+                          {task.comments?.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {task.comments.length}
+                            </span>
+                          )}
+                          {task.updated_at ? (
+                            <span className="text-gray-300 hidden sm:inline" title={`Modified: ${new Date(task.updated_at).toLocaleString()}`}>
+                              {formatRelativeDate(task.updated_at)}
+                            </span>
+                          ) : task.created_at && (
+                            <span className="text-gray-300 hidden sm:inline" title={`Created: ${new Date(task.created_at).toLocaleString()}`}>
+                              {formatRelativeDate(task.created_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <ReminderPicker
+                          value={task.reminder_date}
+                          onChange={(date) => updateTaskReminder(task.id, date)}
+                          compact
+                        />
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Always visible Subtasks */}
+                  {hasSubtasks && (
+                    <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
+                      {task.subtasks.map(subtask => {
+                        const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                        return (
+                          <div 
+                            key={subtask.id}
+                            className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''}`}
+                          >
+                            <button
+                              onClick={() => toggleSubtask(task.id, subtask.id)}
+                              className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''}`}
+                              style={{ width: 16, height: 16 }}
+                            >
+                              {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
+                            </button>
+                            <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                              {subtask.title}
+                            </span>
+                            <ReminderPicker
+                              value={subtask.reminder_date}
+                              onChange={(date) => updateSubtaskReminder(task.id, subtask.id, date)}
+                              compact
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })
@@ -3046,6 +3143,29 @@ function TaskDetail() {
     if (demoMode) saveLocal(newProjects)
   }
 
+  const toggleTaskCompletion = async () => {
+    const newIsCompleted = !currentTask.is_completed
+    
+    // If completing the task, also complete all subtasks
+    const updatedSubtasks = newIsCompleted && currentTask.subtasks?.length > 0
+      ? currentTask.subtasks.map(s => ({ ...s, is_completed: true }))
+      : currentTask.subtasks
+    
+    updateTask({ is_completed: newIsCompleted, subtasks: updatedSubtasks })
+    
+    if (!demoMode) {
+      await db.updateTask(task.id, { is_completed: newIsCompleted })
+      // Also update all subtasks in the database if completing parent
+      if (newIsCompleted && currentTask.subtasks?.length > 0) {
+        for (const subtask of currentTask.subtasks) {
+          if (!subtask.is_completed) {
+            await db.updateSubtask(subtask.id, { is_completed: true })
+          }
+        }
+      }
+    }
+  }
+
   const updateTaskReminder = async (reminderDate) => {
     updateTask({ reminder_date: reminderDate })
     if (!demoMode) {
@@ -3210,7 +3330,7 @@ function TaskDetail() {
         {/* Task Header */}
         <div className={`flex items-start gap-3 sm:gap-4 p-4 rounded-xl ${taskOverdue ? 'bg-red-50 border border-red-200' : ''}`}>
           <button
-            onClick={() => updateTask({ is_completed: !currentTask.is_completed })}
+            onClick={toggleTaskCompletion}
             className={`checkbox-custom mt-1 flex-shrink-0 ${currentTask.is_completed ? 'checked' : ''}`}
             style={{ width: 28, height: 28 }}
           >
@@ -3414,6 +3534,7 @@ function AllTasksView() {
   const [sortDirection, setSortDirection] = useState('asc')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
+  const [expandedTasks, setExpandedTasks] = useState(new Set())
 
   const handleSortChange = (newOption) => {
     if (newOption === sortOption) {
@@ -3505,6 +3626,75 @@ function AllTasksView() {
     
     setSelectedTaskIds(new Set())
     setIsSelectionMode(false)
+  }
+
+  const toggleExpanded = (taskId) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSubtask = async (projectId, stageIndex, taskId, subtaskId) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+    const task = project.stages[stageIndex]?.tasks?.find(t => t.id === taskId)
+    if (!task) return
+    const subtask = task.subtasks?.find(s => s.id === subtaskId)
+    if (!subtask) return
+
+    const now = new Date().toISOString()
+    const updatedProject = {
+      ...project,
+      updated_at: now,
+      stages: project.stages.map((s, i) => 
+        i === stageIndex 
+          ? { ...s, tasks: s.tasks.map(t => 
+              t.id === taskId 
+                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: !st.is_completed } : st), updated_at: now }
+                : t
+            )}
+          : s
+      )
+    }
+    const newProjects = projects.map(p => p.id === projectId ? updatedProject : p)
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { is_completed: !subtask.is_completed })
+    }
+  }
+
+  const updateSubtaskReminder = async (projectId, stageIndex, taskId, subtaskId, reminderDate) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+
+    const now = new Date().toISOString()
+    const updatedProject = {
+      ...project,
+      stages: project.stages.map((s, i) => 
+        i === stageIndex 
+          ? { ...s, tasks: s.tasks.map(t => 
+              t.id === taskId 
+                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate } : st), updated_at: now }
+                : t
+            )}
+          : s
+      )
+    }
+    const newProjects = projects.map(p => p.id === projectId ? updatedProject : p)
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
+    }
   }
 
   const scheduledCount = allTasks.filter(({ task }) => task.reminder_date).length
@@ -3612,55 +3802,102 @@ function AllTasksView() {
           {filteredTasks.map(({ project, stage, stageIndex, task }, i) => {
             const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
             const isSelected = selectedTaskIds.has(task.id)
+            const isExpanded = expandedTasks.has(task.id)
+            const hasSubtasks = task.subtasks?.length > 0
             return (
               <div
                 key={`${project.id}-${task.id}`}
-                className={`glass-card glass-card-hover rounded-xl p-3 sm:p-4 cursor-pointer animate-fade-in ${
+                className={`glass-card glass-card-hover rounded-xl animate-fade-in ${
                   taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
                 } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
                 style={{ animationDelay: `${i * 30}ms` }}
-                onClick={() => {
-                  if (isSelectionMode) {
-                    toggleTaskSelection(task.id, { stopPropagation: () => {} })
-                  } else {
-                    setSelectedProject(project)
-                    setSelectedTask({ task, stageIndex })
-                    setView('task')
-                  }
-                }}
               >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {isSelectionMode && (
-                    <button
-                      onClick={(e) => toggleTaskSelection(task.id, e)}
-                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                        isSelected 
-                          ? 'bg-brand-600 border-brand-600 text-white' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3 h-3" />}
-                    </button>
-                  )}
-                  <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-medium text-sm sm:text-base truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <PriorityBadge rank={project.priority_rank} />
-                        <span className="text-xs sm:text-sm text-gray-600 truncate max-w-[120px] sm:max-w-none">{project.title}</span>
-                      </span>
-                      <span className="tag tag-default text-[8px] sm:text-[9px] px-1.5 py-0.5">{stage.name}</span>
-                      {task.reminder_date && (
-                        <span className={`text-[9px] sm:text-[10px] flex items-center gap-0.5 ${taskOverdue ? 'text-red-600' : 'text-amber-600'}`}>
-                          <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                          {formatReminderDate(task.reminder_date)}
+                <div 
+                  className="p-3 sm:p-4 cursor-pointer"
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      toggleTaskSelection(task.id, { stopPropagation: () => {} })
+                    } else {
+                      setSelectedProject(project)
+                      setSelectedTask({ task, stageIndex })
+                      setView('task')
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {isSelectionMode && (
+                      <button
+                        onClick={(e) => toggleTaskSelection(task.id, e)}
+                        className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                          isSelected 
+                            ? 'bg-brand-600 border-brand-600 text-white' 
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3" />}
+                      </button>
+                    )}
+                    <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-medium text-sm sm:text-base truncate ${taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>{task.title}</div>
+                      <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <PriorityBadge rank={project.priority_rank} />
+                          <span className="text-xs sm:text-sm text-gray-600 truncate max-w-[120px] sm:max-w-none">{project.title}</span>
                         </span>
-                      )}
+                        <span className="tag tag-default text-[8px] sm:text-[9px] px-1.5 py-0.5">{stage.name}</span>
+                        {hasSubtasks && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleExpanded(task.id); }}
+                            className="flex items-center gap-0.5 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            <FileText className="w-3 h-3" />
+                            {task.subtasks.filter(s => s.is_completed).length}/{task.subtasks.length}
+                          </button>
+                        )}
+                        {task.reminder_date && (
+                          <span className={`text-[9px] sm:text-[10px] flex items-center gap-0.5 ${taskOverdue ? 'text-red-600' : 'text-amber-600'}`}>
+                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            {formatReminderDate(task.reminder_date)}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                   </div>
-                  {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                 </div>
+                
+                {/* Collapsible Subtasks */}
+                {hasSubtasks && isExpanded && (
+                  <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
+                    {task.subtasks.map(subtask => {
+                      const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                      return (
+                        <div 
+                          key={subtask.id}
+                          className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''}`}
+                        >
+                          <button
+                            onClick={() => toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
+                            className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''}`}
+                            style={{ width: 16, height: 16 }}
+                          >
+                            {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
+                          </button>
+                          <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                            {subtask.title}
+                          </span>
+                          <ReminderPicker
+                            value={subtask.reminder_date}
+                            onChange={(date) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date)}
+                            compact
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
