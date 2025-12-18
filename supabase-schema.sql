@@ -101,6 +101,11 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Prevent duplicate notifications for the same user and entity/type combination.
+-- This ensures one notification per (user_id, type, task_id, subtask_id).
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_unique_per_entity UNIQUE (user_id, type, task_id, subtask_id);
+
 -- Project invitations (for inviting users who haven't signed up yet)
 CREATE TABLE IF NOT EXISTS public.project_invitations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

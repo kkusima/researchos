@@ -419,9 +419,53 @@ export const db = {
       
       if (error) {
         logError('updateTask', error)
-      } else {
-        console.log('✅ Task updated:', data?.id, 'reminder_date:', data?.reminder_date)
+        return { data, error }
       }
+
+      // If modified_by provided and project is shared, notify collaborators
+      try {
+        if (data && updates.modified_by) {
+          // Determine project id via task -> stage -> project
+          const { data: task } = await supabase
+            .from('tasks')
+            .select('stage_id, title')
+            .eq('id', id)
+            .single()
+          if (task && task.stage_id) {
+            const { data: stage } = await supabase
+              .from('stages')
+              .select('project_id')
+              .eq('id', task.stage_id)
+              .single()
+            if (stage && stage.project_id) {
+              const modifierId = updates.modified_by
+              // If completion changed, use task_completed type
+              if (Object.prototype.hasOwnProperty.call(updates, 'is_completed')) {
+                const type = updates.is_completed ? 'task_completed' : 'task_uncompleted'
+                await module.exports.notifyCollaborators(stage.project_id, modifierId, {
+                  type,
+                  title: updates.is_completed ? 'Task completed' : 'Task updated',
+                  message: `${task.title} (${updates.is_completed ? 'completed' : 'updated'})`,
+                  task_id: id
+                })
+              } else {
+                // Generic task modified
+                await module.exports.notifyCollaborators(stage.project_id, modifierId, {
+                  type: 'task_modified',
+                  title: 'Task modified',
+                  message: `${task.title} → changes made`,
+                  task_id: id
+                })
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // swallow notification errors but log
+        logError('updateTask:notify', e)
+      }
+
+      console.log('✅ Task updated:', data?.id, 'reminder_date:', data?.reminder_date)
       return { data, error }
     } catch (error) {
       logError('updateTask:catch', error)
@@ -432,11 +476,39 @@ export const db = {
     if (!supabase) return { error: null }
     
     try {
+      // Fetch task info to notify collaborators before deletion
+      const { data: task } = await supabase
+        .from('tasks')
+        .select('title, stage_id')
+        .eq('id', id)
+        .single()
+
+      // Determine project and notify
+      if (task && task.stage_id) {
+        const { data: stage } = await supabase
+          .from('stages')
+          .select('project_id')
+          .eq('id', task.stage_id)
+          .single()
+        if (stage && stage.project_id) {
+          try {
+            await module.exports.notifyCollaborators(stage.project_id, null, {
+              type: 'task_deleted',
+              title: 'Task deleted',
+              message: `${task.title} was deleted`,
+              task_id: id
+            })
+          } catch (e) {
+            logError('deleteTask:notify', e)
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('tasks')
         .delete()
         .eq('id', id)
-      
+
       if (error) logError('deleteTask', error)
       return { error }
     } catch (error) {
@@ -571,6 +643,35 @@ export const db = {
         .single()
       
       if (error) logError('createComment', error)
+      // Notify collaborators about new comment
+      try {
+        if (data && comment.user_id) {
+          // Lookup task -> stage -> project
+          const { data: task } = await supabase
+            .from('tasks')
+            .select('title, stage_id')
+            .eq('id', comment.task_id)
+            .single()
+          if (task && task.stage_id) {
+            const { data: stage } = await supabase
+              .from('stages')
+              .select('project_id')
+              .eq('id', task.stage_id)
+              .single()
+            if (stage && stage.project_id) {
+              await module.exports.notifyCollaborators(stage.project_id, comment.user_id, {
+                type: 'comment_added',
+                title: 'New comment',
+                message: `${task.title}: ${comment.content}`,
+                task_id: comment.task_id
+              })
+            }
+          }
+        }
+      } catch (e) {
+        logError('createComment:notify', e)
+      }
+
       return { data, error }
     } catch (error) {
       logError('createComment:catch', error)
@@ -990,13 +1091,40 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
+      // Use upsert with onConflict to avoid creating duplicate notifications
+      // for the same (user_id, type, task_id, subtask_id) combination.
+      const conflictCols = ['user_id', 'type', 'task_id', 'subtask_id']
       const { data, error } = await supabase
         .from('notifications')
-        .insert(notification)
+        .upsert(notification, { onConflict: conflictCols })
         .select()
         .single()
 
-      if (error) logError('createNotification', error)
+      if (error) {
+        // If the error is due to unique constraint, try to fetch the existing notification and return it.
+        const msg = (error && (error.message || '')).toString().toLowerCase()
+        if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('constraint')) {
+          try {
+            const matchQuery = {
+              user_id: notification.user_id,
+              type: notification.type,
+              task_id: notification.task_id || null,
+              subtask_id: notification.subtask_id || null
+            }
+            const { data: existing, error: getErr } = await supabase
+              .from('notifications')
+              .select('*')
+              .match(matchQuery)
+              .limit(1)
+              .single()
+            if (!getErr) return { data: existing, error: null }
+          } catch (e) {
+            // fallthrough to log
+          }
+        }
+        logError('createNotification', error)
+        return { data: null, error }
+      }
       return { data, error }
     } catch (error) {
       logError('createNotification:catch', error)
@@ -1124,7 +1252,8 @@ export const db = {
       
       if (userIds.size === 0) return { error: null }
       
-      // Create notifications for all collaborators
+      // Create notifications for all collaborators (use upsert to avoid duplicates)
+      const conflictCols = ['user_id', 'type', 'task_id', 'subtask_id']
       const notifications = Array.from(userIds).map(userId => ({
         user_id: userId,
         type: notification.type,
@@ -1133,13 +1262,14 @@ export const db = {
         project_id: projectId,
         task_id: notification.task_id || null,
         subtask_id: notification.subtask_id || null,
-        is_read: false
+        is_read: false,
+        created_at: new Date().toISOString()
       }))
-      
+
       const { error } = await supabase
         .from('notifications')
-        .insert(notifications)
-      
+        .upsert(notifications, { onConflict: conflictCols })
+
       if (error) logError('notifyCollaborators', error)
       return { error }
     } catch (error) {

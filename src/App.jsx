@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useRef } from 'react'
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
@@ -786,9 +786,14 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
 // ============================================
 // REMINDER DATE PICKER
 // ============================================
-function ReminderPicker({ value, onChange, compact = false }) {
+function ReminderPicker({ value, onChange, compact = false, isShared = false, defaultScope = 'all' }) {
+  // onChange may accept (date) or (date, scope)
+  // scope: 'all' (notify collaborators) | 'me' (only me)
+  // To enable collaborator notifications, callers should pass `isShared` and handle scope in their update handlers.
+  // Backwards compatible: if caller expects only date, we'll call with single arg.
   const [isOpen, setIsOpen] = useState(false)
   const [pendingValue, setPendingValue] = useState('')
+  const [scope, setScope] = useState(defaultScope)
   const buttonRef = useRef(null)
   const hasReminder = !!value
   const overdue = isOverdue(value)
@@ -807,7 +812,12 @@ function ReminderPicker({ value, onChange, compact = false }) {
   const handleQuickSet = (hours) => {
     const now = new Date()
     const futureDate = new Date(now.getTime() + hours * 60 * 60 * 1000)
-    onChange(futureDate.toISOString())
+    // default to notify all unless caller expects scope handling
+    if (onChange.length >= 2) {
+      onChange(futureDate.toISOString(), defaultScope)
+    } else {
+      onChange(futureDate.toISOString())
+    }
     setIsOpen(false)
   }
 
@@ -816,7 +826,11 @@ function ReminderPicker({ value, onChange, compact = false }) {
     if (pendingValue) {
       // Parse the local datetime string and convert to ISO
       const localDate = new Date(pendingValue)
-      onChange(localDate.toISOString())
+      if (onChange.length >= 2) {
+        onChange(localDate.toISOString(), scope)
+      } else {
+        onChange(localDate.toISOString())
+      }
     }
     setIsOpen(false)
   }
@@ -853,17 +867,11 @@ function ReminderPicker({ value, onChange, compact = false }) {
           <span>{hasReminder ? formatReminderDate(value) : 'Remind'}</span>
         )}
       </button>
-      
-      {isOpen && ReactDOM.createPortal(
-        <>
-          <div 
-            className="fixed inset-0" 
-            style={{ zIndex: 9998 }}
-            onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} 
-          />
-          <div 
-            className="fixed bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[280px] animate-fade-in"
+        {isOpen && ReactDOM.createPortal(
+          <>
+          <div
             style={{
+              position: 'absolute',
               zIndex: 9999,
               top: buttonRef.current ? buttonRef.current.getBoundingClientRect().bottom + 8 : 100,
               left: buttonRef.current ? Math.min(
@@ -897,6 +905,25 @@ function ReminderPicker({ value, onChange, compact = false }) {
             )}
             
             {/* Action buttons */}
+            {isShared && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <span className="text-gray-500">Notify</span>
+                <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                  <button
+                    onClick={() => setScope('all')}
+                    className={`px-2 py-1 rounded-md ${scope === 'all' ? 'bg-white shadow text-gray-900' : 'text-gray-600'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setScope('me')}
+                    className={`px-2 py-1 rounded-md ${scope === 'me' ? 'bg-white shadow text-gray-900' : 'text-gray-600'}`}
+                  >
+                    Only me
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={handleConfirm}
@@ -1209,7 +1236,7 @@ function ProfileSettingsModal({ onClose }) {
 // ============================================
 // HEADER
 // ============================================
-function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkNotificationUnread, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate }) {
+function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkNotificationUnread, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate, onLogoClick }) {
   const { user, signOut, demoMode, isEmailAuth } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -1225,10 +1252,12 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
-                🔬
+              <div onClick={(e) => { e.stopPropagation(); if (onLogoClick) onLogoClick() }} className="cursor-pointer flex items-center gap-2">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
+                  🔬
+                </div>
+                <span className="font-bold text-lg sm:text-xl text-gray-900 hidden sm:block">ResearchOS</span>
               </div>
-              <span className="font-bold text-lg sm:text-xl text-gray-900 hidden sm:block">ResearchOS</span>
               {demoMode && (
                 <span className="tag tag-warning text-[10px] hidden sm:inline-flex">DEMO</span>
               )}
@@ -1841,6 +1870,24 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
+  const activeTasksCount = (project.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+  // Count reminders set on tasks and subtasks
+  const reminderCount = (project.stages || []).reduce((pAcc, s) => {
+    const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
+      const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
+      return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
+    }, 0)
+    return pAcc + tasksWithReminders
+  }, 0)
+  // Count overdue reminders (reminder date in past and not completed)
+  const overdueCount = (project.stages || []).reduce((pAcc, s) => {
+    const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
+      const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
+      const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
+      return tAcc + taskOverdue + subtaskOverdue
+    }, 0)
+    return pAcc + tasksOverdue
+  }, 0)
   // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
   const isCollaborator = project.owner_id !== user?.id
   const hasMembers = project.project_members?.length > 0
@@ -1883,6 +1930,24 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className={`tag text-[9px] py-0.5 px-1.5 ${isComplete ? 'bg-green-100 text-green-700' : 'tag-default'}`}>{isComplete ? '✓ Complete' : currentStage?.name || 'No stage'}</span>
+              {activeTasksCount > 0 && (
+                <span className="tag bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 flex items-center gap-2">
+                  <span className="font-medium">{activeTasksCount}</span>
+                  <span className="text-[9px] text-amber-700">{activeTasksCount === 1 ? 'active task' : 'active tasks'}</span>
+                </span>
+              )}
+              {reminderCount > 0 && (
+                <span className="tag bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 flex items-center gap-2">
+                  <span className="font-medium">{reminderCount}</span>
+                  <span className="text-[9px] text-blue-700">{reminderCount === 1 ? 'reminder' : 'reminders'}</span>
+                </span>
+              )}
+              {overdueCount > 0 && (
+                <span className="tag bg-red-50 text-red-700 text-[10px] px-2 py-0.5 flex items-center gap-2">
+                  <span className="font-medium">{overdueCount}</span>
+                  <span className="text-[9px] text-red-700">{overdueCount === 1 ? 'overdue task' : 'overdue tasks'}</span>
+                </span>
+              )}
               <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isComplete ? 'bg-green-200' : 'bg-gray-200'}`}>
                 <div className={`h-full rounded-full ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-gray-300 to-gray-500'}`} style={{ width: `${progress * 100}%` }} />
               </div>
@@ -1945,7 +2010,27 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
 
         <div className={`rounded-xl p-4 ${isComplete ? 'bg-green-100' : 'bg-gray-100'}`}>
           <div className="flex justify-between items-center mb-2">
-            <span className={`text-xs font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>{isComplete ? '✓ Complete' : 'Progress'}</span>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs font-medium ${isComplete ? 'text-green-600' : 'text-gray-500'}`}>{isComplete ? '✓ Complete' : 'Progress'}</span>
+              {activeTasksCount > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-2 text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+                  <span className="font-medium">{activeTasksCount}</span>
+                  <span className="text-[11px]">{activeTasksCount === 1 ? 'active task' : 'active tasks'}</span>
+                </span>
+              )}
+              {reminderCount > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-2 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                  <span className="font-medium">{reminderCount}</span>
+                  <span className="text-[11px]">{reminderCount === 1 ? 'reminder' : 'reminders'}</span>
+                </span>
+              )}
+              {overdueCount > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-2 text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">
+                  <span className="font-medium">{overdueCount}</span>
+                  <span className="text-[11px]">{overdueCount === 1 ? 'overdue task' : 'overdue tasks'}</span>
+                </span>
+              )}
+            </div>
             <span className={`text-sm font-bold ${isComplete ? 'text-green-700' : 'text-gray-900'}`}>{Math.round(progress * 100)}%</span>
           </div>
           <div className={`progress-bar ${isComplete ? 'bg-green-200' : ''}`}>
@@ -2008,6 +2093,24 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
   const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
+  const activeTasksCount = (project.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+  // Count reminders set on tasks and subtasks
+  const reminderCount = (project.stages || []).reduce((pAcc, s) => {
+    const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
+      const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
+      return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
+    }, 0)
+    return pAcc + tasksWithReminders
+  }, 0)
+  // Count overdue reminders (reminder date in past and not completed)
+  const overdueCount = (project.stages || []).reduce((pAcc, s) => {
+    const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
+      const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
+      const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
+      return tAcc + taskOverdue + subtaskOverdue
+    }, 0)
+    return pAcc + tasksOverdue
+  }, 0)
   const currentStage = project.stages?.[project.current_stage_index]
   const totalStages = project.stages?.length || 0
   const completedStages = project.current_stage_index || 0
@@ -2110,6 +2213,24 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
+            {activeTasksCount > 0 && (
+              <span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs border border-amber-100">
+                <span className="font-medium">{activeTasksCount}</span>
+                <span>{activeTasksCount === 1 ? 'active task' : 'active tasks'}</span>
+              </span>
+            )}
+            {reminderCount > 0 && (
+              <span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-100">
+                <span className="font-medium">{reminderCount}</span>
+                <span>{reminderCount === 1 ? 'reminder' : 'reminders'}</span>
+              </span>
+            )}
+            {overdueCount > 0 && (
+              <span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-xs border border-red-100">
+                <span className="font-medium">{overdueCount}</span>
+                <span>{overdueCount === 1 ? 'overdue task' : 'overdue tasks'}</span>
+              </span>
+            )}
             <span className={`text-xs font-medium w-8 ${isComplete ? 'text-green-600' : 'text-gray-600'}`}>{Math.round(progress * 100)}%</span>
           </div>
         </div>
@@ -2517,7 +2638,7 @@ function ProjectDetail() {
     updateProject(updated)
 
     if (!demoMode) {
-      await db.updateTask(taskId, { is_completed: newIsCompleted })
+      await db.updateTask(taskId, { is_completed: newIsCompleted, modified_by: user?.id })
       // Also update all subtasks in the database if completing parent
       if (newIsCompleted && task.subtasks?.length > 0) {
         for (const subtask of task.subtasks) {
@@ -2539,11 +2660,20 @@ function ProjectDetail() {
     updateProject(updated)
 
     if (!demoMode) {
+      // Notify collaborators (exclude current user) then delete
+      if (isShared) {
+        await db.notifyCollaborators(project.id, user?.id, {
+          type: 'task_deleted',
+          title: 'Task deleted',
+          message: `A task was deleted`,
+          task_id: taskId
+        })
+      }
       await db.deleteTask(taskId)
     }
   }
 
-  const updateTaskReminder = async (taskId, reminderDate) => {
+  const updateTaskReminder = async (taskId, reminderDate, scope = 'all') => {
     const now = new Date().toISOString()
     const userName = user?.user_metadata?.name || user?.email || 'Unknown'
     const task = stage.tasks.find(t => t.id === taskId)
@@ -2560,8 +2690,8 @@ function ProjectDetail() {
     if (!demoMode) {
       await db.updateTask(taskId, { reminder_date: reminderDate, modified_by: user?.id })
       
-      // Notify collaborators about the reminder
-      if (isShared && reminderDate && task) {
+      // Notify collaborators about the reminder only if scope === 'all'
+      if (isShared && reminderDate && task && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
           type: 'task_reminder_set',
           title: 'Reminder set on task',
@@ -2599,7 +2729,7 @@ function ProjectDetail() {
     }
   }
 
-  const updateSubtaskReminder = async (taskId, subtaskId, reminderDate) => {
+  const updateSubtaskReminder = async (taskId, subtaskId, reminderDate, scope = 'all') => {
     const now = new Date().toISOString()
     const userName = user?.user_metadata?.name || user?.email || 'Unknown'
     const task = stage.tasks.find(t => t.id === taskId)
@@ -2654,7 +2784,7 @@ function ProjectDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-30">
+      <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
@@ -2828,8 +2958,9 @@ function ProjectDetail() {
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <ReminderPicker
                           value={task.reminder_date}
-                          onChange={(date) => updateTaskReminder(task.id, date)}
+                          onChange={(date, scope) => updateTaskReminder(task.id, date, scope)}
                           compact
+                          isShared={isShared}
                         />
                         <button
                           onClick={() => deleteTask(task.id)}
@@ -2863,8 +2994,9 @@ function ProjectDetail() {
                             </span>
                             <ReminderPicker
                               value={subtask.reminder_date}
-                              onChange={(date) => updateSubtaskReminder(task.id, subtask.id, date)}
+                              onChange={(date, scope) => updateSubtaskReminder(task.id, subtask.id, date, scope)}
                               compact
+                              isShared={isShared}
                             />
                           </div>
                         )
@@ -3441,7 +3573,7 @@ function TaskDetail() {
     updateTask({ is_completed: newIsCompleted, subtasks: updatedSubtasks })
     
     if (!demoMode) {
-      await db.updateTask(task.id, { is_completed: newIsCompleted })
+      await db.updateTask(task.id, { is_completed: newIsCompleted, modified_by: user?.id })
       // Also update all subtasks in the database if completing parent
       if (newIsCompleted && currentTask.subtasks?.length > 0) {
         for (const subtask of currentTask.subtasks) {
@@ -3453,13 +3585,13 @@ function TaskDetail() {
     }
   }
 
-  const updateTaskReminder = async (reminderDate) => {
+  const updateTaskReminder = async (reminderDate, scope = 'all') => {
     updateTask({ reminder_date: reminderDate })
     if (!demoMode) {
       await db.updateTask(task.id, { reminder_date: reminderDate, modified_by: user?.id })
       
-      // Notify collaborators about the reminder
-      if (isShared && reminderDate) {
+      // Notify collaborators about the reminder only if scope === 'all'
+      if (isShared && reminderDate && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
           type: 'task_reminder_set',
           title: 'Reminder set on task',
@@ -3594,7 +3726,7 @@ function TaskDetail() {
     }
   }
 
-  const updateSubtaskReminder = async (subtaskId, reminderDate) => {
+  const updateSubtaskReminder = async (subtaskId, reminderDate, scope = 'all') => {
     const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
       subtasks: currentTask.subtasks.map(s => 
@@ -3605,8 +3737,8 @@ function TaskDetail() {
     if (!demoMode) {
       await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
       
-      // Notify collaborators about the subtask reminder
-      if (isShared && reminderDate && subtask) {
+      // Notify collaborators about the subtask reminder only if scope === 'all'
+      if (isShared && reminderDate && subtask && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
           type: 'subtask_reminder_set',
           title: 'Reminder set on subtask',
@@ -3667,7 +3799,7 @@ function TaskDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
-      <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-30">
+      <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <button 
             onClick={() => { setSelectedTask(null); setView('project'); }}
@@ -3842,8 +3974,9 @@ function TaskDetail() {
                     <>
                       <ReminderPicker
                         value={s.reminder_date}
-                        onChange={(date) => updateSubtaskReminder(s.id, date)}
+                        onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
                         compact
+                        isShared={isShared}
                       />
                       <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
                         <Trash2 className="w-4 h-4" />
@@ -4152,7 +4285,7 @@ function AllTasksView() {
     }
   }
 
-  const updateSubtaskReminder = async (projectId, stageIndex, taskId, subtaskId, reminderDate) => {
+  const updateSubtaskReminder = async (projectId, stageIndex, taskId, subtaskId, reminderDate, scope = 'all') => {
     const project = projects.find(p => p.id === projectId)
     if (!project) return
 
@@ -4174,7 +4307,20 @@ function AllTasksView() {
     if (demoMode) saveLocal(newProjects)
 
     if (!demoMode) {
-      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
+      // Notify collaborators only if scope === 'all' and project is shared
+      const isCollaborator = project.owner_id !== user?.id
+      const hasMembers = project.project_members?.length > 0
+      const isShared = isCollaborator || hasMembers
+      if (isShared && reminderDate && scope === 'all') {
+        await db.notifyCollaborators(projectId, user?.id, {
+          type: 'subtask_reminder_set',
+          title: 'Reminder set on subtask',
+          message: `Subtask reminder updated`,
+          task_id: taskId,
+          subtask_id: subtaskId
+        })
+      }
     }
   }
 
@@ -4454,8 +4600,9 @@ function AllTasksView() {
                           {!isCompleted && (
                             <ReminderPicker
                               value={subtask.reminder_date}
-                              onChange={(date) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date)}
+                              onChange={(date, scope) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date, scope)}
                               compact
+                              isShared={isSharedProject}
                             />
                           )}
                         </div>
@@ -4475,7 +4622,40 @@ function AllTasksView() {
 // ============================================
 // MAIN APP
 // ============================================
-export default function App() {
+// Error boundary to catch render-time exceptions and show a helpful message
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null, info: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('React render error:', error, info)
+    this.setState({ error, info })
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-6">
+          <h2 className="text-lg font-bold text-red-600">An error occurred while rendering the app</h2>
+          <pre className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">{String(this.state.error)}</pre>
+          <details className="mt-2 text-xs text-gray-500">
+            <summary>Stack / info</summary>
+            <pre className="whitespace-pre-wrap">{this.state.info?.componentStack}</pre>
+          </details>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function AppContent() {
   const { user, loading: authLoading, demoMode } = useAuth()
   const [projects, setProjects] = useState([])
   const [selectedProject, setSelectedProject] = useState(null)
@@ -4485,10 +4665,20 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState([])
   const notificationsRef = useRef(notifications)
+  const notifiedOverdueRef = useRef(new Set())
   
   // Keep ref in sync
   useEffect(() => {
     notificationsRef.current = notifications
+    // keep notifiedOverdueRef in sync for existing overdue notifications
+    try {
+      const set = new Set()
+      (notifications || []).forEach(n => {
+        if (n.type === 'task_overdue' && n.task_id) set.add(`task-${n.task_id}`)
+        if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
+      })
+      notifiedOverdueRef.current = set
+    } catch (e) {}
   }, [notifications])
 
   // Load notifications
@@ -4497,7 +4687,17 @@ export default function App() {
       // Load from localStorage for demo
       try {
         const stored = localStorage.getItem('researchos_notifications')
-        setNotifications(stored ? JSON.parse(stored) : [])
+        const parsed = stored ? JSON.parse(stored) : []
+        setNotifications(parsed)
+        // populate notifiedOverdueRef from stored notifications
+        try {
+          const set = new Set()
+          parsed.forEach(n => {
+            if (n.type === 'task_overdue' && n.task_id) set.add(`task-${n.task_id}`)
+            if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
+          })
+          notifiedOverdueRef.current = set
+        } catch (e) {}
       } catch {
         setNotifications([])
       }
@@ -4506,7 +4706,16 @@ export default function App() {
 
     if (user) {
       const { data } = await db.getNotifications(user.id)
-      setNotifications(data || [])
+      const parsed = data || []
+      setNotifications(parsed)
+      try {
+        const set = new Set()
+        parsed.forEach(n => {
+          if (n.type === 'task_overdue' && n.task_id) set.add(`task-${n.task_id}`)
+          if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
+        })
+        notifiedOverdueRef.current = set
+      } catch (e) {}
     }
   }
 
@@ -4543,14 +4752,27 @@ export default function App() {
         })
       })
     })
+    // Prune notifiedOverdueRef for items that are no longer overdue or removed
+    try {
+      const currentTaskKeys = new Set(overdueTasks.map(o => `task-${o.task.id}`))
+      const currentSubtaskKeys = new Set(overdueSubtasks.map(o => `subtask-${o.task.id}-${o.subtask.id}`))
+      const keep = new Set()
+      notifiedOverdueRef.current.forEach(k => {
+        if (k.startsWith('task-') && currentTaskKeys.has(k)) keep.add(k)
+        if (k.startsWith('subtask-') && currentSubtaskKeys.has(k)) keep.add(k)
+      })
+      notifiedOverdueRef.current = keep
+    } catch (e) {}
     
     // Create notifications for overdue items that don't already have one
     const newNotifications = []
     const existingNotifKeys = new Set(existingNotifications.map(n => `${n.type}-${n.task_id || ''}-${n.subtask_id || ''}`))
     
     overdueTasks.forEach(({ project, task }) => {
-      const key = `task_overdue-${task.id}-`
-      if (!existingNotifKeys.has(key)) {
+      const key = `task-${task.id}`
+      const existingKey = `task_overdue-${task.id}-`
+      // skip if already notified (in-memory set) or existing notifications include it
+      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey)) {
         newNotifications.push({
           id: uuid(),
           type: 'task_overdue',
@@ -4562,12 +4784,15 @@ export default function App() {
           created_at: new Date().toISOString(),
           reminder_date: task.reminder_date
         })
+        // mark as notified to avoid repeats
+        try { notifiedOverdueRef.current.add(key) } catch (e) {}
       }
     })
     
     overdueSubtasks.forEach(({ project, task, subtask }) => {
-      const key = `subtask_overdue-${task.id}-${subtask.id}`
-      if (!existingNotifKeys.has(key)) {
+      const key = `subtask-${task.id}-${subtask.id}`
+      const existingKey = `subtask_overdue-${task.id}-${subtask.id}`
+      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey)) {
         newNotifications.push({
           id: uuid(),
           type: 'subtask_overdue',
@@ -4580,6 +4805,7 @@ export default function App() {
           created_at: new Date().toISOString(),
           reminder_date: subtask.reminder_date
         })
+        try { notifiedOverdueRef.current.add(key) } catch (e) {}
       }
     })
     
@@ -4888,20 +5114,21 @@ export default function App() {
   return (
     <AppContext.Provider value={ctx}>
       <div className="min-h-screen pb-8">
+        <Header 
+          projects={projects} 
+          onSearchNavigate={handleSearchNavigate}
+          notifications={notifications}
+          onMarkNotificationRead={handleMarkNotificationRead}
+          onMarkNotificationUnread={handleMarkNotificationUnread}
+          onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+          onDeleteNotification={handleDeleteNotification}
+          onDeleteMultipleNotifications={handleDeleteMultipleNotifications}
+          onClearAllNotifications={handleClearAllNotifications}
+          onNotificationNavigate={handleNotificationNavigate}
+          onLogoClick={() => { setView('main'); setSelectedProject(null); setActiveTab('projects') }}
+        />
         {view === 'main' && (
           <>
-            <Header 
-              projects={projects} 
-              onSearchNavigate={handleSearchNavigate}
-              notifications={notifications}
-              onMarkNotificationRead={handleMarkNotificationRead}
-              onMarkNotificationUnread={handleMarkNotificationUnread}
-              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
-              onDeleteNotification={handleDeleteNotification}
-              onDeleteMultipleNotifications={handleDeleteMultipleNotifications}
-              onClearAllNotifications={handleClearAllNotifications}
-              onNotificationNavigate={handleNotificationNavigate}
-            />
             <TabNav tab={activeTab} setTab={setActiveTab} />
             {activeTab === 'projects' ? <ProjectsView /> : <AllTasksView />}
           </>
@@ -4914,5 +5141,13 @@ export default function App() {
         </footer>
       </div>
     </AppContext.Provider>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   )
 }
