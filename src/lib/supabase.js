@@ -63,10 +63,31 @@ export const db = {
       }
 
       // Then get projects where user is a member (including their personal priority)
-      const { data: membershipData, error: memberError } = await supabase
+      // Try with priority_rank first, fall back to just project_id if column doesn't exist
+      let membershipData = null
+      let memberError = null
+      
+      const { data: memberData, error: memberErr } = await supabase
         .from('project_members')
         .select('project_id, priority_rank')
         .eq('user_id', userId)
+      
+      if (memberErr) {
+        // If error mentions priority_rank column, try without it
+        if (memberErr.message?.includes('priority_rank') || memberErr.code === 'PGRST204') {
+          console.log('⚠️ priority_rank column not found, falling back to basic query')
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('project_members')
+            .select('project_id')
+            .eq('user_id', userId)
+          membershipData = fallbackData
+          memberError = fallbackError
+        } else {
+          memberError = memberErr
+        }
+      } else {
+        membershipData = memberData
+      }
       
       if (memberError) {
         logError('getMemberships', memberError)
@@ -461,6 +482,7 @@ export const db = {
     
     try {
       const normalizedEmail = email.toLowerCase().trim()
+      console.log('🔍 shareProject: Looking up user by email:', normalizedEmail)
       
       // Try to find existing user
       const { data: user, error: userError } = await supabase
@@ -472,6 +494,8 @@ export const db = {
       if (userError && userError.code !== 'PGRST116') {
         console.error('Error looking up user:', userError)
       }
+      
+      console.log('🔍 shareProject: User lookup result:', { found: !!user, user, error: userError })
 
       // If user exists, add them directly
       if (user) {
@@ -488,21 +512,42 @@ export const db = {
         }
 
         // Add as project member
+        console.log('📝 Adding existing user as member:', { projectId, userId: user.id, role })
         const { data, error } = await supabase
           .from('project_members')
           .insert({ project_id: projectId, user_id: user.id, role })
-          .select(`
-            *,
-            user:users(id, email, name, avatar_url)
-          `)
+          .select()
           .single()
         
         if (error) {
-          logError('shareProject', error)
-          return { data: null, error: { message: 'Failed to add member. Please try again.' } }
+          logError('shareProject:insert', error)
+          console.error('Insert error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint })
+          return { data: null, error: { message: `Failed to add member: ${error.message || 'Unknown error'}` } }
         }
         
-        return { data, error: null, type: 'added' }
+        // Get project details for the notification
+        const { data: project } = await supabase
+          .from('projects')
+          .select('title, emoji')
+          .eq('id', projectId)
+          .single()
+        
+        // Create a notification for the new member
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            type: 'project_shared',
+            title: 'You were added to a project',
+            message: project ? `${project.emoji} ${project.title}` : 'You now have access to a shared project',
+            project_id: projectId,
+            is_read: false
+          })
+        
+        // Fetch user details separately to avoid potential join issues
+        const memberWithUser = { ...data, user }
+        console.log('✅ Member added successfully:', memberWithUser)
+        return { data: memberWithUser, error: null, type: 'added' }
       }
 
       // User doesn't exist - create an invitation
@@ -639,6 +684,25 @@ export const db = {
         .from('project_invitations')
         .update({ status: 'accepted' })
         .eq('id', invitation.id)
+
+      // Get project details for the notification
+      const { data: project } = await supabase
+        .from('projects')
+        .select('title, emoji')
+        .eq('id', invitation.project_id)
+        .single()
+
+      // Create a notification for the new member
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type: 'project_shared',
+          title: 'You were added to a project',
+          message: project ? `${project.emoji} ${project.title}` : 'You now have access to a shared project',
+          project_id: invitation.project_id,
+          is_read: false
+        })
 
       return { data: { projectId: invitation.project_id, role: invitation.role }, error: null }
     } catch (error) {
@@ -848,6 +912,64 @@ export const db = {
       return { error }
     } catch (error) {
       logError('clearAllNotifications:catch', error)
+      return { error }
+    }
+  },
+
+  // Notify all project collaborators about a change (excludes the person who made the change)
+  async notifyCollaborators(projectId, excludeUserId, notification) {
+    if (!supabase) return { error: null }
+    
+    try {
+      // Get project owner and members
+      const { data: project } = await supabase
+        .from('projects')
+        .select('owner_id, title, emoji')
+        .eq('id', projectId)
+        .single()
+      
+      if (!project) return { error: null }
+      
+      const { data: members } = await supabase
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', projectId)
+      
+      // Collect all user IDs to notify (owner + members, excluding the one who made the change)
+      const userIds = new Set()
+      if (project.owner_id !== excludeUserId) {
+        userIds.add(project.owner_id)
+      }
+      if (members) {
+        members.forEach(m => {
+          if (m.user_id !== excludeUserId) {
+            userIds.add(m.user_id)
+          }
+        })
+      }
+      
+      if (userIds.size === 0) return { error: null }
+      
+      // Create notifications for all collaborators
+      const notifications = Array.from(userIds).map(userId => ({
+        user_id: userId,
+        type: notification.type,
+        title: notification.title,
+        message: `${project.emoji} ${project.title} - ${notification.message}`,
+        project_id: projectId,
+        task_id: notification.task_id || null,
+        subtask_id: notification.subtask_id || null,
+        is_read: false
+      }))
+      
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notifications)
+      
+      if (error) logError('notifyCollaborators', error)
+      return { error }
+    } catch (error) {
+      logError('notifyCollaborators:catch', error)
       return { error }
     }
   }

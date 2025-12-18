@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
   current_stage_index INTEGER DEFAULT 0,
   publication_target TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 -- Project members (for sharing)
@@ -57,7 +58,9 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   reminder_date TIMESTAMPTZ,
   order_index INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 -- Subtasks table
@@ -68,7 +71,10 @@ CREATE TABLE IF NOT EXISTS public.subtasks (
   is_completed BOOLEAN DEFAULT FALSE,
   reminder_date TIMESTAMPTZ,
   order_index INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 -- Comments table
@@ -84,7 +90,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
 CREATE TABLE IF NOT EXISTS public.notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL, -- 'task_reminder', 'subtask_reminder', 'project_shared', 'project_invite'
+  type TEXT NOT NULL, -- 'task_reminder', 'subtask_reminder', 'project_shared', 'project_invite', 'task_created', 'subtask_created', 'task_reminder_set', 'subtask_reminder_set', 'task_overdue', 'subtask_overdue'
   title TEXT NOT NULL,
   message TEXT,
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
@@ -820,3 +826,33 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- ============================================================================
+-- MIGRATIONS: Add new columns to existing tables
+-- These ALTER statements are safe to run multiple times (uses IF NOT EXISTS)
+-- ============================================================================
+
+-- Add modified_by to projects table
+ALTER TABLE public.projects 
+ADD COLUMN IF NOT EXISTS modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+-- Add created_by and modified_by to tasks table
+ALTER TABLE public.tasks 
+ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tasks 
+ADD COLUMN IF NOT EXISTS modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+-- Add created_by, modified_by, and updated_at to subtasks table
+ALTER TABLE public.subtasks 
+ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+ALTER TABLE public.subtasks 
+ADD COLUMN IF NOT EXISTS modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL;
+
+ALTER TABLE public.subtasks 
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Add priority_rank to project_members for user-specific ordering of shared projects
+ALTER TABLE public.project_members
+ADD COLUMN IF NOT EXISTS priority_rank INTEGER DEFAULT 999;
