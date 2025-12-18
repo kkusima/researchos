@@ -856,3 +856,28 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 -- Add priority_rank to project_members for user-specific ordering of shared projects
 ALTER TABLE public.project_members
 ADD COLUMN IF NOT EXISTS priority_rank INTEGER DEFAULT 999;
+
+-- ============================================================================
+-- REALTIME: Enable real-time sync for collaborative features
+-- ============================================================================
+
+-- Enable realtime for tables (run these in Supabase SQL editor)
+-- Note: You may also need to enable replication in the Supabase Dashboard:
+-- Database > Replication > Enable for each table
+
+DO $$
+BEGIN
+  -- Enable realtime publication if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END;
+$$;
+
+-- Add tables to realtime publication (idempotent)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.stages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.subtasks;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.project_members;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
