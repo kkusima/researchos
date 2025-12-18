@@ -96,6 +96,19 @@ const formatRelativeDate = (dateString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Format modified by text (e.g., "Modified 2h ago by John" or "Modified 2h ago" if same user)
+const formatModifiedBy = (dateString, modifiedByName, currentUserName) => {
+  if (!dateString) return null
+  const relativeTime = formatRelativeDate(dateString)
+  // If modified by name is available and different from current user, show it
+  if (modifiedByName && modifiedByName !== currentUserName) {
+    // Get first name only
+    const firstName = modifiedByName.split(' ')[0].split('@')[0]
+    return `${relativeTime} by ${firstName}`
+  }
+  return relativeTime
+}
+
 // Local storage helpers for demo mode
 const loadLocal = () => {
   try {
@@ -604,6 +617,12 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
       case 'project_shared':
       case 'project_invite':
         return <Users className="w-4 h-4 text-blue-500" />
+      case 'task_created':
+      case 'subtask_created':
+        return <Plus className="w-4 h-4 text-green-500" />
+      case 'task_reminder_set':
+      case 'subtask_reminder_set':
+        return <Clock className="w-4 h-4 text-purple-500" />
       default:
         return <Bell className="w-4 h-4 text-gray-500" />
     }
@@ -1820,6 +1839,7 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
   const hasMembers = project.project_members?.length > 0
   const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
+  const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
 
   return (
     <div
@@ -1932,8 +1952,8 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
               </span>
             )}
             {project.updated_at && project.updated_at !== project.created_at && (
-              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
-                Modified {formatRelativeDate(project.updated_at)}
+              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
+                Modified {formatModifiedBy(project.updated_at, project.modified_by_name, currentUserName)}
               </span>
             )}
           </div>
@@ -1989,6 +2009,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
   const hasMembers = project.project_members?.length > 0
   const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
+  const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
 
   return (
     <div
@@ -2041,8 +2062,8 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             )}
             <span className="text-[10px] text-gray-300 hidden sm:inline">•</span>
             {project.updated_at ? (
-              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(project.updated_at).toLocaleString()}`}>
-                {formatRelativeDate(project.updated_at)}
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(project.updated_at).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
+                {formatModifiedBy(project.updated_at, project.modified_by_name, currentUserName)}
               </span>
             ) : project.created_at && (
               <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
@@ -2403,6 +2424,7 @@ function ProjectDetail() {
     if (!newTask.trim()) return
     const now = new Date().toISOString()
     const localId = uuid()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
     const task = {
       id: localId,
       title: newTask.trim(),
@@ -2412,7 +2434,11 @@ function ProjectDetail() {
       subtasks: [],
       comments: [],
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      created_by: user?.id,
+      created_by_name: userName,
+      modified_by: user?.id,
+      modified_by_name: userName
     }
 
     const updated = {
@@ -2428,7 +2454,9 @@ function ProjectDetail() {
       const { data: createdTask } = await db.createTask({
         stage_id: stage.id,
         title: task.title,
-        order_index: stage.tasks?.length || 0
+        order_index: stage.tasks?.length || 0,
+        created_by: user?.id,
+        modified_by: user?.id
       })
       
       // Update local state with server-generated ID
@@ -2444,6 +2472,16 @@ function ProjectDetail() {
         const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
         setProjects(newProjects)
         setSelectedProject(syncedProject)
+        
+        // Notify collaborators about the new task
+        if (isShared) {
+          await db.notifyCollaborators(project.id, user?.id, {
+            type: 'task_created',
+            title: 'New task added',
+            message: task.title,
+            task_id: createdTask.id
+          })
+        }
       }
     }
   }
@@ -2500,18 +2538,30 @@ function ProjectDetail() {
 
   const updateTaskReminder = async (taskId, reminderDate) => {
     const now = new Date().toISOString()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
+    const task = stage.tasks.find(t => t.id === taskId)
     const updated = {
       ...project,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, reminder_date: reminderDate, updated_at: now } : t) }
+          ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, reminder_date: reminderDate, updated_at: now, modified_by: user?.id, modified_by_name: userName } : t) }
           : s
       )
     }
     updateProject(updated)
 
     if (!demoMode) {
-      await db.updateTask(taskId, { reminder_date: reminderDate })
+      await db.updateTask(taskId, { reminder_date: reminderDate, modified_by: user?.id })
+      
+      // Notify collaborators about the reminder
+      if (isShared && reminderDate && task) {
+        await db.notifyCollaborators(project.id, user?.id, {
+          type: 'task_reminder_set',
+          title: 'Reminder set on task',
+          message: `${task.title} - ${formatReminderDate(reminderDate)}`,
+          task_id: taskId
+        })
+      }
     }
   }
 
@@ -2544,13 +2594,16 @@ function ProjectDetail() {
 
   const updateSubtaskReminder = async (taskId, subtaskId, reminderDate) => {
     const now = new Date().toISOString()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
+    const task = stage.tasks.find(t => t.id === taskId)
+    const subtask = task?.subtasks?.find(s => s.id === subtaskId)
     const updated = {
       ...project,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
           ? { ...s, tasks: s.tasks.map(t => 
               t.id === taskId 
-                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate } : st), updated_at: now }
+                ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate, updated_at: now, modified_by: user?.id, modified_by_name: userName } : st), updated_at: now }
                 : t
             )}
           : s
@@ -2559,7 +2612,18 @@ function ProjectDetail() {
     updateProject(updated)
 
     if (!demoMode) {
-      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
+      
+      // Notify collaborators about the subtask reminder
+      if (isShared && reminderDate && subtask) {
+        await db.notifyCollaborators(project.id, user?.id, {
+          type: 'subtask_reminder_set',
+          title: 'Reminder set on subtask',
+          message: `${subtask.title} - ${formatReminderDate(reminderDate)}`,
+          task_id: taskId,
+          subtask_id: subtaskId
+        })
+      }
     }
   }
 
@@ -3336,6 +3400,10 @@ function TaskDetail() {
   if (!currentTask) return null
 
   const taskOverdue = isOverdue(currentTask.reminder_date) && !currentTask.is_completed
+  const isCollaborator = project.owner_id !== user?.id
+  const hasMembers = project.project_members?.length > 0
+  const isShared = isCollaborator || hasMembers
+  const userName = user?.user_metadata?.name || user?.email || 'Unknown'
 
   const updateTask = (updates) => {
     const now = new Date().toISOString()
@@ -3344,7 +3412,7 @@ function TaskDetail() {
       updated_at: now,
       stages: project.stages.map((s, i) => 
         i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => t.id === task.id ? { ...t, ...updates, updated_at: now } : t) }
+          ? { ...s, tasks: s.tasks.map(t => t.id === task.id ? { ...t, ...updates, updated_at: now, modified_by: user?.id, modified_by_name: userName } : t) }
           : s
       )
     }
@@ -3379,7 +3447,17 @@ function TaskDetail() {
   const updateTaskReminder = async (reminderDate) => {
     updateTask({ reminder_date: reminderDate })
     if (!demoMode) {
-      await db.updateTask(task.id, { reminder_date: reminderDate })
+      await db.updateTask(task.id, { reminder_date: reminderDate, modified_by: user?.id })
+      
+      // Notify collaborators about the reminder
+      if (isShared && reminderDate) {
+        await db.notifyCollaborators(project.id, user?.id, {
+          type: 'task_reminder_set',
+          title: 'Reminder set on task',
+          message: `${currentTask.title} - ${formatReminderDate(reminderDate)}`,
+          task_id: task.id
+        })
+      }
     }
   }
 
@@ -3422,12 +3500,26 @@ function TaskDetail() {
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
     const localId = uuid()
-    const subtask = { id: localId, title: newSubtask.trim(), is_completed: false, reminder_date: null }
+    const subtask = { 
+      id: localId, 
+      title: newSubtask.trim(), 
+      is_completed: false, 
+      reminder_date: null,
+      created_by: user?.id,
+      created_by_name: userName,
+      modified_by: user?.id,
+      modified_by_name: userName
+    }
     updateTask({ subtasks: [...(currentTask.subtasks || []), subtask] })
     setNewSubtask('')
 
     if (!demoMode) {
-      const { data: createdSubtask } = await db.createSubtask({ task_id: task.id, title: subtask.title })
+      const { data: createdSubtask } = await db.createSubtask({ 
+        task_id: task.id, 
+        title: subtask.title,
+        created_by: user?.id,
+        modified_by: user?.id
+      })
       
       // Update local state with server-generated ID
       if (createdSubtask) {
@@ -3446,6 +3538,17 @@ function TaskDetail() {
         }
         const newProjects = projects.map(p => p.id === project.id ? updated : p)
         setProjects(newProjects)
+        
+        // Notify collaborators about the new subtask
+        if (isShared) {
+          await db.notifyCollaborators(project.id, user?.id, {
+            type: 'subtask_created',
+            title: 'New subtask added',
+            message: `${currentTask.title} → ${subtask.title}`,
+            task_id: task.id,
+            subtask_id: createdSubtask.id
+          })
+        }
       }
     }
   }
@@ -3464,14 +3567,26 @@ function TaskDetail() {
   }
 
   const updateSubtaskReminder = async (subtaskId, reminderDate) => {
+    const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
       subtasks: currentTask.subtasks.map(s => 
-        s.id === subtaskId ? { ...s, reminder_date: reminderDate } : s
+        s.id === subtaskId ? { ...s, reminder_date: reminderDate, modified_by: user?.id, modified_by_name: userName } : s
       )
     })
 
     if (!demoMode) {
-      await db.updateSubtask(subtaskId, { reminder_date: reminderDate })
+      await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
+      
+      // Notify collaborators about the subtask reminder
+      if (isShared && reminderDate && subtask) {
+        await db.notifyCollaborators(project.id, user?.id, {
+          type: 'subtask_reminder_set',
+          title: 'Reminder set on subtask',
+          message: `${subtask.title} - ${formatReminderDate(reminderDate)}`,
+          task_id: task.id,
+          subtask_id: subtaskId
+        })
+      }
     }
   }
 
