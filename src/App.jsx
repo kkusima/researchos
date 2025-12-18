@@ -1815,7 +1815,10 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
   const currentStage = project.stages?.[project.current_stage_index]
-  const isShared = project.owner_id !== user?.id
+  // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
+  const isCollaborator = project.owner_id !== user?.id
+  const hasMembers = project.project_members?.length > 0
+  const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
 
   return (
@@ -1981,7 +1984,10 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
   const currentStage = project.stages?.[project.current_stage_index]
   const totalStages = project.stages?.length || 0
   const completedStages = project.current_stage_index || 0
-  const isShared = project.owner_id !== user?.id
+  // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
+  const isCollaborator = project.owner_id !== user?.id
+  const hasMembers = project.project_members?.length > 0
+  const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
 
   return (
@@ -2373,7 +2379,10 @@ function ProjectDetail() {
   const stageIndex = previewIndex ?? currentStageIndex
   const stage = project.stages?.[stageIndex]
   const progress = getProgress(project)
-  const isShared = project.owner_id !== user?.id
+  // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
+  const isCollaborator = project.owner_id !== user?.id
+  const hasMembers = project.project_members?.length > 0
+  const isShared = isCollaborator || hasMembers
 
   const updateProject = (updated) => {
     const newProjects = projects.map(p => p.id === updated.id ? updated : p)
@@ -4383,7 +4392,7 @@ export default function App() {
   useEffect(() => {
     if (projects.length === 0) return
     
-    const runOverdueCheck = () => {
+    const runOverdueCheck = async () => {
       const currentNotifications = notificationsRef.current
       const newOverdueNotifications = checkOverdueTasks(projects, currentNotifications)
       
@@ -4393,6 +4402,14 @@ export default function App() {
         
         if (demoMode) {
           localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
+        } else {
+          // Save new notifications to the database
+          for (const notif of newOverdueNotifications) {
+            await db.createNotification({
+              ...notif,
+              user_id: user?.id
+            })
+          }
         }
       }
     }
@@ -4404,7 +4421,7 @@ export default function App() {
     const interval = setInterval(runOverdueCheck, 30000)
     
     return () => clearInterval(interval)
-  }, [projects, demoMode])
+  }, [projects, demoMode, user?.id])
 
   // Notification handlers
   const handleMarkNotificationRead = async (id) => {
@@ -4568,13 +4585,38 @@ export default function App() {
     setProjects(updatedProjects)
     if (demoMode) {
       saveLocal(updatedProjects)
+      // Also save member priorities for demo mode
+      const memberPriorities = {}
+      updatedProjects.forEach((p, index) => {
+        // For shared projects (not owned by current user), store user-specific priority
+        if (p.owner_id && p.owner_id !== user?.id) {
+          memberPriorities[p.id] = index + 1
+        }
+      })
+      if (Object.keys(memberPriorities).length > 0) {
+        localStorage.setItem('researchos_member_priorities', JSON.stringify(memberPriorities))
+      }
     } else {
-      // In real mode, update each project's priority_rank
-      Promise.all(
-        updatedProjects.map((project, index) =>
-          db.updateProject(project.id, { priority_rank: index + 1 })
-        )
-      ).catch((e) => console.error('❌ Failed to persist priority order:', e))
+      // In real mode, update priorities differently for owned vs shared projects
+      const ownedUpdates = []
+      const sharedUpdates = []
+      
+      updatedProjects.forEach((project, index) => {
+        if (project.isOwner) {
+          // Owned projects: update project.priority_rank
+          ownedUpdates.push(
+            db.updateProject(project.id, { priority_rank: index + 1 })
+          )
+        } else {
+          // Shared projects: update project_members.priority_rank for this user
+          sharedUpdates.push(
+            db.updateMemberPriority(project.id, user?.id, index + 1)
+          )
+        }
+      })
+      
+      Promise.all([...ownedUpdates, ...sharedUpdates])
+        .catch((e) => console.error('❌ Failed to persist priority order:', e))
     }
   }
 
