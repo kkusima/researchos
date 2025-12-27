@@ -1671,11 +1671,11 @@ function TodayView() {
                                 try {
                                   if (!demoMode && db && (it.taskId || it.subtaskId)) {
                                     if (it.subtaskId) {
-                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed })
-                                      if (error) { showToast('Failed to update subtask'); return }
+                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
+                                      if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
                                     } else if (it.taskId) {
-                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed })
-                                      if (error) { showToast('Failed to update task'); return }
+                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
+                                      if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
                                     }
                                     try { await reloadProjects() } catch (e) {}
                                   } else {
@@ -1721,11 +1721,11 @@ function TodayView() {
                                 try {
                                   if (!demoMode && db && (it.taskId || it.subtaskId)) {
                                     if (it.subtaskId) {
-                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed })
-                                      if (error) { showToast('Failed to update subtask'); return }
+                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
+                                      if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
                                     } else if (it.taskId) {
-                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed })
-                                      if (error) { showToast('Failed to update task'); return }
+                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
+                                      if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
                                     }
                                     // refresh local projects to reflect updated title
                                     try { await reloadProjects() } catch (e) {}
