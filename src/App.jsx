@@ -1457,7 +1457,7 @@ function TabNav({ tab, setTab }) {
 // PROJECTS VIEW
 // ============================================
 function TodayView() {
-  const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView } = useApp()
+  const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView, setTodayItems, saveTodayItems, showToast, user, demoMode, reloadProjects, setProjects } = useApp()
   const [newTitle, setNewTitle] = useState('')
   const [showExistingPicker, setShowExistingPicker] = useState(false)
   const [existingQuery, setExistingQuery] = useState('')
@@ -6016,12 +6016,18 @@ function AppContent() {
     selectedTask, setSelectedTask,
     view, setView,
     loading,
-    reorderProjects
-    , todayItems, addToToday, addLocalTodayTask, removeTodayItem, reorderToday
-    , toggleTodayDone
-    , addSubtaskToToday
-    , removeTodayItems, duplicateTodayItems
-    , reloadProjects
+    reorderProjects,
+    todayItems, addToToday, addLocalTodayTask, removeTodayItem, reorderToday,
+    toggleTodayDone,
+    addSubtaskToToday,
+    removeTodayItems, duplicateTodayItems,
+    reloadProjects,
+    // Expose helpers used by child components
+    setTodayItems,
+    saveTodayItems,
+    showToast,
+    user,
+    demoMode
   }
 
   return (
