@@ -5342,11 +5342,28 @@ function AppContent() {
         if (!demoMode && user && db && db.getTodayItems) {
           try {
             const { data, error } = await db.getTodayItems(user.id, today)
-            if (!error && data) {
-              setTodayItems(Array.isArray(data) ? data : [])
-              // also persist locally for offline
-              try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) {}
-              return
+            if (!error) {
+              // If the server is empty but we have a non-empty local copy, prefer local (assume unsynced changes)
+              try {
+                const rawLocal = localStorage.getItem(key)
+                const localItems = rawLocal ? JSON.parse(rawLocal) : null
+                if ((!data || (Array.isArray(data) && data.length === 0)) && Array.isArray(localItems) && localItems.length > 0) {
+                  // push local copy to server and use it locally
+                  try { await db.saveTodayItems(user.id, today, localItems) } catch (e) {}
+                  setTodayItems(localItems)
+                  try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) {}
+                  return
+                }
+              } catch (e) {
+                // ignore JSON parse errors and continue
+              }
+
+              if (data) {
+                setTodayItems(Array.isArray(data) ? data : [])
+                // also persist locally for offline
+                try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) {}
+                return
+              }
             }
           } catch (e) {
             // fall back to local
@@ -5414,14 +5431,16 @@ function AppContent() {
 
   const addToToday = (task, opts = {}) => {
     if (!task) return
-    const exists = todayItems.find(i => i.taskId === task.id)
+    // Prevent duplicates: consider legacy linked items (taskId) and copied items (sourceTaskId)
+    const exists = todayItems.find(i => i.taskId === task.id || i.sourceTaskId === task.id)
     if (exists) { showToast('Task already in Tod(o)ay'); return }
+    // Create a local copy of the task so edits don't affect the original
     const item = {
       id: uuid(),
       title: task.title,
       projectId: opts.projectId || null,
-      taskId: task.id,
-      isLocal: false,
+      isLocal: true,
+      sourceTaskId: task.id,
       created_at: new Date().toISOString()
     }
     const next = [...todayItems, item]
@@ -5431,16 +5450,17 @@ function AppContent() {
 
   const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
     if (!subtask || !parentTask) return
-    // prevent duplicates by subtask id when possible
-    const exists = todayItems.find(i => i.subtaskId === subtask.id || (i.taskId === parentTask.id && i.title === `${parentTask.title} — ${subtask.title}`))
+    // Prevent duplicates: consider legacy linked items and copied items
+    const exists = todayItems.find(i => i.subtaskId === subtask.id || i.sourceSubtaskId === subtask.id || (i.taskId === parentTask.id || i.sourceTaskId === parentTask.id) && i.title === `${parentTask.title} — ${subtask.title}`)
     if (exists) { showToast('Subtask already in Tod(o)ay'); return }
+    // Create a local copy of the subtask so edits don't affect the original
     const item = {
       id: uuid(),
       title: `${parentTask.title} — ${subtask.title}`,
       projectId: opts.projectId || null,
-      taskId: parentTask.id,
-      subtaskId: subtask.id,
-      isLocal: false,
+      isLocal: true,
+      sourceTaskId: parentTask.id,
+      sourceSubtaskId: subtask.id,
       created_at: new Date().toISOString()
     }
     const next = [...todayItems, item]
