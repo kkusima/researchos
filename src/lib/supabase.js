@@ -354,7 +354,7 @@ export const db = {
       const payload = { user_id: userId, day: dayStr, items: items, updated_at: new Date().toISOString() }
       const { data, error } = await supabase
         .from('today_items')
-        .upsert(payload, { onConflict: '(user_id, day)' })
+        .upsert(payload, { onConflict: 'user_id,day' })
         .select()
         .single()
       if (error) return { data: null, error }
