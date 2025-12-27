@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+const DEV = import.meta.env.DEV
+const devLog = (...args) => { if (DEV) console.log(...args) }
+const devWarn = (...args) => { if (DEV) console.warn(...args) }
+const devErr = (...args) => { if (DEV) console.error(...args) }
+
 // Validate that the anon key looks like a real JWT (starts with eyJ and is long enough)
 const isValidSupabaseKey = (key) => {
   return key && key.startsWith('eyJ') && key.length > 100
@@ -10,18 +15,12 @@ const isValidSupabaseKey = (key) => {
 
 const hasValidConfig = supabaseUrl && supabaseAnonKey && isValidSupabaseKey(supabaseAnonKey)
 
-console.log('🔧 Supabase Config:', {
-  url: supabaseUrl ? '✅ Set' : '❌ Missing',
-  key: supabaseAnonKey ? (isValidSupabaseKey(supabaseAnonKey) ? '✅ Valid JWT' : '❌ Invalid format (not a JWT)') : '❌ Missing',
-  mode: hasValidConfig ? 'LIVE' : 'DEMO'
-})
+devLog('🔧 Supabase config present:', { url: !!supabaseUrl, keyLooksValid: isValidSupabaseKey(supabaseAnonKey), mode: hasValidConfig ? 'LIVE' : 'DEMO' })
 
 if (!hasValidConfig) {
-  console.warn('⚠️ Supabase credentials missing or invalid. Running in demo mode.')
+  devWarn('⚠️ Supabase credentials missing or invalid. Running in demo mode.')
   if (supabaseAnonKey && !isValidSupabaseKey(supabaseAnonKey)) {
-    console.warn('⚠️ Your VITE_SUPABASE_ANON_KEY does not look like a valid Supabase key.')
-    console.warn('   Valid keys start with "eyJ" and are ~200+ characters long.')
-    console.warn('   Get your key from: https://supabase.com/dashboard/project/_/settings/api')
+    devWarn('⚠️ Your VITE_SUPABASE_ANON_KEY does not look like a valid Supabase key. (dev only)')
   }
 }
 
@@ -36,9 +35,9 @@ export const supabase = hasValidConfig
     })
   : null
 
-// Helper to log errors
+// Helper to log errors (dev only)
 const logError = (operation, error) => {
-  console.error(`❌ Database Error [${operation}]:`, error)
+  devErr(`❌ Database Error [${operation}]:`, error)
   return error
 }
 
@@ -49,7 +48,7 @@ export const db = {
     if (!supabase) return { data: [], error: null }
     
     try {
-      console.log('📦 Loading projects for user:', userId)
+      devLog('📦 Loading projects for user:', userId)
       
       // Get projects where user is owner OR member
       // First get owned projects
@@ -75,7 +74,7 @@ export const db = {
       if (memberErr) {
         // If error mentions priority_rank column, try without it
         if (memberErr.message?.includes('priority_rank') || memberErr.code === 'PGRST204') {
-          console.log('⚠️ priority_rank column not found, falling back to basic query')
+          devWarn('⚠️ priority_rank column not found, falling back to basic query')
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('project_members')
             .select('project_id')
@@ -135,11 +134,11 @@ export const db = {
         .sort((a, b) => a.priority_rank - b.priority_rank)
 
       if (projects.length === 0) {
-        console.log('📦 No projects found')
+        devLog('📦 No projects found')
         return { data: [], error: null }
       }
 
-      console.log(`📦 Found ${projects.length} projects (${ownedProjects?.length || 0} owned, ${sharedProjects.length} shared), loading details...`)
+      devLog(`📦 Found ${projects.length} projects (${ownedProjects?.length || 0} owned, ${sharedProjects.length} shared), loading details...`)
 
       // Then get related data for each project
       const projectsWithData = await Promise.all(
@@ -250,7 +249,7 @@ export const db = {
         })
       )
 
-      console.log('✅ Projects loaded successfully:', projectsWithData.length)
+      devLog('✅ Projects loaded successfully:', projectsWithData.length)
       return { data: projectsWithData, error: null }
     } catch (error) {
       logError('getProjects:catch', error)
@@ -262,7 +261,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
-      console.log('📝 Creating project:', project.title)
+      devLog('📝 Creating project:', project.title)
       const { data, error } = await supabase
         .from('projects')
         .insert(project)
@@ -274,7 +273,7 @@ export const db = {
         return { data: null, error }
       }
       
-      console.log('✅ Project created:', data.id)
+      devLog('✅ Project created:', data.id)
       return { data, error: null }
     } catch (error) {
       logError('createProject:catch', error)
@@ -285,7 +284,7 @@ export const db = {
   async updateProject(id, updates) {
     if (!supabase) return { data: null, error: null }
     try {
-      console.log('📝 Updating project:', id, updates)
+      devLog('📝 Updating project:', id, updates)
       const { data, error } = await supabase
         .from('projects')
         .update(updates)
@@ -295,7 +294,7 @@ export const db = {
       if (error) {
         logError('updateProject', error)
       } else {
-        console.log('✅ Project updated:', data?.id)
+        devLog('✅ Project updated:', data?.id)
       }
       return { data, error }
     } catch (error) {
@@ -308,7 +307,7 @@ export const db = {
     if (!supabase) return { error: null }
     
     try {
-      console.log('🗑️ Deleting project:', id)
+      devLog('🗑️ Deleting project:', id)
       const { error } = await supabase
         .from('projects')
         .delete()
@@ -319,7 +318,7 @@ export const db = {
         return { error }
       }
       
-      console.log('✅ Project deleted')
+      devLog('✅ Project deleted')
       return { error: null }
     } catch (error) {
       logError('deleteProject:catch', error)
@@ -332,7 +331,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
-      console.log('📝 Creating stage:', stage.name)
+      devLog('📝 Creating stage:', stage.name)
       const { data, error } = await supabase
         .from('stages')
         .insert(stage)
@@ -340,7 +339,7 @@ export const db = {
         .single()
       
       if (error) logError('createStage', error)
-      else console.log('✅ Stage created:', data.id)
+      else devLog('✅ Stage created:', data.id)
       return { data, error }
     } catch (error) {
       logError('createStage:catch', error)
@@ -389,7 +388,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
-      console.log('📝 Creating task:', task.title)
+      devLog('📝 Creating task:', task.title)
       const { data, error } = await supabase
         .from('tasks')
         .insert(task)
@@ -397,7 +396,7 @@ export const db = {
         .single()
       
       if (error) logError('createTask', error)
-      else console.log('✅ Task created:', data.id)
+      else devLog('✅ Task created:', data.id)
       return { data, error }
     } catch (error) {
       logError('createTask:catch', error)
@@ -409,7 +408,7 @@ export const db = {
     if (!supabase) return { data: null, error: null }
     
     try {
-      console.log('📝 Updating task:', id, updates)
+      devLog('📝 Updating task:', id, updates)
       const { data, error } = await supabase
         .from('tasks')
         .update(updates)
@@ -442,7 +441,7 @@ export const db = {
               // If completion changed, use task_completed type
               if (Object.prototype.hasOwnProperty.call(updates, 'is_completed')) {
                 const type = updates.is_completed ? 'task_completed' : 'task_uncompleted'
-                await module.exports.notifyCollaborators(stage.project_id, modifierId, {
+                await db.notifyCollaborators(stage.project_id, modifierId, {
                   type,
                   title: updates.is_completed ? 'Task completed' : 'Task updated',
                   message: `${task.title} (${updates.is_completed ? 'completed' : 'updated'})`,
@@ -450,7 +449,7 @@ export const db = {
                 })
               } else {
                 // Generic task modified
-                await module.exports.notifyCollaborators(stage.project_id, modifierId, {
+                await db.notifyCollaborators(stage.project_id, modifierId, {
                   type: 'task_modified',
                   title: 'Task modified',
                   message: `${task.title} → changes made`,
@@ -465,7 +464,7 @@ export const db = {
         logError('updateTask:notify', e)
       }
 
-      console.log('✅ Task updated:', data?.id, 'reminder_date:', data?.reminder_date)
+      devLog('✅ Task updated:', data?.id, 'reminder_date:', data?.reminder_date)
       return { data, error }
     } catch (error) {
       logError('updateTask:catch', error)
@@ -492,7 +491,7 @@ export const db = {
           .single()
         if (stage && stage.project_id) {
           try {
-            await module.exports.notifyCollaborators(stage.project_id, null, {
+            await db.notifyCollaborators(stage.project_id, null, {
               type: 'task_deleted',
               title: 'Task deleted',
               message: `${task.title} was deleted`,
@@ -539,7 +538,7 @@ export const db = {
   async updateSubtask(id, updates) {
     if (!supabase) return { data: null, error: null }
     try {
-      console.log('📝 Updating subtask:', id, updates)
+      devLog('📝 Updating subtask:', id, updates)
       const { data, error } = await supabase
         .from('subtasks')
         .update(updates)
@@ -549,7 +548,7 @@ export const db = {
       if (error) {
         logError('updateSubtask', error)
       } else {
-        console.log('✅ Subtask updated:', data?.id)
+        devLog('✅ Subtask updated:', data?.id)
         // Notify collaborators if not self
         if (data && updates.modified_by) {
           // Get project_id for this subtask
@@ -659,7 +658,7 @@ export const db = {
               .eq('id', task.stage_id)
               .single()
             if (stage && stage.project_id) {
-              await module.exports.notifyCollaborators(stage.project_id, comment.user_id, {
+              await db.notifyCollaborators(stage.project_id, comment.user_id, {
                 type: 'comment_added',
                 title: 'New comment',
                 message: `${task.title}: ${comment.content}`,
@@ -686,7 +685,7 @@ export const db = {
     
     try {
       const normalizedEmail = email.toLowerCase().trim()
-      console.log('🔍 shareProject: Looking up user by email:', normalizedEmail)
+      devLog('🔍 shareProject: Looking up user by email:', normalizedEmail)
       
       // Try to find existing user
       const { data: user, error: userError } = await supabase
@@ -696,10 +695,10 @@ export const db = {
         .maybeSingle()
       
       if (userError && userError.code !== 'PGRST116') {
-        console.error('Error looking up user:', userError)
+        devErr('Error looking up user:', userError)
       }
       
-      console.log('🔍 shareProject: User lookup result:', { found: !!user, user, error: userError })
+      devLog('🔍 shareProject: User lookup result:', { found: !!user, user, error: userError })
 
       // If user exists, add them directly
       if (user) {
@@ -716,7 +715,7 @@ export const db = {
         }
 
         // Add as project member
-        console.log('📝 Adding existing user as member:', { projectId, userId: user.id, role })
+        devLog('📝 Adding existing user as member:', { projectId, userId: user.id, role })
         const { data, error } = await supabase
           .from('project_members')
           .insert({ project_id: projectId, user_id: user.id, role })
@@ -725,7 +724,7 @@ export const db = {
         
         if (error) {
           logError('shareProject:insert', error)
-          console.error('Insert error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint })
+          devErr('Insert error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint })
           return { data: null, error: { message: `Failed to add member: ${error.message || 'Unknown error'}` } }
         }
         
@@ -750,7 +749,7 @@ export const db = {
         
         // Fetch user details separately to avoid potential join issues
         const memberWithUser = { ...data, user }
-        console.log('✅ Member added successfully:', memberWithUser)
+        devLog('✅ Member added successfully:', memberWithUser)
         return { data: memberWithUser, error: null, type: 'added' }
       }
 
@@ -963,7 +962,7 @@ export const db = {
     if (!supabase) return { error: null }
     
     try {
-      console.log('📝 Updating member priority:', { projectId, userId, priorityRank })
+      devLog('📝 Updating member priority:', { projectId, userId, priorityRank })
       const { error } = await supabase
         .from('project_members')
         .update({ priority_rank: priorityRank })
@@ -975,7 +974,7 @@ export const db = {
         return { error }
       }
       
-      console.log('✅ Member priority updated')
+      devLog('✅ Member priority updated')
       return { error: null }
     } catch (error) {
       logError('updateMemberPriority:catch', error)
@@ -1058,13 +1057,34 @@ export const db = {
       filter: `user_id=eq.${userId}`
     }, callback)
     
-    return channel.subscribe()
+    // Start the subscription and return the channel object so callers
+    // can remove it later with `db.unsubscribe(channel)`.
+    try {
+      channel.subscribe()
+    } catch (e) {
+      devWarn('Failed to start channel subscription (ignored):', e)
+    }
+    return channel
   },
 
   // Unsubscribe from a channel
   unsubscribe(channel) {
     if (!supabase || !channel) return
-    supabase.removeChannel(channel)
+    try {
+      // If it's a RealtimeChannel, remove via supabase SDK
+      if (channel && (channel.topic || channel.name || channel.unsubscribe)) {
+        // If it has an unsubscribe method, call it first
+        if (typeof channel.unsubscribe === 'function') {
+          try { channel.unsubscribe() } catch (e) { devWarn('channel.unsubscribe failed:', e) }
+        }
+        try { supabase.removeChannel(channel) } catch (e) { devWarn('removeChannel failed, ignored:', e) }
+        return
+      }
+      // Fallback
+      supabase.removeChannel(channel)
+    } catch (e) {
+      devWarn('unsubscribe error:', e)
+    }
   },
 
   // Notifications
