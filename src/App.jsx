@@ -5343,17 +5343,38 @@ function AppContent() {
           try {
             const { data, error } = await db.getTodayItems(user.id, today)
             if (!error) {
-              // If the server is empty but we have a non-empty local copy, prefer local (assume unsynced changes)
+              // Merge server data and local copy when both exist to preserve unsynced local additions
               try {
                 const rawLocal = localStorage.getItem(key)
                 const localItems = rawLocal ? JSON.parse(rawLocal) : null
-                if ((!data || (Array.isArray(data) && data.length === 0)) && Array.isArray(localItems) && localItems.length > 0) {
-                  // push local copy to server and use it locally
-                  try { await db.saveTodayItems(user.id, today, localItems) } catch (e) {}
-                  setTodayItems(localItems)
-                  try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) {}
+                const serverItems = Array.isArray(data) ? data : []
+
+                if (Array.isArray(localItems) && localItems.length > 0) {
+                  // If server empty, prefer local (push to server)
+                  if (!serverItems || serverItems.length === 0) {
+                    try { await db.saveTodayItems(user.id, today, localItems) } catch (e) {}
+                    setTodayItems(localItems)
+                    try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) {}
+                    return
+                  }
+
+                  // Both server and local have items: merge intelligently (dedupe by id/source ids/title)
+                  const merged = [...serverItems]
+                  const existsCheck = (item) => {
+                    return merged.some(m => (item.id && m.id === item.id) || (item.sourceTaskId && (m.sourceTaskId === item.sourceTaskId || m.taskId === item.sourceTaskId)) || (item.sourceSubtaskId && (m.sourceSubtaskId === item.sourceSubtaskId || m.subtaskId === item.sourceSubtaskId)) || (item.title && m.title === item.title))
+                  }
+                  localItems.forEach(li => { if (!existsCheck(li)) merged.push(li) })
+
+                  // If merged differs from server, persist merged set
+                  const mergedDifferent = merged.length !== serverItems.length || merged.some((m, idx) => JSON.stringify(m) !== JSON.stringify(serverItems[idx]))
+                  if (mergedDifferent) {
+                    try { await db.saveTodayItems(user.id, today, merged) } catch (e) {}
+                  }
+                  setTodayItems(merged)
+                  try { localStorage.setItem(key, JSON.stringify(merged || [])) } catch (e) {}
                   return
                 }
+
               } catch (e) {
                 // ignore JSON parse errors and continue
               }
@@ -5446,6 +5467,20 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
+    // Try to persist immediately to server and surface errors
+    (async () => {
+      try {
+        if (!demoMode && user && db && db.saveTodayItems) {
+          const today = new Date()
+          const { data, error } = await db.saveTodayItems(user.id, today, next)
+          if (error) {
+            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+          }
+        }
+      } catch (e) {
+        dwarn('addToToday: save to server failed', e)
+      }
+    })()
   }
 
   const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
@@ -5466,6 +5501,19 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
+    ;(async () => {
+      try {
+        if (!demoMode && user && db && db.saveTodayItems) {
+          const today = new Date()
+          const { data, error } = await db.saveTodayItems(user.id, today, next)
+          if (error) {
+            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+          }
+        }
+      } catch (e) {
+        dwarn('addSubtaskToToday: save to server failed', e)
+      }
+    })()
   }
 
   const addLocalTodayTask = (title) => {
@@ -5477,6 +5525,19 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
+    ;(async () => {
+      try {
+        if (!demoMode && user && db && db.saveTodayItems) {
+          const today = new Date()
+          const { data, error } = await db.saveTodayItems(user.id, today, next)
+          if (error) {
+            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+          }
+        }
+      } catch (e) {
+        dwarn('addLocalTodayTask: save to server failed', e)
+      }
+    })()
   }
 
   const toggleTodayDone = async (id) => {
