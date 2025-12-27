@@ -103,8 +103,16 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- Prevent duplicate notifications for the same user and entity/type combination.
 -- This ensures one notification per (user_id, type, task_id, subtask_id).
-ALTER TABLE public.notifications
-  ADD CONSTRAINT notifications_unique_per_entity UNIQUE (user_id, type, task_id, subtask_id);
+-- Create the unique constraint idempotently (skip if it already exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'notifications_unique_per_entity'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.notifications ADD CONSTRAINT notifications_unique_per_entity UNIQUE (user_id, type, task_id, subtask_id)';
+  END IF;
+END;
+$$;
 
 -- Today items table: per-user per-date stored JSON of today's items
 CREATE TABLE IF NOT EXISTS public.today_items (
