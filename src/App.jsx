@@ -1627,7 +1627,7 @@ function TodayView() {
                       <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
                         {it.is_done ? <Check className="w-3 h-3" /> : null}
                       </button>
-                      <button title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
+                      <button type="button" title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
                         <FileText className="w-4 h-4" />
                       </button>
                     </div>
@@ -1654,8 +1654,57 @@ function TodayView() {
                           {/* inline edit for local items; navigate to task detail for linked items */}
                           {editingId === it.id ? (
                             <div className="flex gap-2 items-center">
-                              <input className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} />
-                              <button onClick={async () => {
+                              <input autoFocus className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={async (e) => {
+                                if (e.key !== 'Enter') return
+                                e.preventDefault()
+                                const trimmed = (editText || '').trim()
+                                if (!trimmed) return
+
+                                // reuse same save flow as Save button
+                                if (it.isLocal) {
+                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                                  setTodayItems(next)
+                                  saveTodayItems(next)
+                                  setEditingId(null)
+                                  return
+                                }
+                                try {
+                                  if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                                    if (it.subtaskId) {
+                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed })
+                                      if (error) { showToast('Failed to update subtask'); return }
+                                    } else if (it.taskId) {
+                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed })
+                                      if (error) { showToast('Failed to update task'); return }
+                                    }
+                                    try { await reloadProjects() } catch (e) {}
+                                  } else {
+                                    let updated = false
+                                    const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
+                                      if (it.subtaskId) {
+                                        const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
+                                        if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                                        return { ...t, subtasks: newSubtasks }
+                                      }
+                                      if (it.taskId && t.id === it.taskId) {
+                                        updated = true
+                                        return { ...t, title: trimmed }
+                                      }
+                                      return t
+                                    }) })) }))
+                                    if (updated) setProjects(newProjects)
+                                  }
+
+                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                                  setTodayItems(next)
+                                  saveTodayItems(next)
+                                  setEditingId(null)
+                                } catch (e) {
+                                  dwarn('Failed to save renamed item', e)
+                                  showToast('Failed to save change')
+                                }
+                              }} />
+                              <button type="button" onClick={async () => {
                                 const trimmed = (editText || '').trim()
                                 if (!trimmed) return
 
@@ -1708,7 +1757,7 @@ function TodayView() {
                                   showToast('Failed to save change')
                                 }
                               }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
-                              <button onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
+                              <button type="button" onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
                             </div>
                           ) : (
                             <>
