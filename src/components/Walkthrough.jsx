@@ -41,13 +41,31 @@ export default function Walkthrough({ steps = [], visible = false, onClose = () 
 
   // Positioning
   const style = pos ? {
-    position: 'absolute',
-    top: pos.top + pos.height + 8,
-    left: Math.max(8, pos.left),
-    zIndex: 9999,
-    minWidth: 220,
-    maxWidth: 320
-  } : { position: 'fixed', top: '18%', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, minWidth: 260 }
+    // Positioning: prefer below target; if no space, render above; clamp horizontally
+    const style = (() => {
+      const base = { position: 'fixed', zIndex: 9999, minWidth: 220, maxWidth: 320 }
+      if (!pos) return { ...base, top: '18%', left: '50%', transform: 'translateX(-50%)' }
+
+      const panelMaxW = 320
+      const margin = 8
+      const panelEstimateH = 160 // conservative estimate for panel height
+      const viewportW = window.innerWidth
+      const viewportH = window.innerHeight
+
+      // compute left and clamp to viewport
+      let left = pos.left + window.scrollX
+      if (left + panelMaxW + margin > viewportW) left = Math.max(margin, viewportW - panelMaxW - margin)
+      if (left < margin) left = margin
+
+      // prefer below target; if not enough space, place above
+      let top = pos.top + window.scrollY + pos.height + 8
+      if (top + panelEstimateH + margin > viewportH + window.scrollY) {
+        // place above
+        top = Math.max(margin, pos.top + window.scrollY - panelEstimateH - 8)
+      }
+
+      return { ...base, position: 'absolute', top, left, minWidth: 220, maxWidth: panelMaxW }
+    })()
 
   return (
     <>
