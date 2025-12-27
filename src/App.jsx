@@ -1429,7 +1429,21 @@ function TabNav({ tab, setTab }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <span className="mr-2">{t.icon}</span>
+              <span className="mr-2">
+                {t.id === 'today' ? (
+                  <svg className="w-4 h-4 inline-block" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M12 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M12 20v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M4.93 4.93l1.41 1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M17.66 17.66l1.41 1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M2 12h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M20 12h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M4.93 19.07l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    <path d="M17.66 6.34l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                ) : t.icon }
+              </span>
               {t.label}
             </button>
           ))}
@@ -1493,7 +1507,7 @@ function TodayView() {
           <h2 className="text-lg font-bold">Tod(o)ay tasks</h2>
           <p className="text-sm text-gray-500">Today — small wins, big progress.</p>
         </div>
-        <div className="flex items-center gap-2 relative">
+        <div className="flex items-center gap-2 relative flex-wrap sm:flex-nowrap">
           {/* Selection mode toggle / actions (moved left of input) */}
           {!isSelectionMode ? (
             <button
@@ -1536,7 +1550,7 @@ function TodayView() {
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { addLocalTodayTask(newTitle); setNewTitle('') } }}
             placeholder="+ New task for today"
-            className="input-sleek"
+            className="input-sleek min-w-0"
           />
           <button onClick={() => { addLocalTodayTask(newTitle); setNewTitle('') }} className="px-3 py-2 bg-gray-800 text-white rounded">Add</button>
           <button
@@ -5245,21 +5259,40 @@ function AppContent() {
   const notifiedOverdueRef = useRef(new Set())
   const [walkVisible, setWalkVisible] = useState(false)
   // Today / daily focus state (per-date persisted)
-  const getTodayKey = (d = new Date()) => `researchos_today_${d.toISOString().slice(0,10)}`
+  const getTodayKey = (d = new Date()) => `researchos_today_${user?.id || 'anon'}_${d.toISOString().slice(0,10)}`
   const [todayItems, setTodayItems] = useState([]) // { id, title, projectId?, taskId?, isLocal, created_at }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
 
   useEffect(() => {
-    // load today's items from localStorage
+    // load today's items from localStorage; include migration from legacy (non-user) key
     try {
-      const raw = localStorage.getItem(getTodayKey())
-      const parsed = raw ? JSON.parse(raw) : []
-      setTodayItems(parsed)
+      const today = new Date()
+      const key = getTodayKey(today)
+      const legacyKey = `researchos_today_${today.toISOString().slice(0,10)}`
+
+      const rawUser = localStorage.getItem(key)
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null
+
+      // If no user-specific value, but legacy (date-only) exists, migrate/merge it
+      if ((parsedUser === null || parsedUser === undefined) && localStorage.getItem(legacyKey)) {
+        try {
+          const rawLegacy = localStorage.getItem(legacyKey)
+          const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : []
+          // save under user key (or anon if no user)
+          localStorage.setItem(key, JSON.stringify(parsedLegacy || []))
+          setTodayItems(parsedLegacy || [])
+          return
+        } catch (e) {
+          // fallback to empty
+        }
+      }
+
+      setTodayItems(parsedUser || [])
     } catch (e) {
       setTodayItems([])
     }
-  }, [])
+  }, [user])
 
   const saveTodayItems = (items) => {
     try {
