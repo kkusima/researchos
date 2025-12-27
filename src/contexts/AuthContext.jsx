@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, db } from '../lib/supabase'
 
+const DEV = import.meta.env.DEV
+const dlog = (...args) => { if (DEV) console.log(...args) }
+const dwarn = (...args) => { if (DEV) console.warn(...args) }
+const derr = (...args) => { if (DEV) console.error(...args) }
+
 const AuthContext = createContext({})
 
 export const useAuth = () => useContext(AuthContext)
@@ -52,7 +57,7 @@ const cleanUrl = () => {
       return true
     }
   } catch (e) {
-    console.warn('Failed to clean URL:', e)
+    dwarn('Failed to clean URL:', e)
   }
   return false
 }
@@ -85,13 +90,13 @@ export function AuthProvider({ children }) {
       )
 
       if (error) {
-        console.error('Profile sync error:', error)
+        derr('Profile sync error:', error)
         // Don't block auth for profile errors - user can still use the app
         return false
       }
       return true
     } catch (e) {
-      console.error('Profile sync failed:', e)
+      derr('Profile sync failed:', e)
       return false
     }
   }, [])
@@ -104,7 +109,7 @@ export function AuthProvider({ children }) {
       return
     }
 
-    console.log('✅ Authenticated:', session.user.email)
+    dlog('✅ Authenticated:', session.user.email)
     setUser(session.user)
     
     // Profile sync in background - don't block UI
@@ -114,20 +119,20 @@ export function AuthProvider({ children }) {
       // Check for pending invite token after profile is ready
       const inviteToken = sessionStorage.getItem('pendingInviteToken')
       if (inviteToken && ready) {
-        console.log('🎫 Processing invite token...')
+        dlog('🎫 Processing invite token...')
         try {
           const { data, error } = await db.acceptInvitationByToken(inviteToken, session.user.id)
           if (error) {
-            console.error('Failed to accept invitation:', error)
+            derr('Failed to accept invitation:', error)
           } else if (data) {
-            console.log('✅ Joined project:', data.projectId)
+            dlog('✅ Joined project:', data.projectId)
             // Could dispatch an event here to reload projects
             window.dispatchEvent(new CustomEvent('invitation-accepted', { 
               detail: { projectId: data.projectId, role: data.role }
             }))
           }
         } catch (e) {
-          console.error('Invite processing error:', e)
+          derr('Invite processing error:', e)
         } finally {
           // Clear the token regardless of outcome
           sessionStorage.removeItem('pendingInviteToken')
@@ -146,7 +151,7 @@ export function AuthProvider({ children }) {
 
     // Demo mode - no Supabase
     if (!supabase) {
-      console.log('🎭 Demo mode - no Supabase configured')
+      dlog('🎭 Demo mode - no Supabase configured')
       setUser({
         id: 'demo-user',
         email: 'demo@researchos.app',
@@ -160,7 +165,7 @@ export function AuthProvider({ children }) {
     let mounted = true
 
     const initialize = async () => {
-      console.log('🔐 Initializing auth...')
+      dlog('🔐 Initializing auth...')
       
       try {
         // Check for OAuth callback code
@@ -170,7 +175,7 @@ export function AuthProvider({ children }) {
 
         // Handle OAuth error
         if (error) {
-          console.error('OAuth error:', error, params.get('error_description'))
+          derr('OAuth error:', error, params.get('error_description'))
           cleanUrl()
           if (mounted) setLoading(false)
           return
@@ -178,7 +183,7 @@ export function AuthProvider({ children }) {
 
         // Handle OAuth code exchange
         if (code) {
-          console.log('🔄 Exchanging OAuth code...')
+          dlog('🔄 Exchanging OAuth code...')
           cleanUrl() // Clean URL immediately to prevent re-processing
           
           try {
@@ -189,7 +194,7 @@ export function AuthProvider({ children }) {
             )
 
             if (exchangeError) {
-              console.error('Code exchange failed:', exchangeError)
+              derr('Code exchange failed:', exchangeError)
               // Fall through to check for existing session
             } else if (data?.session) {
               if (mounted) {
@@ -199,7 +204,7 @@ export function AuthProvider({ children }) {
               return
             }
           } catch (e) {
-            console.error('Code exchange error:', e)
+            derr('Code exchange error:', e)
             // Fall through to check for existing session
           }
         }
@@ -212,21 +217,21 @@ export function AuthProvider({ children }) {
         )
 
         if (sessionError) {
-          console.error('Session check failed:', sessionError)
+          derr('Session check failed:', sessionError)
         }
 
         if (mounted) {
           if (session) {
             await handleAuthSuccess(session)
           } else {
-            console.log('ℹ️ No session')
+            dlog('ℹ️ No session')
             setUser(null)
             setProfileReady(false)
           }
           setLoading(false)
         }
       } catch (e) {
-        console.error('Auth initialization failed:', e)
+        derr('Auth initialization failed:', e)
         cleanUrl()
         if (mounted) {
           setUser(null)
@@ -239,7 +244,7 @@ export function AuthProvider({ children }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔔 Auth event:', event)
+        dlog('🔔 Auth event:', event)
         
         if (!mounted) return
 
@@ -270,7 +275,7 @@ export function AuthProvider({ children }) {
       return
     }
 
-    console.log('🚀 Starting Google Sign-In...')
+    dlog('🚀 Starting Google Sign-In...')
     const redirectTo = window.location.origin
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -285,7 +290,7 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Sign in error:', error)
+      derr('Sign in error:', error)
       alert('Sign in failed: ' + error.message)
     }
   }
@@ -297,7 +302,7 @@ export function AuthProvider({ children }) {
       return { error: new Error('Demo mode') }
     }
 
-    console.log('📝 Starting email sign up...')
+    dlog('📝 Starting email sign up...')
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -311,14 +316,14 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Sign up error:', error)
+      derr('Sign up error:', error)
       return { error }
     }
 
     // Check if email confirmation is required
     // If user exists but no session, email confirmation is pending
     if (data?.user && !data?.session) {
-      console.log('📧 Email confirmation required')
+      dlog('📧 Email confirmation required')
       return { data, error: null, confirmationRequired: true }
     }
 
@@ -337,14 +342,14 @@ export function AuthProvider({ children }) {
       return { error: new Error('Demo mode') }
     }
 
-    console.log('🔑 Starting email sign in...')
+    dlog('🔑 Starting email sign in...')
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
 
     if (error) {
-      console.error('Sign in error:', error)
+      derr('Sign in error:', error)
       return { error }
     }
 
@@ -371,7 +376,7 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Profile update error:', error)
+      derr('Profile update error:', error)
       return { error }
     }
 
@@ -402,7 +407,7 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Email update error:', error)
+      derr('Email update error:', error)
       return { error }
     }
 
@@ -420,7 +425,7 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Password update error:', error)
+      derr('Password update error:', error)
       return { error }
     }
 
@@ -438,7 +443,7 @@ export function AuthProvider({ children }) {
     })
 
     if (error) {
-      console.error('Password reset error:', error)
+      derr('Password reset error:', error)
       return { error }
     }
 
@@ -464,7 +469,7 @@ export function AuthProvider({ children }) {
       setUser(null)
       setProfileReady(false)
     } catch (e) {
-      console.error('Sign out error:', e)
+      derr('Sign out error:', e)
       // Force clear state even on error
       setUser(null)
       setProfileReady(false)

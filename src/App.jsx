@@ -2,6 +2,8 @@ import React, { useState, useEffect, createContext, useContext, useRef } from 'r
 import ReactDOM from 'react-dom'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
+import Avatar from './components/Avatar'
+import Walkthrough from './components/Walkthrough'
 import { 
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare,
@@ -28,6 +30,11 @@ const STORAGE_KEY = 'researchos_local'
 // Helpers
 const uuid = () => crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
 const getProgress = (p) => p.stages?.length ? (p.current_stage_index + 1) / p.stages.length : 0
+
+const DEV = import.meta.env.DEV
+const dlog = (...args) => { if (DEV) console.log(...args) }
+const dwarn = (...args) => { if (DEV) console.warn(...args) }
+const derr = (...args) => { if (DEV) console.error(...args) }
 
 // Check if a task/subtask is overdue
 const isOverdue = (reminderDate) => {
@@ -981,6 +988,36 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
 // ============================================
 function ProfileSettingsModal({ onClose }) {
   const { user, updateProfile, updateEmail, updatePassword, isEmailAuth, demoMode } = useAuth()
+  const avatarInputRef = React.useRef(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
+  const handleAvatarFile = async (file) => {
+    if (!file) return
+    const maxBytes = 2 * 1024 * 1024
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please upload an image (png/jpg).' })
+      return
+    }
+    if (file.size > maxBytes) {
+      setMessage({ type: 'error', text: 'Image too large; use under 2MB.' })
+      return
+    }
+    setAvatarUploading(true)
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const dataUrl = e.target.result
+        const { error } = await updateProfile({ avatar_url: dataUrl })
+        if (error) setMessage({ type: 'error', text: error.message })
+        else setMessage({ type: 'success', text: 'Avatar updated' })
+        setAvatarUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (e) {
+      setMessage({ type: 'error', text: 'Upload failed' })
+      setAvatarUploading(false)
+    }
+  }
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
@@ -1125,6 +1162,19 @@ function ProfileSettingsModal({ onClose }) {
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <form onSubmit={handleUpdateProfile}>
+              <div className="mb-4 flex items-center gap-4">
+                <div>
+                  <Avatar size={64} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-gray-700">Profile Image</label>
+                  <div className="flex items-center gap-2">
+                    <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatarFile(e.target.files?.[0])} />
+                    <button type="button" onClick={() => avatarInputRef.current?.click()} className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200">Upload avatar</button>
+                    {avatarUploading && <span className="text-xs text-gray-500">Uploading…</span>}
+                  </div>
+                </div>
+              </div>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
                 <input
@@ -1252,7 +1302,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <div onClick={(e) => { e.stopPropagation(); if (onLogoClick) onLogoClick() }} className="cursor-pointer flex items-center gap-2">
+              <div id="app-logo" onClick={(e) => { e.stopPropagation(); if (onLogoClick) onLogoClick() }} className="cursor-pointer flex items-center gap-2">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
                   🔬
                 </div>
@@ -1305,11 +1355,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                   onClick={() => setShowMenu(!showMenu)}
                   className="flex items-center gap-2 sm:gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
                 >
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={userName} className="w-8 h-8 rounded-full" />
-                  ) : (
-                    <div className="avatar text-sm">{userName[0]?.toUpperCase()}</div>
-                  )}
+                  <Avatar size={32} />
                   <span className="font-medium text-gray-700 hidden md:block">{userName}</span>
                 </button>
 
@@ -1370,9 +1416,11 @@ function TabNav({ tab, setTab }) {
         <nav className="flex gap-1">
           {[
             { id: 'projects', label: 'Projects', icon: '◫' },
-            { id: 'tasks', label: 'Tasks', icon: '✓' }
+            { id: 'tasks', label: 'Tasks', icon: '✓' },
+            { id: 'today', label: 'Tod(o)ay', icon: '☀' }
           ].map(t => (
             <button
+              id={`tab-${t.id}`}
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`px-5 py-4 font-medium text-sm border-b-2 transition-colors ${
@@ -1394,6 +1442,275 @@ function TabNav({ tab, setTab }) {
 // ============================================
 // PROJECTS VIEW
 // ============================================
+function TodayView() {
+  const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView } = useApp()
+  const [newTitle, setNewTitle] = useState('')
+  const [showExistingPicker, setShowExistingPicker] = useState(false)
+  const [existingQuery, setExistingQuery] = useState('')
+  const pickerRef = useRef(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  // Flatten tasks and subtasks with project context for the existing-task picker
+  const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
+    const base = [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }]
+    const subs = (t.subtasks || []).map(st => ({ type: 'subtask', subtask: st, task: t, project: p, stage: s, stageIndex: si }))
+    return [...base, ...subs]
+  })))
+
+  useEffect(() => {
+    if (!showExistingPicker) return
+    const onDocDown = (e) => {
+      if (!pickerRef.current) return
+      if (!pickerRef.current.contains(e.target)) setShowExistingPicker(false)
+    }
+    const onKey = (e) => { if (e.key === 'Escape') setShowExistingPicker(false) }
+    document.addEventListener('mousedown', onDocDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showExistingPicker])
+  // Drag handlers
+  const dragIndex = useRef(null)
+
+  const onDragStart = (e, i) => { dragIndex.current = i; e.dataTransfer?.setData('text/plain', String(i)) }
+  const onDragOver = (e, i) => { e.preventDefault() }
+  const onDrop = (e, i) => {
+    e.preventDefault()
+    const from = dragIndex.current != null ? dragIndex.current : parseInt(e.dataTransfer?.getData('text/plain') || '0', 10)
+    const to = i
+    if (from !== to) reorderToday(from, to)
+    dragIndex.current = null
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold">Tod(o)ay tasks</h2>
+          <p className="text-sm text-gray-500">Today — small wins, big progress.</p>
+        </div>
+        <div className="flex items-center gap-2 relative">
+          {/* Selection mode toggle / actions (moved left of input) */}
+          {!isSelectionMode ? (
+            <button
+              onClick={() => { setIsSelectionMode(true); setSelectedIds(new Set()) }}
+              title="Select items"
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-2"
+            >
+              <Check className="w-4 h-4 text-gray-700" />
+              <span className="text-gray-700">Select</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => {
+                if (selectedIds.size === todayItems.length) {
+                  setSelectedIds(new Set())
+                } else {
+                  setSelectedIds(new Set(todayItems.map(i => i.id)))
+                }
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">{selectedIds.size === todayItems.length ? 'Deselect All' : 'Select All'}</button>
+              <button onClick={() => {
+                const toRemove = Array.from(selectedIds)
+                if (toRemove.length === 0) return
+                try { removeTodayItems(toRemove) } catch (e) { dwarn('removeTodayItems failed', e) }
+                setSelectedIds(new Set())
+                setIsSelectionMode(false)
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"><Trash2 className="w-4 h-4"/> <span>Delete</span> <span className="opacity-80">({selectedIds.size})</span></button>
+              <button onClick={() => {
+                const toDup = Array.from(selectedIds)
+                if (toDup.length === 0) return
+                try { duplicateTodayItems(toDup) } catch (e) { dwarn('duplicateTodayItems failed', e) }
+                setSelectedIds(new Set())
+                setIsSelectionMode(false)
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700 flex items-center gap-1"><Copy className="w-4 h-4"/> <span>Duplicate</span> <span className="opacity-80">({selectedIds.size})</span></button>
+              <button onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()) }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
+            </div>
+          )}
+
+          <input
+            value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { addLocalTodayTask(newTitle); setNewTitle('') } }}
+            placeholder="+ New task for today"
+            className="input-sleek"
+          />
+          <button onClick={() => { addLocalTodayTask(newTitle); setNewTitle('') }} className="px-3 py-2 bg-gray-800 text-white rounded">Add</button>
+          <button
+            id="today-add-existing"
+            onClick={() => { setShowExistingPicker(s => !s); setExistingQuery('') }}
+            className="p-2 bg-white border border-gray-200 rounded text-gray-700 hover:bg-gray-50"
+            title="Add an existing task"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+
+          {showExistingPicker && (
+            <div ref={pickerRef} className="absolute right-0 mt-12 w-80 bg-white border border-gray-100 rounded shadow-lg z-40 p-2">
+              <input
+                className="w-full px-3 py-2 border border-gray-200 rounded mb-2"
+                placeholder="Search tasks..."
+                value={existingQuery}
+                onChange={e => setExistingQuery(e.target.value)}
+                autoFocus
+              />
+              <div className="max-h-48 overflow-auto">
+                {allEntries.filter(entry => {
+                  const title = entry.type === 'task' ? entry.task.title : `${entry.task.title} — ${entry.subtask.title}`
+                  const projectTitle = entry.project?.title || ''
+                  if (!existingQuery) return true
+                  return title.toLowerCase().includes(existingQuery.toLowerCase()) || projectTitle.toLowerCase().includes(existingQuery.toLowerCase())
+                }).slice(0, 200).map(entry => (
+                  <div key={entry.type === 'subtask' ? `s-${entry.subtask.id}` : `t-${entry.task.id}`} className="flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded cursor-pointer" onClick={() => {
+                    if (entry.type === 'subtask') {
+                      addSubtaskToToday(entry.subtask, entry.task, { projectId: entry.project?.id })
+                    } else {
+                      addToToday(entry.task, { projectId: entry.project?.id })
+                    }
+                    setShowExistingPicker(false)
+                  }}>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        {entry.project?.title && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{entry.project.title}</span>}
+                        {entry.stage?.title && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{entry.stage.title}</span>}
+                        {entry.type === 'subtask' && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">subtask</span>}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-400">Add</div>
+                  </div>
+                ))}
+                {allEntries.length === 0 && (
+                  <div className="text-sm text-gray-400 p-2">No tasks available</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {todayItems.length === 0 ? (
+          <div className="p-6 text-center text-gray-400">No items yet — add one or tap 'Add to Tod(o)ay' on a task.</div>
+        ) : (
+          todayItems.map((it, i) => {
+            const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
+            return (
+              <div key={it.id}
+                draggable
+                onDragStart={(e) => onDragStart(e, i)}
+                onDragOver={(e) => onDragOver(e, i)}
+                onDrop={(e) => onDrop(e, i)}
+                className={`glass-card p-2 rounded-lg flex items-center justify-between ${it.is_done ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {!isSelectionMode ? (
+                    <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
+                      {it.is_done ? <Check className="w-3 h-3" /> : null}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => {
+                        const s = new Set(selectedIds)
+                        if (s.has(it.id)) s.delete(it.id)
+                        else s.add(it.id)
+                        setSelectedIds(s)
+                      }} aria-pressed={selectedIds.has(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${selectedIds.has(it.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
+                        {selectedIds.has(it.id) ? <Check className="w-3 h-3" /> : null}
+                      </button>
+                      <button title="Edit" onClick={async () => {
+                        // If this is a linked task/subtask, navigate to task detail
+                        if (!it.isLocal && it.taskId) {
+                          // find task & project
+                          let found = null
+                          for (const p of projects) {
+                            for (let si = 0; si < (p.stages || []).length; si++) {
+                              const stage = p.stages[si]
+                              for (const t of stage.tasks || []) {
+                                if (t.id === it.taskId) {
+                                  found = { project: p, task: t, stageIndex: si }
+                                  break
+                                }
+                              }
+                              if (found) break
+                            }
+                            if (found) break
+                          }
+                          if (!found) {
+                            // try reloading projects then search again
+                            try {
+                              await reloadProjects()
+                            } catch (e) { dwarn('reloadProjects failed', e) }
+                            for (const p of projects) {
+                              for (let si = 0; si < (p.stages || []).length; si++) {
+                                const stage = p.stages[si]
+                                for (const t of stage.tasks || []) {
+                                  if (t.id === it.taskId) {
+                                    found = { project: p, task: t, stageIndex: si }
+                                    break
+                                  }
+                                }
+                                if (found) break
+                              }
+                              if (found) break
+                            }
+                          }
+                          if (found) {
+                            setSelectedProject(found.project)
+                            setSelectedTask({ task: found.task, stageIndex: found.stageIndex })
+                            setView('task')
+                            return
+                          }
+                          // fallback: navigate to task view with minimal info
+                          setSelectedTask({ task: { id: it.taskId, title: it.title }, stageIndex: 0 })
+                          setView('task')
+                          return
+                        }
+                        // Local item: enable inline editing
+                        setEditingId(it.id)
+                        setEditText(it.title || '')
+                      }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                        <div className="min-w-0">
+                          {/* inline edit for local items; navigate to task detail for linked items */}
+                          {editingId === it.id ? (
+                            <div className="flex gap-2 items-center">
+                              <input className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} />
+                              <button onClick={() => {
+                                const trimmed = (editText || '').trim()
+                                if (!trimmed) return
+                                const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                                setTodayItems(next)
+                                saveTodayItems(next)
+                                setEditingId(null)
+                              }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
+                              <button onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''}`}>{it.title}</div>
+                              <div className="text-xs text-gray-400 truncate">{proj ? proj.title : ''}</div>
+                            </>
+                          )}
+                        </div>
+                </div>
+                <div className="flex items-center gap-2">
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ProjectsView() {
   const { projects, setProjects, setView, setSelectedProject, loading, reorderProjects } = useApp()
   const { user, demoMode } = useAuth()
@@ -1407,7 +1724,6 @@ function ProjectsView() {
 
   const handleSortChange = (newOption) => {
     if (newOption === sortOption) {
-      // Toggle direction if same option clicked
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
       setSortOption(newOption)
@@ -1478,6 +1794,114 @@ function ProjectsView() {
     setIsSelectionMode(false)
   }
 
+  const duplicateSelectedProjects = async () => {
+    const toDup = Array.from(selectedProjectIDs)
+    if (toDup.length === 0) return
+
+    const now = new Date().toISOString()
+    const newProjectsArr = []
+
+    // Build duplicated projects locally first
+    for (const id of toDup) {
+      const original = projects.find(p => p.id === id)
+      if (!original) continue
+      const duplicatedProject = {
+        ...original,
+        id: uuid(),
+        title: `${original.title} (Copy)`,
+        priority_rank: projects.length + 1 + newProjectsArr.length,
+        created_at: now,
+        updated_at: now,
+        owner_id: user?.id || 'demo',
+        project_members: [],
+        stages: original.stages?.map(stage => ({
+          ...stage,
+          id: uuid(),
+          tasks: stage.tasks?.map(task => ({
+            ...task,
+            id: uuid(),
+            created_at: now,
+            updated_at: now,
+            subtasks: task.subtasks?.map(st => ({ ...st, id: uuid() })) || [],
+            comments: []
+          })) || []
+        })) || []
+      }
+      newProjectsArr.push(duplicatedProject)
+    }
+
+    if (newProjectsArr.length === 0) return
+
+    if (demoMode) {
+      const merged = [...projects, ...newProjectsArr]
+      setProjects(merged)
+      saveLocal(merged)
+      setSelectedProjectIDs(new Set())
+      setIsSelectionMode(false)
+      return
+    }
+
+    // Persist in Supabase: create projects, stages, tasks, subtasks, then refresh once
+    for (const dup of newProjectsArr) {
+      try {
+        const { data: createdProject, error: projectError } = await db.createProject({
+          title: dup.title,
+          emoji: dup.emoji,
+          priority_rank: dup.priority_rank,
+          current_stage_index: dup.current_stage_index,
+          owner_id: user.id
+        })
+        if (projectError || !createdProject) {
+          derr('Failed to duplicate project:', projectError)
+          continue
+        }
+
+        for (const stage of dup.stages || []) {
+          const { data: createdStage, error: stageError } = await db.createStage({
+            project_id: createdProject.id,
+            name: stage.name,
+            order_index: stage.order_index
+          })
+          if (stageError || !createdStage) {
+            derr('Failed to create stage:', stageError)
+            continue
+          }
+
+          for (const task of stage.tasks || []) {
+            const { data: createdTask, error: taskError } = await db.createTask({
+              stage_id: createdStage.id,
+              title: task.title,
+              description: task.description || '',
+              is_completed: task.is_completed || false,
+              reminder_date: task.reminder_date,
+              order_index: task.order_index || 0
+            })
+            if (taskError || !createdTask) {
+              derr('Failed to create task:', taskError)
+              continue
+            }
+            for (const st of task.subtasks || []) {
+              await db.createSubtask({ ...st, task_id: createdTask.id })
+            }
+          }
+        }
+      } catch (e) {
+        derr('Bulk duplicate error', e)
+      }
+    }
+
+    // Refresh projects list once
+    try {
+      const { data: refreshed } = await db.getProjects(user.id)
+      if (refreshed) setProjects(refreshed)
+    } catch (e) {
+      derr('Failed to refresh projects after duplication', e)
+    }
+
+    setSelectedProjectIDs(new Set())
+    setIsSelectionMode(false)
+  }
+
   const deleteProject = async (id) => {
     if (!window.confirm('Delete this project and all its data?')) return
     
@@ -1532,7 +1956,7 @@ function ProjectsView() {
       })
 
       if (projectError || !createdProject) {
-        console.error('Failed to duplicate project:', projectError)
+        derr('Failed to duplicate project:', projectError)
         return
       }
 
@@ -1545,7 +1969,7 @@ function ProjectsView() {
         })
 
         if (stageError || !createdStage) {
-          console.error('Failed to create stage:', stageError)
+          derr('Failed to create stage:', stageError)
           continue
         }
 
@@ -1621,6 +2045,14 @@ function ProjectsView() {
                   Delete ({selectedProjectIDs.size})
                 </button>
                 <button
+                  onClick={duplicateSelectedProjects}
+                  disabled={selectedProjectIDs.size === 0}
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  Duplicate ({selectedProjectIDs.size})
+                </button>
+                <button
                   onClick={() => { setIsSelectionMode(false); setSelectedProjectIDs(new Set()) }}
                   className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
                 >
@@ -1689,7 +2121,7 @@ function ProjectsView() {
             ))}
           </div>
           
-          <button onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap flex-shrink-0 text-sm px-3 py-2">
+          <button id="projects-reorder-btn" onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap flex-shrink-0 text-sm px-3 py-2">
             <MoreVertical className="w-4 h-4" />
             <span className="hidden sm:inline">Reorder</span>
           </button>
@@ -1710,6 +2142,7 @@ function ProjectsView() {
           {sortedProjects.map((project, i) => (
             <ProjectCard 
               key={project.id} 
+              rootId={i === 0 ? 'project-card-0' : undefined}
               project={project} 
               index={i}
               isSelectionMode={isSelectionMode}
@@ -1865,7 +2298,7 @@ function PriorityBadge({ rank }) {
 // ============================================
 // PROJECT CARD (Grid View)
 // ============================================
-function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
+function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
   const progress = getProgress(project)
@@ -1923,10 +2356,10 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-gray-900 truncate">{project.title}</h3>
               {isShared && (
-                <span className="tag bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 flex-shrink-0">
-                  <Share2 className="w-2 h-2" />
-                </span>
-              )}
+                    <span id={rootId ? `${rootId}-shared` : undefined} className="tag tag-shared bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 flex-shrink-0">
+                      <Share2 className="w-2 h-2" />
+                    </span>
+                  )}
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className={`tag text-[9px] py-0.5 px-1.5 ${isComplete ? 'bg-green-100 text-green-700' : 'tag-default'}`}>{isComplete ? '✓ Complete' : currentStage?.name || 'No stage'}</span>
@@ -1985,7 +2418,7 @@ function ProjectCard({ project, index, onSelect, onDelete, onDuplicate, isSelect
         <div className="absolute top-3 left-3 flex items-center gap-2">
           <PriorityBadge rank={project.priority_rank} />
           {isShared && (
-            <span className="tag bg-blue-100 text-blue-600 text-[9px]">
+            <span id={rootId ? `${rootId}-shared-desktop` : undefined} className="tag tag-shared bg-blue-100 text-blue-600 text-[9px]">
               <Share2 className="w-2.5 h-2.5 mr-0.5" />
               Shared
             </span>
@@ -2349,7 +2782,7 @@ function CreateProjectModal({ onClose }) {
       }
 
       // In real mode, create in Supabase
-      console.log('📝 Creating project in Supabase...')
+      dlog('📝 Creating project in Supabase...')
       const { data, error } = await db.createProject({
         title: newProject.title,
         emoji: newProject.emoji,
@@ -2359,13 +2792,13 @@ function CreateProjectModal({ onClose }) {
       })
 
       if (error || !data) {
-        console.error('❌ Create project failed:', error)
+        derr('❌ Create project failed:', error)
         setErrorMsg(error?.message || 'Failed to create project in Supabase.')
         setLoading(false)
         return
       }
 
-      console.log('✅ Project created:', data.id)
+      dlog('✅ Project created:', data.id)
 
       // Create stages
       for (const stage of newProject.stages) {
@@ -2374,8 +2807,8 @@ function CreateProjectModal({ onClose }) {
           name: stage.name,
           order_index: stage.order_index,
         })
-        if (stageError) {
-          console.error('❌ Create stage failed:', stageError)
+          if (stageError) {
+          derr('❌ Create stage failed:', stageError)
           setErrorMsg(stageError?.message || `Failed to create stage: ${stage.name}`)
           setLoading(false)
           return
@@ -2781,6 +3214,102 @@ function ProjectDetail() {
     return 0
   })
 
+  // Multi-select state for tasks
+  const [selectedTaskIds, setSelectedTaskIds] = React.useState(new Set())
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false)
+  const lastSelectedIndex = React.useRef(null)
+
+  const clearSelection = () => { setSelectedTaskIds(new Set()); setIsSelectionMode(false); lastSelectedIndex.current = null }
+
+  const toggleSelect = (taskId, index, e, opts = {}) => {
+    // Support shift-click selection
+    const newSet = new Set(selectedTaskIds)
+    if (opts.shift && lastSelectedIndex.current != null) {
+      const start = Math.min(lastSelectedIndex.current, index)
+      const end = Math.max(lastSelectedIndex.current, index)
+      for (let i = start; i <= end; i++) {
+        newSet.add(sortedTasks[i].id)
+      }
+    } else if (newSet.has(taskId)) {
+      newSet.delete(taskId)
+    } else {
+      newSet.add(taskId)
+    }
+    setSelectedTaskIds(newSet)
+    setIsSelectionMode(newSet.size > 0)
+    lastSelectedIndex.current = index
+  }
+
+  // Long-press helper for mobile selection
+  const longPressTimeout = React.useRef(null)
+  const handleTouchStartSelect = (taskId, index) => {
+    longPressTimeout.current = setTimeout(() => {
+      toggleSelect(taskId, index, null)
+    }, 500)
+  }
+  const handleTouchEndCancel = () => { if (longPressTimeout.current) { clearTimeout(longPressTimeout.current); longPressTimeout.current = null } }
+
+  // Duplicate selected tasks (preserve subtasks). Performs local update and persists in background.
+  const duplicateSelectedTasks = async () => {
+    if (!sortedTasks || selectedTaskIds.size === 0) return
+    const selectedIds = Array.from(selectedTaskIds)
+    // Build clones
+    const clones = []
+    selectedIds.forEach(id => {
+      const orig = sortedTasks.find(t => t.id === id)
+      if (!orig) return
+      const newTaskId = uuid()
+      const newSubtasks = (orig.subtasks || []).map(s => ({ ...s, id: uuid(), created_at: new Date().toISOString() }))
+      const clone = {
+        ...orig,
+        id: newTaskId,
+        title: `${orig.title} (copy)`,
+        is_completed: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        subtasks: newSubtasks
+      }
+      clones.push({ origId: id, clone })
+    })
+
+    // Insert clones after last selected task index to preserve order
+    const indices = selectedIds.map(id => sortedTasks.findIndex(t => t.id === id)).filter(i => i >= 0).sort((a,b) => a-b)
+    const insertAfter = indices.length ? indices[indices.length-1] : sortedTasks.length - 1
+
+    const newTasks = [...(stage.tasks || [])]
+    // Insert clones after insertAfter in the stage.tasks array (map sortedTasks positions to actual positions)
+    const baseIndex = insertAfter + 1
+    newTasks.splice(baseIndex, 0, ...clones.map(c => c.clone))
+
+    const updatedProject = {
+      ...project,
+      stages: project.stages.map((s, i) => i === stageIndex ? { ...s, tasks: newTasks } : s)
+    }
+
+    updateProject(updatedProject)
+
+    // Persist clones in background
+    if (!demoMode) {
+      for (const c of clones) {
+        try {
+          const { data: created } = await db.createTask({ ...c.clone, stage_id: stage.id })
+          // create subtasks if any
+          if (created && c.clone.subtasks?.length) {
+            for (const st of c.clone.subtasks) {
+              await db.createSubtask({ ...st, task_id: created.id })
+            }
+          }
+        } catch (e) {
+          // swallow background errors (dev logs only)
+          derr('Duplicate persist error', e)
+        }
+      }
+    }
+
+    // Clear selection after duplicate
+    clearSelection()
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
       {/* Header */}
@@ -2900,6 +3429,34 @@ function ProjectDetail() {
 
         {/* Task List */}
         <div className="space-y-3">
+          {/* Selection toolbar */}
+          {isSelectionMode && (
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)))}
+                  className="text-sm text-brand-600 hover:underline"
+                >
+                  Select all
+                </button>
+                <button
+                  onClick={() => clearSelection()}
+                  className="text-sm text-gray-500 hover:underline"
+                >
+                  Clear
+                </button>
+                <span className="text-sm text-gray-600">{selectedTaskIds.size} selected</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={duplicateSelectedTasks}
+                  className="px-3 py-1 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-700"
+                >
+                  Duplicate
+                </button>
+              </div>
+            </div>
+          )}
           {sortedTasks.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               No tasks yet. Add one above!
@@ -2918,12 +3475,25 @@ function ProjectDetail() {
                 >
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-2 sm:gap-3">
-                      <button
-                        onClick={() => toggleTask(task.id)}
-                        className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
-                      >
-                        {task.is_completed && <Check className="w-3 h-3" />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onMouseDown={() => { /* prevent text drag */ }}
+                          onClick={(e) => { e.stopPropagation(); toggleSelect(task.id, i, e, { shift: e.shiftKey }) }}
+                          onTouchStart={() => handleTouchStartSelect(task.id, i)}
+                          onTouchEnd={() => handleTouchEndCancel()}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${selectedTaskIds.has(task.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white text-gray-400'}`}
+                          title="Select task"
+                        >
+                          {selectedTaskIds.has(task.id) ? <Check className="w-3 h-3" /> : null}
+                        </button>
+
+                        <button
+                          onClick={() => toggleTask(task.id)}
+                          className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
+                        >
+                          {task.is_completed && <Check className="w-3 h-3" />}
+                        </button>
+                      </div>
                       <div 
                         className="flex-1 cursor-pointer min-w-0"
                         onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
@@ -2962,6 +3532,13 @@ function ProjectDetail() {
                           compact
                           isShared={isShared}
                         />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); addToToday(task, { projectId: project.id }) }}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Add to Tod(o)ay"
+                          >
+                            <Calendar className="w-4 h-4" />
+                          </button>
                         <button
                           onClick={() => deleteTask(task.id)}
                           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -4634,7 +5211,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('React render error:', error, info)
+    derr('React render error:', error, info)
     this.setState({ error, info })
   }
 
@@ -4666,6 +5243,192 @@ function AppContent() {
   const [notifications, setNotifications] = useState([])
   const notificationsRef = useRef(notifications)
   const notifiedOverdueRef = useRef(new Set())
+  const [walkVisible, setWalkVisible] = useState(false)
+  // Today / daily focus state (per-date persisted)
+  const getTodayKey = (d = new Date()) => `researchos_today_${d.toISOString().slice(0,10)}`
+  const [todayItems, setTodayItems] = useState([]) // { id, title, projectId?, taskId?, isLocal, created_at }
+  const [toast, setToast] = useState(null)
+  const [toastVisible, setToastVisible] = useState(false)
+
+  useEffect(() => {
+    // load today's items from localStorage
+    try {
+      const raw = localStorage.getItem(getTodayKey())
+      const parsed = raw ? JSON.parse(raw) : []
+      setTodayItems(parsed)
+    } catch (e) {
+      setTodayItems([])
+    }
+  }, [])
+
+  const saveTodayItems = (items) => {
+    try {
+      localStorage.setItem(getTodayKey(), JSON.stringify(items))
+    } catch (e) {}
+  }
+
+  const showToast = (message, ms = 2500) => {
+    try {
+      const id = uuid()
+      setToast({ id, message })
+      // show then hide with small exit animation window
+      setToastVisible(true)
+      const hideAt = Math.max(300, ms - 220)
+      setTimeout(() => setToastVisible(false), hideAt)
+      setTimeout(() => {
+        setToast(current => (current && current.id === id ? null : current))
+      }, ms)
+    } catch (e) {}
+  }
+
+  const addToToday = (task, opts = {}) => {
+    if (!task) return
+    const exists = todayItems.find(i => i.taskId === task.id)
+    if (exists) { showToast('Task already in Tod(o)ay'); return }
+    const item = {
+      id: uuid(),
+      title: task.title,
+      projectId: opts.projectId || null,
+      taskId: task.id,
+      isLocal: false,
+      created_at: new Date().toISOString()
+    }
+    const next = [...todayItems, item]
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
+    if (!subtask || !parentTask) return
+    // prevent duplicates by subtask id when possible
+    const exists = todayItems.find(i => i.subtaskId === subtask.id || (i.taskId === parentTask.id && i.title === `${parentTask.title} — ${subtask.title}`))
+    if (exists) { showToast('Subtask already in Tod(o)ay'); return }
+    const item = {
+      id: uuid(),
+      title: `${parentTask.title} — ${subtask.title}`,
+      projectId: opts.projectId || null,
+      taskId: parentTask.id,
+      subtaskId: subtask.id,
+      isLocal: false,
+      created_at: new Date().toISOString()
+    }
+    const next = [...todayItems, item]
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const addLocalTodayTask = (title) => {
+    if (!title || !title.trim()) return
+    const trimmed = title.trim()
+    const exists = todayItems.find(i => i.isLocal && i.title === trimmed)
+    if (exists) { showToast('Item already in Tod(o)ay'); return }
+    const item = { id: uuid(), title: trimmed, isLocal: true, is_done: false, created_at: new Date().toISOString() }
+    const next = [...todayItems, item]
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const toggleTodayDone = async (id) => {
+    const item = todayItems.find(i => i.id === id)
+    if (!item) return
+
+    // Local-only today item
+    if (item.isLocal) {
+      const next = todayItems.map(i => i.id === id ? { ...i, is_done: !i.is_done } : i)
+      setTodayItems(next)
+      saveTodayItems(next)
+      return
+    }
+
+    // Linked to a task or subtask in the DB — persist change
+    const currentlyDone = !!item.is_done
+    const newDone = !currentlyDone
+
+    try {
+      // If running in demo mode, update the in-memory `projects` state instead
+      if (demoMode) {
+        let updated = false
+        const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
+          if (item.subtaskId) {
+            // find subtask
+            const newSubtasks = (t.subtasks || []).map(st => st.id === item.subtaskId ? { ...st, is_completed: newDone } : st)
+            if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+            return { ...t, subtasks: newSubtasks }
+          }
+          if (item.taskId && t.id === item.taskId) {
+            updated = true
+            return { ...t, is_completed: newDone }
+          }
+          return t
+        }) })) }))
+
+        if (updated) {
+          setProjects(newProjects)
+          // update today list to reflect new done status
+          const next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
+          setTodayItems(next)
+          saveTodayItems(next)
+          return
+        }
+        // if not found, fall through to attempt server update
+      }
+
+      if (item.subtaskId) {
+        const { data, error } = await db.updateSubtask(item.subtaskId, { is_completed: newDone })
+        if (error) {
+          dwarn('Failed to update subtask completion:', error)
+          showToast('Failed to update subtask')
+          return
+        }
+      } else if (item.taskId) {
+        const { data, error } = await db.updateTask(item.taskId, { is_completed: newDone })
+        if (error) {
+          dwarn('Failed to update task completion:', error)
+          showToast('Failed to update task')
+          return
+        }
+      }
+
+      // Update local today item to reflect new state
+      const next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
+      setTodayItems(next)
+      saveTodayItems(next)
+    } catch (e) {
+      dwarn('toggleTodayDone error', e)
+      showToast('Error updating completion')
+    }
+  }
+
+  const removeTodayItem = (id) => {
+    const next = todayItems.filter(i => i.id !== id)
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const removeTodayItems = (ids = []) => {
+    if (!ids || ids.length === 0) return
+    const idSet = new Set(ids)
+    const next = todayItems.filter(i => !idSet.has(i.id))
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const duplicateTodayItems = (ids = []) => {
+    if (!ids || ids.length === 0) return
+    const toDup = todayItems.filter(i => ids.includes(i.id))
+    const copies = toDup.map(i => ({ ...i, id: uuid(), created_at: new Date().toISOString(), is_done: false }))
+    const next = [...todayItems, ...copies]
+    setTodayItems(next)
+    saveTodayItems(next)
+  }
+
+  const reorderToday = (fromIndex, toIndex) => {
+    const items = [...todayItems]
+    const [moved] = items.splice(fromIndex, 1)
+    items.splice(toIndex, 0, moved)
+    setTodayItems(items)
+    saveTodayItems(items)
+  }
   
   // Keep ref in sync
   useEffect(() => {
@@ -4718,6 +5481,19 @@ function AppContent() {
       } catch (e) {}
     }
   }
+
+  // Walkthrough: show on first login
+  const WALK_KEY = 'researchos_walkthrough_seen_v1'
+  useEffect(() => {
+    if (!user) return
+    try {
+      const seen = localStorage.getItem(WALK_KEY)
+      if (!seen) {
+        // small delay so UI settles
+        setTimeout(() => setWalkVisible(true), 700)
+      }
+    } catch (e) {}
+  }, [user])
 
   // Check for overdue tasks and create notifications
   const checkOverdueTasks = (projectsList, existingNotifications) => {
@@ -4953,10 +5729,11 @@ function AppContent() {
     }
   }
 
+
   // Listen for invitation-accepted event to reload projects
   useEffect(() => {
     const handleInvitationAccepted = (e) => {
-      console.log('🎉 Invitation accepted, reloading projects...', e.detail)
+      dlog('🎉 Invitation accepted, reloading projects...', e.detail)
       reloadProjects()
       // Add notification for the shared project
       if (demoMode && e.detail?.projectId) {
@@ -5013,12 +5790,12 @@ function AppContent() {
     let debounceTimer = null
     
     const handleRealtimeChange = (payload) => {
-      console.log('🔄 Realtime change detected:', payload.table, payload.eventType)
+      dlog('🔄 Realtime change detected:', payload.table, payload.eventType)
       
       // Debounce to avoid multiple rapid reloads
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(async () => {
-        console.log('🔄 Reloading projects due to realtime change...')
+        dlog('🔄 Reloading projects due to realtime change...')
         const { data, error } = await db.getProjects(user.id)
         if (!error && data) {
           setProjects(data)
@@ -5073,7 +5850,7 @@ function AppContent() {
       await Promise.all([...ownedUpdates, ...sharedUpdates])
       setProjects(updatedProjects)
     } catch (e) {
-      console.error('❌ Failed to persist priority order:', e)
+      derr('❌ Failed to persist priority order:', e)
       // Optionally show error to user
     }
   }
@@ -5109,6 +5886,11 @@ function AppContent() {
     view, setView,
     loading,
     reorderProjects
+    , todayItems, addToToday, addLocalTodayTask, removeTodayItem, reorderToday
+    , toggleTodayDone
+    , addSubtaskToToday
+    , removeTodayItems, duplicateTodayItems
+    , reloadProjects
   }
 
   return (
@@ -5130,12 +5912,30 @@ function AppContent() {
         {view === 'main' && (
           <>
             <TabNav tab={activeTab} setTab={setActiveTab} />
-            {activeTab === 'projects' ? <ProjectsView /> : <AllTasksView />}
+              {activeTab === 'projects' ? <ProjectsView /> : activeTab === 'today' ? <TodayView /> : <AllTasksView />}
           </>
         )}
+        <Walkthrough
+          steps={[
+            { title: 'Welcome to ResearchOS', body: 'Tip: Tap the logo to return to this dashboard anytime.', selector: '#app-logo' },
+            { title: 'Projects', body: 'Create and organize projects here.', selector: '#tab-projects' },
+            { title: 'Reorder Projects', body: 'Reorder your projects to change priority.', selector: '#projects-reorder-btn' },
+            { title: 'Sharing', body: 'Share projects with collaborators and see shared badges.', selector: '#project-card-0-shared-desktop' },
+            { title: 'Tasks & Subtasks', body: 'Manage tasks, set reminders, and add subtasks under each task.', selector: '#tab-tasks' },
+            { title: 'Tod(o)ay', body: 'Quickly pick today’s priorities or add fast local items.', selector: '#tab-today' }
+          ]}
+          visible={walkVisible}
+          onClose={() => { try { localStorage.setItem('researchos_walkthrough_seen_v1', '1') } catch (e) {}; setWalkVisible(false) }}
+        />
         {view === 'project' && <ProjectDetail />}
         {view === 'task' && <TaskDetail />}
         
+        {toast && (
+          <div className="fixed bottom-20 right-6 z-50">
+            <div className="px-4 py-2 bg-gray-900 text-white rounded-lg shadow-lg text-sm">{toast.message}</div>
+          </div>
+        )}
+
         <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-[10px] text-gray-400 bg-white/80 backdrop-blur-sm border-t border-gray-100">
           © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </footer>
