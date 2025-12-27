@@ -106,6 +106,33 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 ALTER TABLE public.notifications
   ADD CONSTRAINT notifications_unique_per_entity UNIQUE (user_id, type, task_id, subtask_id);
 
+-- Today items table: per-user per-date stored JSON of today's items
+CREATE TABLE IF NOT EXISTS public.today_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  items JSONB DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, day)
+);
+
+ALTER TABLE public.today_items ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy p
+    JOIN pg_class c ON p.polrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE p.polname = 'Users can manage own today items'
+      AND n.nspname = 'public' AND c.relname = 'today_items'
+  ) THEN
+    CREATE POLICY "Users can manage own today items" ON public.today_items
+      FOR ALL TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
+  END IF;
+END;
+$$;
+
 -- Project invitations (for inviting users who haven't signed up yet)
 CREATE TABLE IF NOT EXISTS public.project_invitations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

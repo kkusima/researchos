@@ -326,6 +326,44 @@ export const db = {
     }
   },
 
+  // Today items: per-user per-day storage
+  async getTodayItems(userId, day) {
+    if (!supabase) return { data: null, error: null }
+    try {
+      const dayStr = (day instanceof Date) ? day.toISOString().slice(0,10) : day
+      const { data, error } = await supabase
+        .from('today_items')
+        .select('items')
+        .eq('user_id', userId)
+        .eq('day', dayStr)
+        .single()
+      if (error && error.code !== 'PGRST116') {
+        return { data: null, error }
+      }
+      return { data: data ? data.items : [], error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
+  },
+
+  async saveTodayItems(userId, day, items) {
+    if (!supabase) return { data: null, error: null }
+    try {
+      const dayStr = (day instanceof Date) ? day.toISOString().slice(0,10) : day
+      // upsert row for (user_id, day)
+      const payload = { user_id: userId, day: dayStr, items: items, updated_at: new Date().toISOString() }
+      const { data, error } = await supabase
+        .from('today_items')
+        .upsert(payload, { onConflict: '(user_id, day)' })
+        .select()
+        .single()
+      if (error) return { data: null, error }
+      return { data: data.items, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
+  },
+
   // Stages
   async createStage(stage) {
     if (!supabase) return { data: null, error: null }
