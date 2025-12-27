@@ -5265,38 +5265,70 @@ function AppContent() {
   const [toastVisible, setToastVisible] = useState(false)
 
   useEffect(() => {
-    // load today's items from localStorage; include migration from legacy (non-user) key
-    try {
-      const today = new Date()
-      const key = getTodayKey(today)
-      const legacyKey = `researchos_today_${today.toISOString().slice(0,10)}`
+    // load today's items: prefer server when available, migrate legacy localStorage if needed
+    (async () => {
+      try {
+        const today = new Date()
+        const key = getTodayKey(today)
+        const legacyKey = `researchos_today_${today.toISOString().slice(0,10)}`
 
-      const rawUser = localStorage.getItem(key)
-      const parsedUser = rawUser ? JSON.parse(rawUser) : null
-
-      // If no user-specific value, but legacy (date-only) exists, migrate/merge it
-      if ((parsedUser === null || parsedUser === undefined) && localStorage.getItem(legacyKey)) {
-        try {
-          const rawLegacy = localStorage.getItem(legacyKey)
-          const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : []
-          // save under user key (or anon if no user)
-          localStorage.setItem(key, JSON.stringify(parsedLegacy || []))
-          setTodayItems(parsedLegacy || [])
-          return
-        } catch (e) {
-          // fallback to empty
+        // Try server if available and user is signed in
+        if (!demoMode && user && db && db.getTodayItems) {
+          try {
+            const { data, error } = await db.getTodayItems(user.id, today)
+            if (!error && data) {
+              setTodayItems(Array.isArray(data) ? data : [])
+              // also persist locally for offline
+              try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) {}
+              return
+            }
+          } catch (e) {
+            // fall back to local
+          }
         }
-      }
 
-      setTodayItems(parsedUser || [])
-    } catch (e) {
-      setTodayItems([])
-    }
+        // No server or not signed in: load from localStorage and migrate legacy
+        const rawUser = localStorage.getItem(key)
+        const parsedUser = rawUser ? JSON.parse(rawUser) : null
+
+        if ((parsedUser === null || parsedUser === undefined) && localStorage.getItem(legacyKey)) {
+          try {
+            const rawLegacy = localStorage.getItem(legacyKey)
+            const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : []
+            localStorage.setItem(key, JSON.stringify(parsedLegacy || []))
+            setTodayItems(parsedLegacy || [])
+            // If user is signed in and server available, push migration to server
+            if (!demoMode && user && db && db.saveTodayItems) {
+              try { await db.saveTodayItems(user.id, today, parsedLegacy || []) } catch (e) {}
+            }
+            return
+          } catch (e) {
+            // fallback to empty
+          }
+        }
+
+        setTodayItems(parsedUser || [])
+      } catch (e) {
+        setTodayItems([])
+      }
+    })()
   }, [user])
 
   const saveTodayItems = (items) => {
     try {
-      localStorage.setItem(getTodayKey(), JSON.stringify(items))
+      const key = getTodayKey()
+      localStorage.setItem(key, JSON.stringify(items))
+    } catch (e) {}
+
+    // persist to server if available and user signed in
+    try {
+      const today = new Date()
+      if (!demoMode && user && db && db.saveTodayItems) {
+        db.saveTodayItems(user.id, today, items).catch(e => {
+          // Log in dev only
+          try { console.warn('Failed to save today items to server', e) } catch (_) {}
+        })
+      }
     } catch (e) {}
   }
 
