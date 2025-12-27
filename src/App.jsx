@@ -1466,6 +1466,7 @@ function TodayView() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
+  const lastTapRef = useRef(0)
   // Flatten tasks and subtasks with project context for the existing-task picker
   const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
     const base = [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }]
@@ -1622,9 +1623,14 @@ function TodayView() {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {!isSelectionMode ? (
-                    <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
-                      {it.is_done ? <Check className="w-3 h-3" /> : null}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
+                        {it.is_done ? <Check className="w-3 h-3" /> : null}
+                      </button>
+                      <button title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <button onClick={() => {
@@ -1706,7 +1712,20 @@ function TodayView() {
                             </div>
                           ) : (
                             <>
-                              <div className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''}`}>{it.title}</div>
+                              <div
+                                className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''} cursor-pointer`}
+                                onDoubleClick={() => { setEditingId(it.id); setEditText(it.title || '') }}
+                                onTouchEnd={() => {
+                                  const now = Date.now()
+                                  if (now - lastTapRef.current < 350) {
+                                    setEditingId(it.id)
+                                    setEditText(it.title || '')
+                                    lastTapRef.current = 0
+                                  } else {
+                                    lastTapRef.current = now
+                                  }
+                                }}
+                              >{it.title}</div>
                               <div className="text-xs text-gray-400 truncate">{proj ? proj.title : ''}</div>
                             </>
                           )}
