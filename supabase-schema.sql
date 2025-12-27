@@ -915,9 +915,21 @@ END;
 $$;
 
 -- Add tables to realtime publication (idempotent)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.stages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.subtasks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.project_members;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+-- Add tables to realtime publication (idempotent):
+DO $$
+DECLARE
+  tbl RECORD;
+  tables_to_add TEXT[] := ARRAY[
+    'projects', 'stages', 'tasks', 'subtasks', 'project_members', 'notifications'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY tables_to_add LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
+    END IF;
+  END LOOP;
+END;
+$$;
