@@ -1635,55 +1635,8 @@ function TodayView() {
                       }} aria-pressed={selectedIds.has(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${selectedIds.has(it.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
                         {selectedIds.has(it.id) ? <Check className="w-3 h-3" /> : null}
                       </button>
-                      <button title="Edit" onClick={async () => {
-                        // If this is a linked task/subtask, navigate to task detail
-                        if (!it.isLocal && it.taskId) {
-                          // find task & project
-                          let found = null
-                          for (const p of projects) {
-                            for (let si = 0; si < (p.stages || []).length; si++) {
-                              const stage = p.stages[si]
-                              for (const t of stage.tasks || []) {
-                                if (t.id === it.taskId) {
-                                  found = { project: p, task: t, stageIndex: si }
-                                  break
-                                }
-                              }
-                              if (found) break
-                            }
-                            if (found) break
-                          }
-                          if (!found) {
-                            // try reloading projects then search again
-                            try {
-                              await reloadProjects()
-                            } catch (e) { dwarn('reloadProjects failed', e) }
-                            for (const p of projects) {
-                              for (let si = 0; si < (p.stages || []).length; si++) {
-                                const stage = p.stages[si]
-                                for (const t of stage.tasks || []) {
-                                  if (t.id === it.taskId) {
-                                    found = { project: p, task: t, stageIndex: si }
-                                    break
-                                  }
-                                }
-                                if (found) break
-                              }
-                              if (found) break
-                            }
-                          }
-                          if (found) {
-                            setSelectedProject(found.project)
-                            setSelectedTask({ task: found.task, stageIndex: found.stageIndex })
-                            setView('task')
-                            return
-                          }
-                          // fallback: navigate to task view with minimal info
-                          setSelectedTask({ task: { id: it.taskId, title: it.title }, stageIndex: 0 })
-                          setView('task')
-                          return
-                        }
-                        // Local item: enable inline editing
+                      <button title="Edit" onClick={() => {
+                        // Enable inline editing for both local and linked items
                         setEditingId(it.id)
                         setEditText(it.title || '')
                       }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
@@ -1696,13 +1649,58 @@ function TodayView() {
                           {editingId === it.id ? (
                             <div className="flex gap-2 items-center">
                               <input className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} />
-                              <button onClick={() => {
+                              <button onClick={async () => {
                                 const trimmed = (editText || '').trim()
                                 if (!trimmed) return
-                                const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                                setTodayItems(next)
-                                saveTodayItems(next)
-                                setEditingId(null)
+
+                                // Local item: update locally
+                                if (it.isLocal) {
+                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                                  setTodayItems(next)
+                                  saveTodayItems(next)
+                                  setEditingId(null)
+                                  return
+                                }
+
+                                // Linked item: attempt server update, fall back to demo-mode local update
+                                try {
+                                  if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                                    if (it.subtaskId) {
+                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed })
+                                      if (error) { showToast('Failed to update subtask'); return }
+                                    } else if (it.taskId) {
+                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed })
+                                      if (error) { showToast('Failed to update task'); return }
+                                    }
+                                    // refresh local projects to reflect updated title
+                                    try { await reloadProjects() } catch (e) {}
+                                  } else {
+                                    // demo mode: update in-memory projects
+                                    let updated = false
+                                    const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
+                                      if (it.subtaskId) {
+                                        const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
+                                        if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                                        return { ...t, subtasks: newSubtasks }
+                                      }
+                                      if (it.taskId && t.id === it.taskId) {
+                                        updated = true
+                                        return { ...t, title: trimmed }
+                                      }
+                                      return t
+                                    }) })) }))
+                                    if (updated) setProjects(newProjects)
+                                  }
+
+                                  // Update today list to reflect new title
+                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                                  setTodayItems(next)
+                                  saveTodayItems(next)
+                                  setEditingId(null)
+                                } catch (e) {
+                                  dwarn('Failed to save renamed item', e)
+                                  showToast('Failed to save change')
+                                }
                               }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
                               <button onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
                             </div>
