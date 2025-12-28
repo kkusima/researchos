@@ -2364,13 +2364,14 @@ function ReorderModal({ projects, onReorder, onClose }) {
 // ============================================
 // PRIORITY BADGE COMPONENT
 // ============================================
-function PriorityBadge({ rank }) {
+function PriorityBadge({ rank, position }) {
+  const display = (position !== null && position !== undefined) ? position : rank
   return (
     <span 
       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gray-400"
-      title={`Priority ${rank}`}
+      title={`Priority ${display}`}
     >
-      {rank}
+      {display}
     </span>
   )
 }
@@ -2418,7 +2419,7 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
       <div className="sm:hidden">
         <div className="flex items-center gap-2">
           {/* Priority badge first on mobile for long project titles */}
-          <PriorityBadge rank={project.priority_rank} />
+          <PriorityBadge position={index + 1} rank={project.priority_rank} />
           {isSelectionMode && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
@@ -2496,7 +2497,7 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
         
         {/* Priority Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-2">
-          <PriorityBadge rank={project.priority_rank} />
+          <PriorityBadge position={index + 1} rank={project.priority_rank} />
           {isShared && (
             <span id={rootId ? `${rootId}-shared-desktop` : undefined} className="tag tag-shared bg-blue-100 text-blue-600 text-[9px]">
               <Share2 className="w-2.5 h-2.5 mr-0.5" />
@@ -2656,7 +2657,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
         )}
         
         {/* Priority Badge */}
-        <PriorityBadge rank={project.priority_rank} />
+        <PriorityBadge position={index + 1} rank={project.priority_rank} />
         
         {/* Emoji */}
         <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
