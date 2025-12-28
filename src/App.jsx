@@ -6,7 +6,7 @@ import Avatar from './components/Avatar'
 import Walkthrough from './components/Walkthrough'
 import { 
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
-  LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare,
+  LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare, Sun,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
   LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle
 } from 'lucide-react'
@@ -1505,8 +1505,8 @@ function TodayView() {
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold">Tod(o)ay tasks</h2>
-          <p className="text-sm text-gray-500">Today — small wins, big progress.</p>
+          <h2 className="text-lg font-bold">Tod(o)ay checklist</h2>
+          <p className="text-sm text-gray-500">Today — small wins, big progress. Create a Todo checklist to conquer the day! </p>
         </div>
         <div className="flex items-center gap-2 relative flex-wrap sm:flex-nowrap">
           {/* Selection mode toggle / actions (moved left of input) */}
@@ -1609,7 +1609,7 @@ function TodayView() {
 
       <div className="space-y-2">
         {todayItems.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No items yet — add one or tap 'Add to Tod(o)ay' on a task.</div>
+          <div className="p-6 text-center text-gray-400">No items yet - Start your day's to do list and add a task or tap 'Add to Tod(o)ay' on a task.</div>
         ) : (
           todayItems.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
@@ -1622,17 +1622,8 @@ function TodayView() {
                 className={`glass-card p-2 rounded-lg flex items-center justify-between ${it.is_done ? 'opacity-60' : ''}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {!isSelectionMode ? (
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
-                        {it.is_done ? <Check className="w-3 h-3" /> : null}
-                      </button>
-                      <button type="button" title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
-                        <FileText className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {isSelectionMode && (
                       <button onClick={() => {
                         const s = new Set(selectedIds)
                         if (s.has(it.id)) s.delete(it.id)
@@ -1641,15 +1632,14 @@ function TodayView() {
                       }} aria-pressed={selectedIds.has(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${selectedIds.has(it.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
                         {selectedIds.has(it.id) ? <Check className="w-3 h-3" /> : null}
                       </button>
-                      <button title="Edit" onClick={() => {
-                        // Enable inline editing for both local and linked items
-                        setEditingId(it.id)
-                        setEditText(it.title || '')
-                      }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
-                        <FileText className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
+                      {it.is_done ? <Check className="w-3 h-3" /> : null}
+                    </button>
+                    <button type="button" title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
+                      <FileText className="w-4 h-4" />
+                    </button>
+                  </div>
                         <div className="min-w-0">
                           {/* inline edit for local items; navigate to task detail for linked items */}
                           {editingId === it.id ? (
@@ -3028,7 +3018,7 @@ function CreateProjectModal({ onClose }) {
 // PROJECT DETAIL VIEW
 // ============================================
 function ProjectDetail() {
-  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask } = useApp()
+  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday } = useApp()
   const { demoMode, user } = useAuth()
   const [previewIndex, setPreviewIndex] = useState(null)
   const [newTask, setNewTask] = useState('')
@@ -3481,10 +3471,28 @@ function ProjectDetail() {
 
       {/* Tasks */}
       <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-4 sm:mb-6 flex items-start justify-between">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Tasks for {stage?.name}
           </h2>
+          <div>
+            {!isSelectionMode ? (
+              <button
+                onClick={() => { setIsSelectionMode(true); setSelectedTaskIds(new Set()) }}
+                title="Select items"
+                className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center gap-2"
+              >
+                <Check className="w-4 h-4 text-gray-700" />
+                <span className="text-gray-700">Select</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)))} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">Select all</button>
+                <button onClick={() => clearSelection()} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">Clear</button>
+                <button onClick={() => setIsSelectionMode(false)} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Add Task Input */}
@@ -3557,16 +3565,18 @@ function ProjectDetail() {
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-2 sm:gap-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onMouseDown={() => { /* prevent text drag */ }}
-                          onClick={(e) => { e.stopPropagation(); toggleSelect(task.id, i, e, { shift: e.shiftKey }) }}
-                          onTouchStart={() => handleTouchStartSelect(task.id, i)}
-                          onTouchEnd={() => handleTouchEndCancel()}
-                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${selectedTaskIds.has(task.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white text-gray-400'}`}
-                          title="Select task"
-                        >
-                          {selectedTaskIds.has(task.id) ? <Check className="w-3 h-3" /> : null}
-                        </button>
+                        {isSelectionMode && (
+                          <button
+                            onMouseDown={() => { /* prevent text drag */ }}
+                            onClick={(e) => { e.stopPropagation(); toggleSelect(task.id, i, e, { shift: e.shiftKey }) }}
+                            onTouchStart={() => handleTouchStartSelect(task.id, i)}
+                            onTouchEnd={() => handleTouchEndCancel()}
+                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${selectedTaskIds.has(task.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white text-gray-400'}`}
+                            title="Select task"
+                          >
+                            {selectedTaskIds.has(task.id) ? <Check className="w-3 h-3" /> : null}
+                          </button>
+                        )}
 
                         <button
                           onClick={() => toggleTask(task.id)}
@@ -3618,7 +3628,7 @@ function ProjectDetail() {
                             className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                             title="Add to Tod(o)ay"
                           >
-                            <Calendar className="w-4 h-4" />
+                            <Sun className="w-4 h-4" />
                           </button>
                         <button
                           onClick={() => deleteTask(task.id)}
