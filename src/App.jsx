@@ -3435,9 +3435,9 @@ function ProjectDetail() {
                   Created {formatRelativeDate(project.created_at)}
                 </span>
               )}
-              {project.updated_at && project.updated_at !== project.created_at && (
-                <span title={new Date(project.updated_at).toLocaleString()}>
-                  Modified {formatRelativeDate(project.updated_at)}
+              {getProjectLatestUpdatedAt(project) && getProjectLatestUpdatedAt(project) !== project.created_at && (
+                <span title={new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}>
+                  Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
                 </span>
               )}
             </div>
