@@ -116,6 +116,25 @@ const formatModifiedBy = (dateString, modifiedByName, currentUserName) => {
   return relativeTime
 }
 
+// Get the latest updated timestamp for a project by checking project, its stages, tasks and subtasks
+const getProjectLatestUpdatedAt = (project) => {
+  if (!project) return null
+  let latest = project.updated_at || project.created_at || null
+  try {
+    (project.stages || []).forEach(stage => {
+      (stage.tasks || []).forEach(task => {
+        if (task.updated_at && (!latest || new Date(task.updated_at) > new Date(latest))) latest = task.updated_at
+        (task.subtasks || []).forEach(st => {
+          if (st.updated_at && (!latest || new Date(st.updated_at) > new Date(latest))) latest = st.updated_at
+        })
+      })
+    })
+  } catch (e) {
+    // ignore
+  }
+  return latest
+}
+
 // Local storage helpers for demo mode
 const loadLocal = () => {
   try {
@@ -1609,7 +1628,7 @@ function TodayView() {
 
       <div className="space-y-2">
         {todayItems.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No items yet - Start your day's to do list and add a task or tap 'Add to Tod(o)ay' on a task.</div>
+          <div className="p-6 text-center text-gray-400">No items yet - Start your day's to do list Today.</div>
         ) : (
           todayItems.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
@@ -2547,9 +2566,9 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
                 Created {formatRelativeDate(project.created_at)}
               </span>
             )}
-            {project.updated_at && project.updated_at !== project.created_at && (
-              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(project.updated_at).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                Modified {formatModifiedBy(project.updated_at, project.modified_by_name, currentUserName)}
+            {getProjectLatestUpdatedAt(project) && getProjectLatestUpdatedAt(project) !== project.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
+                Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
               </span>
             )}
           </div>
@@ -2675,9 +2694,9 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
               </span>
             )}
             <span className="text-[10px] text-gray-300 hidden sm:inline">•</span>
-            {project.updated_at ? (
-              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(project.updated_at).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                {formatModifiedBy(project.updated_at, project.modified_by_name, currentUserName)}
+            {getProjectLatestUpdatedAt(project) ? (
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
+                {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
               </span>
             ) : project.created_at && (
               <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
