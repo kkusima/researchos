@@ -1506,7 +1506,7 @@ function TodayView() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold">Tod(o)ay checklist</h2>
-          <p className="text-sm text-gray-500">Today — small wins, big progress. Create a Todo checklist to conquer the day! </p>
+          <p className="text-sm text-gray-500">Your ToDo checklist to conquer the day! </p>
         </div>
         <div className="flex items-center gap-2 relative flex-wrap sm:flex-nowrap">
           {/* Selection mode toggle / actions (moved left of input) */}
@@ -3018,7 +3018,7 @@ function CreateProjectModal({ onClose }) {
 // PROJECT DETAIL VIEW
 // ============================================
 function ProjectDetail() {
-  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday } = useApp()
+  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday } = useApp()
   const { demoMode, user } = useAuth()
   const [previewIndex, setPreviewIndex] = useState(null)
   const [newTask, setNewTask] = useState('')
@@ -3666,6 +3666,13 @@ function ProjectDetail() {
                               compact
                               isShared={isShared}
                             />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); addSubtaskToToday(subtask, task, { projectId: project.id }) }}
+                              className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Add subtask to Tod(o)ay"
+                            >
+                              <Sun className="w-4 h-4" />
+                            </button>
                           </div>
                         )
                       })}
@@ -4190,7 +4197,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 // TASK DETAIL VIEW
 // ============================================
 function TaskDetail() {
-  const { projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView } = useApp()
+  const { projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday } = useApp()
   const { demoMode, user } = useAuth()
   const [newSubtask, setNewSubtask] = useState('')
   const [newComment, setNewComment] = useState('')
@@ -4502,6 +4509,13 @@ function TaskDetail() {
                 value={currentTask.reminder_date}
                 onChange={updateTaskReminder}
               />
+              <button
+                onClick={(e) => { e.stopPropagation(); addToToday(currentTask, { projectId: project.id }) }}
+                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                title="Add task to Tod(o)ay"
+              >
+                <Sun className="w-4 h-4" />
+              </button>
               {currentTask.created_at && (
                 <span className="flex items-center gap-1 hidden sm:flex" title={`${new Date(currentTask.created_at).toLocaleString()}${currentTask.created_by_name ? ` by ${currentTask.created_by_name}` : ''}`}>
                   <Clock className="w-3 h-3" />
@@ -4638,7 +4652,7 @@ function TaskDetail() {
                       </div>
                     )}
                   </div>
-                  {!isSubtaskSelectionMode && (
+                      {!isSubtaskSelectionMode && (
                     <>
                       <ReminderPicker
                         value={s.reminder_date}
@@ -4646,6 +4660,13 @@ function TaskDetail() {
                         compact
                         isShared={isShared}
                       />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addSubtaskToToday(s, currentTask, { projectId: project.id }) }}
+                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Add subtask to Tod(o)ay"
+                      >
+                        <Sun className="w-4 h-4" />
+                      </button>
                       <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
                         <Trash2 className="w-4 h-4" />
                       </button>
