@@ -3039,6 +3039,7 @@ function CreateProjectModal({ onClose }) {
 function ProjectDetail() {
   const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday } = useApp()
   const { demoMode, user } = useAuth()
+  const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
   const [previewIndex, setPreviewIndex] = useState(null)
   const [newTask, setNewTask] = useState('')
   const [showSettings, setShowSettings] = useState(false)
