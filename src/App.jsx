@@ -2568,7 +2568,7 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
             )}
             {getProjectLatestUpdatedAt(project) && getProjectLatestUpdatedAt(project) !== project.created_at && (
               <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
+                Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
               </span>
             )}
           </div>
@@ -2696,7 +2696,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             <span className="text-[10px] text-gray-300 hidden sm:inline">•</span>
             {getProjectLatestUpdatedAt(project) ? (
               <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
+                {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
               </span>
             ) : project.created_at && (
               <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
@@ -3438,7 +3438,7 @@ function ProjectDetail() {
               )}
               {getProjectLatestUpdatedAt(project) && getProjectLatestUpdatedAt(project) !== project.created_at && (
                 <span title={new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}>
-                  Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, currentUserName)}
+                  Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
                 </span>
               )}
             </div>
