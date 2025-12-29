@@ -2390,12 +2390,14 @@ function PriorityBadge({ rank, position }) {
 // ============================================
 function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
+  const { projects } = useApp()
   const [showMenu, setShowMenu] = useState(false)
-  const progress = getProgress(project)
-  const currentStage = project.stages?.[project.current_stage_index]
-  const activeTasksCount = (project.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+  const liveProject = projects.find(p => p.id === project.id) || project
+  const progress = getProgress(liveProject)
+  const currentStage = liveProject.stages?.[liveProject.current_stage_index]
+  const activeTasksCount = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
   // Count reminders set on tasks and subtasks
-  const reminderCount = (project.stages || []).reduce((pAcc, s) => {
+  const reminderCount = (liveProject.stages || []).reduce((pAcc, s) => {
     const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
       const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
       return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
@@ -2403,7 +2405,7 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
     return pAcc + tasksWithReminders
   }, 0)
   // Count overdue reminders (reminder date in past and not completed)
-  const overdueCount = (project.stages || []).reduce((pAcc, s) => {
+  const overdueCount = (liveProject.stages || []).reduce((pAcc, s) => {
     const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
       const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
       const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
@@ -2412,8 +2414,8 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
     return pAcc + tasksOverdue
   }, 0)
   // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
-  const isCollaborator = project.owner_id !== user?.id
-  const hasMembers = project.project_members?.length > 0
+  const isCollaborator = liveProject.owner_id !== user?.id
+  const hasMembers = liveProject.project_members?.length > 0
   const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
   const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
@@ -2561,14 +2563,14 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
           </div>
           {/* Timestamps */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
-            {project.created_at && (
-              <span className="text-[10px] text-gray-400" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
-                Created {formatRelativeDate(project.created_at)}
+            {liveProject.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Created: ${new Date(liveProject.created_at).toLocaleString()}`}>
+                Created {formatRelativeDate(liveProject.created_at)}
               </span>
             )}
-            {getProjectLatestUpdatedAt(project) && getProjectLatestUpdatedAt(project) !== project.created_at && (
-              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                Modified {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
+            {getProjectLatestUpdatedAt(liveProject) && getProjectLatestUpdatedAt(liveProject) !== liveProject.created_at && (
+              <span className="text-[10px] text-gray-400" title={`Modified: ${new Date(getProjectLatestUpdatedAt(liveProject)).toLocaleString()}${liveProject.modified_by_name ? ` by ${liveProject.modified_by_name}` : ''}`}>
+                Modified {formatModifiedBy(getProjectLatestUpdatedAt(liveProject), liveProject.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
               </span>
             )}
           </div>
@@ -2614,11 +2616,13 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
 // ============================================
 function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
+  const { projects } = useApp()
   const [showMenu, setShowMenu] = useState(false)
-  const progress = getProgress(project)
-  const activeTasksCount = (project.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+  const liveProject = projects.find(p => p.id === project.id) || project
+  const progress = getProgress(liveProject)
+  const activeTasksCount = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
   // Count reminders set on tasks and subtasks
-  const reminderCount = (project.stages || []).reduce((pAcc, s) => {
+  const reminderCount = (liveProject.stages || []).reduce((pAcc, s) => {
     const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
       const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
       return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
@@ -2626,7 +2630,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
     return pAcc + tasksWithReminders
   }, 0)
   // Count overdue reminders (reminder date in past and not completed)
-  const overdueCount = (project.stages || []).reduce((pAcc, s) => {
+  const overdueCount = (liveProject.stages || []).reduce((pAcc, s) => {
     const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
       const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
       const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
@@ -2634,12 +2638,12 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
     }, 0)
     return pAcc + tasksOverdue
   }, 0)
-  const currentStage = project.stages?.[project.current_stage_index]
-  const totalStages = project.stages?.length || 0
-  const completedStages = project.current_stage_index || 0
+  const currentStage = liveProject.stages?.[liveProject.current_stage_index]
+  const totalStages = liveProject.stages?.length || 0
+  const completedStages = liveProject.current_stage_index || 0
   // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
-  const isCollaborator = project.owner_id !== user?.id
-  const hasMembers = project.project_members?.length > 0
+  const isCollaborator = liveProject.owner_id !== user?.id
+  const hasMembers = liveProject.project_members?.length > 0
   const isShared = isCollaborator || hasMembers
   const isComplete = progress >= 1
   const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
@@ -2687,20 +2691,20 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             {isShared && (
               <span className="text-[9px] text-blue-500 sm:hidden">Shared</span>
             )}
-            {project.project_members?.length > 0 && (
+            {liveProject.project_members?.length > 0 && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                {project.project_members.length + 1}
+                {liveProject.project_members.length + 1}
               </span>
             )}
             <span className="text-[10px] text-gray-300 hidden sm:inline">•</span>
-            {getProjectLatestUpdatedAt(project) ? (
-              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(getProjectLatestUpdatedAt(project)).toLocaleString()}${project.modified_by_name ? ` by ${project.modified_by_name}` : ''}`}>
-                {formatModifiedBy(getProjectLatestUpdatedAt(project), project.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
+            {getProjectLatestUpdatedAt(liveProject) ? (
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Modified: ${new Date(getProjectLatestUpdatedAt(liveProject)).toLocaleString()}${liveProject.modified_by_name ? ` by ${liveProject.modified_by_name}` : ''}`}>
+                {formatModifiedBy(getProjectLatestUpdatedAt(liveProject), liveProject.modified_by_name, user?.user_metadata?.name || user?.email || 'Unknown')}
               </span>
-            ) : project.created_at && (
-              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(project.created_at).toLocaleString()}`}>
-                {formatRelativeDate(project.created_at)}
+            ) : liveProject.created_at && (
+              <span className="text-[10px] text-gray-400 hidden sm:inline" title={`Created: ${new Date(liveProject.created_at).toLocaleString()}`}>
+                {formatRelativeDate(liveProject.created_at)}
               </span>
             )}
           </div>
@@ -3087,6 +3091,7 @@ function ProjectDetail() {
       comments: [],
       created_at: now,
       updated_at: now,
+      is_local: true,
       created_by: user?.id,
       created_by_name: userName,
       modified_by: user?.id,
@@ -3120,7 +3125,7 @@ function ProjectDetail() {
           ...project,
           stages: project.stages.map((s, i) => 
             i === stageIndex 
-              ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, id: createdTask.id } : t) }
+              ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, ...createdTask, id: createdTask.id, is_local: false } : t) }
               : s
           )
         }
@@ -6039,7 +6044,33 @@ function AppContent() {
       if (user) {
         const { data, error } = await db.getProjects(user.id)
         if (!error && data) {
-          setProjects(data)
+          // Merge local optimistic items (those marked `is_local`) into server response
+          try {
+            const merged = data.map(serverProj => {
+              const localProj = projects.find(p => p.id === serverProj.id)
+              if (!localProj) return serverProj
+              const mergedStages = (serverProj.stages || []).map(serverStage => {
+                const localStage = (localProj.stages || []).find(s => s.id === serverStage.id)
+                if (!localStage) return serverStage
+                const serverTaskIds = new Set((serverStage.tasks || []).map(t => t.id))
+                const localOnlyTasks = (localStage.tasks || []).filter(t => t.is_local && !serverTaskIds.has(t.id))
+                // Also merge local-only subtasks under tasks that exist on server
+                const mergedTasks = (serverStage.tasks || []).map(serverTask => {
+                  const localTask = (localStage.tasks || []).find(t => t.id === serverTask.id)
+                  if (!localTask) return serverTask
+                  const serverSubtaskIds = new Set((serverTask.subtasks || []).map(st => st.id))
+                  const localOnlySubtasks = (localTask.subtasks || []).filter(st => st.is_local && !serverSubtaskIds.has(st.id))
+                  return { ...serverTask, subtasks: [...(serverTask.subtasks || []), ...localOnlySubtasks] }
+                })
+                return { ...serverStage, tasks: [...mergedTasks, ...localOnlyTasks] }
+              })
+              return { ...serverProj, stages: mergedStages }
+            })
+            setProjects(merged)
+          } catch (e) {
+            // Fallback: if merge fails, just set server data
+            setProjects(data)
+          }
         }
         loadNotifications()
       }
