@@ -3095,6 +3095,9 @@ function ProjectDetail() {
 
     const updated = {
       ...project,
+      updated_at: now,
+      modified_by: user?.id,
+      modified_by_name: userName,
       stages: project.stages.map((s, i) => 
         i === stageIndex ? { ...s, tasks: [...(s.tasks || []), task] } : s
       )
@@ -6055,7 +6058,34 @@ function AppContent() {
     
     const handleRealtimeChange = (payload) => {
       dlog('🔄 Realtime change detected:', payload.table, payload.eventType)
-      
+
+      // Quick relevance checks to avoid unnecessary reloads that clobber optimistic UI
+      const table = payload.table
+      let relevant = false
+
+      if (table === 'projects' || table === 'stages') {
+        relevant = true
+      } else if (table === 'tasks') {
+        const stageId = payload.new?.stage_id || payload.old?.stage_id
+        if (stageId) {
+          for (const p of projects) {
+            if ((p.stages || []).some(s => s.id === stageId)) { relevant = true; break }
+          }
+        }
+      } else if (table === 'subtasks') {
+        const taskId = payload.new?.task_id || payload.old?.task_id
+        if (taskId) {
+          for (const p of projects) {
+            if ((p.stages || []).some(s => (s.tasks || []).some(t => t.id === taskId))) { relevant = true; break }
+          }
+        }
+      } else {
+        // conservatively treat other tables as relevant
+        relevant = true
+      }
+
+      if (!relevant) return
+
       // Debounce to avoid multiple rapid reloads
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(async () => {
