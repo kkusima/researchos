@@ -3915,7 +3915,38 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
     onUpdate(updated)
 
     if (!demoMode) {
+      // 1. Update project metadata
       await db.updateProject(project.id, { title, emoji, current_stage_index: newCurrentStageIndex })
+
+      // 2. Sync Stages
+      const originalStages = project.stages || []
+      const originalIds = originalStages.map(s => s.id)
+      const currentIds = updatedStages.map(s => s.id)
+
+      // Deletions
+      const deletedIds = originalIds.filter(id => !currentIds.includes(id))
+      for (const id of deletedIds) {
+        await db.deleteStage(id)
+      }
+
+      // Additions & Updates
+      for (const s of updatedStages) {
+        if (originalIds.includes(s.id)) {
+          // Existing stage - check for changes (name or order)
+          const original = originalStages.find(os => os.id === s.id)
+          if (original.name !== s.name || original.order_index !== s.order_index) {
+            await db.updateStage(s.id, { name: s.name, order_index: s.order_index })
+          }
+        } else {
+          // New stage - create it
+          await db.createStage({
+            id: s.id, // Use valid UUID generated locally by uuid()
+            project_id: project.id,
+            name: s.name,
+            order_index: s.order_index
+          })
+        }
+      }
     }
 
     setLoading(false)

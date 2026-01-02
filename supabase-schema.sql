@@ -217,9 +217,15 @@ CREATE OR REPLACE FUNCTION public.handle_project_updated_at()
 RETURNS TRIGGER AS $$
 DECLARE
   project_id_val UUID;
-  user_id_val UUID;
+  user_id_val UUID := null; -- Start as null
 BEGIN
-  IF TG_TABLE_NAME = 'tasks' THEN
+  IF TG_TABLE_NAME = 'stages' THEN
+    IF (TG_OP = 'DELETE') THEN
+       project_id_val := OLD.project_id;
+    ELSE
+       project_id_val := NEW.project_id;
+    END IF;
+  ELSIF TG_TABLE_NAME = 'tasks' THEN
     IF (TG_OP = 'DELETE') THEN
        SELECT project_id INTO project_id_val FROM public.stages WHERE id = OLD.stage_id;
        user_id_val := OLD.modified_by; 
@@ -233,7 +239,7 @@ BEGIN
   IF project_id_val IS NOT NULL THEN
     UPDATE public.projects 
     SET updated_at = NOW(), 
-        modified_by = user_id_val
+        modified_by = COALESCE(user_id_val, modified_by)
     WHERE id = project_id_val;
   END IF;
 
@@ -251,6 +257,12 @@ DROP TRIGGER IF EXISTS on_comment_update_task ON public.comments;
 -- 1. Tasks -> Projects
 CREATE TRIGGER on_task_change
   AFTER INSERT OR UPDATE OR DELETE ON public.tasks
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
+
+-- 1b. Stages -> Projects
+DROP TRIGGER IF EXISTS on_stage_change ON public.stages;
+CREATE TRIGGER on_stage_change
+  AFTER INSERT OR UPDATE OR DELETE ON public.stages
   FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
 
 -- 2. Subtasks -> Tasks (Cascade)
