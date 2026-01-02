@@ -41,7 +41,7 @@ jobs:
 
       - name: Build Electron App (macOS Universal)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac universal -p never
+        run: npx electron-builder --mac --universal -p never
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
