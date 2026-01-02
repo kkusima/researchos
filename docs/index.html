@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResearchOS — Research Project Management</title>
+    <meta name="description"
+        content="A modern, collaborative research project management application designed for researchers, academics, and teams working on complex projects.">
+
+    <!-- Favicon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container nav__inner">
+            <a href="index.html" class="nav__logo">
+                <span class="nav__logo-icon">🔬</span>
+                <span>ResearchOS</span>
+            </a>
+            <div class="nav__links">
+                <a href="#features" class="nav__link">Features</a>
+                <a href="downloads.html" class="nav__link">Downloads</a>
+                <a href="https://github.com/kkusima/researchos" class="nav__link" target="_blank"
+                    rel="noopener">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero__badge">
+            <span class="hero__badge-dot"></span>
+            <span>Version 1.0 — Now Available</span>
+        </div>
+        <h1 class="hero__title">
+            Research,<br><span class="text-gradient">Reimagined.</span>
+        </h1>
+        <p class="hero__subtitle">
+            A beautifully crafted project management app for researchers, academics, and teams.
+            Organize projects, track progress, and collaborate — all in one place.
+        </p>
+        <div class="hero__actions">
+            <a href="https://researchos.vercel.app/" class="btn btn--primary btn--large" target="_blank" rel="noopener">
+                Launch Web App
+            </a>
+            <a href="downloads.html" class="btn btn--secondary btn--large">
+                Download for Desktop
+            </a>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section class="demo">
+        <div class="container">
+            <h2 class="demo__title">See it in action</h2>
+            <div class="demo__grid">
+                <div class="demo__item">
+                    <img src="images/v1GIF.gif" alt="ResearchOS project organization demo" loading="lazy">
+                </div>
+                <div class="demo__item">
+                    <img src="images/v2GIF.gif" alt="ResearchOS task management demo" loading="lazy">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <header class="features__header">
+                <p class="features__label">Features</p>
+                <h2 class="features__title">Everything you need.<br>Nothing you don't.</h2>
+                <p class="features__subtitle">
+                    Built specifically for research workflows,
+                    with the tools you need to stay organized and focused.
+                </p>
+            </header>
+            <div class="features__grid">
+                <article class="feature-card">
+                    <div class="feature-card__icon">📁</div>
+                    <h3 class="feature-card__title">Project Organization</h3>
+                    <p class="feature-card__description">
+                        Create projects with custom emojis, descriptions, and flexible stage-based workflows that adapt
+                        to your research process.
+                    </p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-card__icon">✅</div>
+                    <h3 class="feature-card__title">Task Management</h3>
+                    <p class="feature-card__description">
+                        Break down work into tasks and subtasks with progress tracking. Never lose sight of what needs
+                        to be done.
+                    </p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-card__icon">👥</div>
+                    <h3 class="feature-card__title">Team Collaboration</h3>
+                    <p class="feature-card__description">
+                        Share projects with collaborators via email or invite links. Work together in real-time with
+                        synced updates.
+                    </p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-card__icon">🔄</div>
+                    <h3 class="feature-card__title">Drag & Drop</h3>
+                    <p class="feature-card__description">
+                        Prioritize projects with intuitive drag-and-drop reordering. Your workflow should be as fluid as
+                        your thinking.
+                    </p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-card__icon">☁️</div>
+                    <h3 class="feature-card__title">Cloud Sync</h3>
+                    <p class="feature-card__description">
+                        Data stored securely in the cloud with real-time sync. Access your research from any device,
+                        anywhere.
+                    </p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-card__icon">🔐</div>
+                    <h3 class="feature-card__title">Secure Sign-In</h3>
+                    <p class="feature-card__description">
+                        Authenticate securely with your Google account. Your data is protected with industry-standard
+                        encryption.
+                    </p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h2 class="cta__title">Ready to transform<br>your research workflow?</h2>
+            <p class="cta__subtitle">
+                Start organizing your projects today. Free to use, forever.
+            </p>
+            <div class="hero__actions">
+                <a href="https://researchos.vercel.app/" class="btn btn--primary btn--large" target="_blank"
+                    rel="noopener">
+                    Get Started Free
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer__content">
+            <div class="footer__links">
+                <a href="https://github.com/kkusima/researchos" class="footer__link" target="_blank"
+                    rel="noopener">GitHub</a>
+                <a href="downloads.html" class="footer__link">Downloads</a>
+                <a href="https://researchos.vercel.app/" class="footer__link" target="_blank" rel="noopener">Web App</a>
+            </div>
+            <p class="footer__copyright">
+                © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener">Kenneth Kusima</a>. All
+                rights reserved.
+            </p>
+        </div>
+    </footer>
+</body>
+
+</html>
