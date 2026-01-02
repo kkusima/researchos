@@ -5,6 +5,8 @@ A modern, collaborative research project management application designed for res
 ![ResearchOS](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+🔗 **Github Pages**: [https://kkusima.github.io/researchos/](https://kkusima.github.io/researchos/)
+
 🔗 **Live WebApp**: [researchos.vercel.app](https://researchos.vercel.app/)
 
 
