@@ -10,8 +10,8 @@ A modern, collaborative research project management application designed for res
 
 ### 🖥️  Desktop Apps 
 Get the native experience for your workstation:
-*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/researchos/actions/runs/20651696965/artifacts/5006308565) (~188 MB)
-*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/researchos/actions/runs/20651696965/artifacts/5006316513) (~339 MB)
+*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/researchos/actions/runs/20653820999/artifacts/5006697036) (~524 MB)
+*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/researchos/actions/runs/20653820999/artifacts/5006692273) (~339 MB)
 
 ## What is ResearchOS?
 
