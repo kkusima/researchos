@@ -7,6 +7,11 @@ A modern, collaborative research project management application designed for res
 
 🔗 **Live App**: [researchos.vercel.app](https://researchos.vercel.app/)
 
+### 🖥️ Desktop Apps (v1.0.0)
+Get the native experience for your workstation:
+*   🍎 **macOS**: [Download .dmg](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055714) (~101 MB)
+*   🪟 **Windows**: [Download .exe](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055096) (~112 MB)
+
 ## What is ResearchOS?
 
 ResearchOS is a lightweight project management tool built specifically for research workflows. It helps you organize projects into customizable stages, track tasks with subtasks, and collaborate with team members in real-time.
@@ -39,31 +44,7 @@ ResearchOS is a lightweight project management tool built specifically for resea
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: Supabase (PostgreSQL + Auth + Real-time)
 - **Hosting**: Vercel
-
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/kkusima/researchos.git
-cd researchos
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Add your Supabase credentials to .env
-
-# Run development server
-npm run dev
-```
-
-## Environment Variables
-
-```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+- **Desktop App development**: Electron
 
 ## License
 
