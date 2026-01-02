@@ -176,13 +176,49 @@ ALTER TABLE public.today_items ENABLE ROW LEVEL SECURITY;
 --
 
 -- Function to handle project timestamp updates
+-- Function: When a Subtask or Comment changes, update the parent Task
+CREATE OR REPLACE FUNCTION public.handle_task_child_change()
+RETURNS TRIGGER AS $$
+DECLARE
+  target_task_id UUID;
+  modifier_id UUID;
+BEGIN
+  IF TG_TABLE_NAME = 'subtasks' THEN
+    IF (TG_OP = 'DELETE') THEN
+       target_task_id := OLD.task_id;
+       modifier_id := OLD.modified_by; 
+    ELSE
+       target_task_id := NEW.task_id;
+       modifier_id := NEW.modified_by;
+    END IF;
+  ELSIF TG_TABLE_NAME = 'comments' THEN
+    IF (TG_OP = 'DELETE') THEN
+       target_task_id := OLD.task_id; 
+       modifier_id := OLD.user_id;
+    ELSE
+       target_task_id := NEW.task_id;
+       modifier_id := NEW.user_id;
+    END IF;
+  END IF;
+
+  IF target_task_id IS NOT NULL THEN
+    UPDATE public.tasks 
+    SET updated_at = NOW(), 
+        modified_by = modifier_id
+    WHERE id = target_task_id;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to handle project timestamp updates (Only triggered by Tasks now)
 CREATE OR REPLACE FUNCTION public.handle_project_updated_at()
 RETURNS TRIGGER AS $$
 DECLARE
   project_id_val UUID;
   user_id_val UUID;
 BEGIN
-  -- Determine project_id and user_id based on table
   IF TG_TABLE_NAME = 'tasks' THEN
     IF (TG_OP = 'DELETE') THEN
        SELECT project_id INTO project_id_val FROM public.stages WHERE id = OLD.stage_id;
@@ -191,20 +227,6 @@ BEGIN
        SELECT project_id INTO project_id_val FROM public.stages WHERE id = NEW.stage_id;
        user_id_val := NEW.modified_by;
     END IF;
-  ELSIF TG_TABLE_NAME = 'subtasks' THEN
-     IF (TG_OP = 'DELETE') THEN
-       SELECT s.project_id INTO project_id_val 
-       FROM public.stages s
-       JOIN public.tasks t ON t.stage_id = s.id
-       WHERE t.id = OLD.task_id;
-       user_id_val := OLD.modified_by;
-     ELSE
-       SELECT s.project_id INTO project_id_val 
-       FROM public.stages s
-       JOIN public.tasks t ON t.stage_id = s.id
-       WHERE t.id = NEW.task_id;
-       user_id_val := NEW.modified_by;
-     END IF;
   END IF;
 
   -- Update Project
@@ -222,15 +244,24 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Drop existing triggers if any to avoid errors
 DROP TRIGGER IF EXISTS on_task_change ON public.tasks;
 DROP TRIGGER IF EXISTS on_subtask_change ON public.subtasks;
+DROP TRIGGER IF EXISTS on_subtask_update_task ON public.subtasks;
+DROP TRIGGER IF EXISTS on_comment_update_task ON public.comments;
 
 -- Create Triggers
+-- 1. Tasks -> Projects
 CREATE TRIGGER on_task_change
   AFTER INSERT OR UPDATE OR DELETE ON public.tasks
   FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
 
-CREATE TRIGGER on_subtask_change
+-- 2. Subtasks -> Tasks (Cascade)
+CREATE TRIGGER on_subtask_update_task
   AFTER INSERT OR UPDATE OR DELETE ON public.subtasks
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_task_child_change();
+
+-- 3. Comments -> Tasks (Cascade)
+CREATE TRIGGER on_comment_update_task
+  AFTER INSERT OR UPDATE OR DELETE ON public.comments
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_task_child_change();
 
 -- Policies (examples, ensure specific policies match your auth requirements)
 -- Users can see their own data and shared projects data
