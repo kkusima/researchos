@@ -27,12 +27,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Build Web App
+        run: npm run build
+
+      - name: Clean Mac Detritus (Mac Only)
+        if: matrix.os == 'macos-latest'
+        run: xattr -cr src public electron dist index.html package.json
+
       - name: Build Electron App
-        run: npm run electron:build
+        run: npx electron-builder --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }}
         env:
           # Using direct values since these are frontend keys meant to be bundled in the app
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2pyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
           # Skip code signing in CI for now to ensure builds complete
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
