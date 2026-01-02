@@ -4397,6 +4397,14 @@ function TaskDetail() {
     }
   }
 
+  // Local description state for robust saving
+  const [localDescription, setLocalDescription] = useState(currentTask?.description || '')
+
+  // Sync local description when currentTask changes (e.g. switching tasks)
+  useEffect(() => {
+    setLocalDescription(currentTask?.description || '')
+  }, [currentTask?.id, currentTask?.description])
+
   const toggleSubtaskSelection = (subtaskId, e) => {
     e?.stopPropagation()
     const newSelected = new Set(selectedSubtaskIds)
@@ -4697,8 +4705,13 @@ function TaskDetail() {
         <div className="glass-card rounded-xl p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Description</h3>
           <textarea
-            value={currentTask.description || ''}
-            onChange={e => updateTask({ description: e.target.value })}
+            value={localDescription}
+            onChange={e => setLocalDescription(e.target.value)}
+            onBlur={() => {
+              if (localDescription !== currentTask.description) {
+                updateTask({ description: localDescription })
+              }
+            }}
             placeholder="Add a description..."
             className="w-full min-h-[100px] bg-transparent resize-y outline-none text-gray-700"
           />
@@ -4803,14 +4816,24 @@ function TaskDetail() {
                         {s.title}
                       </span>
                     )}
-                    {isShared && (s.created_by_name || s.modified_by_name) && (
-                      <div className="text-[10px] text-gray-400 mt-0.5">
-                        {s.modified_by_name && s.updated_at !== s.created_at
-                          ? `Modified ${formatRelativeDate(s.updated_at)} by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`
-                          : s.created_by_name && `Created by ${s.created_by === user?.id ? 'you' : s.created_by_name}`
-                        }
-                      </div>
-                    )}
+                    {/* Timestamp & Attribution Row */}
+                    <div className="text-[10px] text-gray-400 mt-1 flex flex-wrap items-center gap-2">
+                      {s.created_at && (
+                        <span title={new Date(s.created_at).toLocaleString()}>
+                          Created {formatRelativeDate(s.created_at)}
+                          {isShared && s.created_by_name && ` by ${s.created_by === user?.id ? 'you' : s.created_by_name}`}
+                        </span>
+                      )}
+                      {s.updated_at && s.updated_at !== s.created_at && (
+                        <>
+                          <span>•</span>
+                          <span title={new Date(s.updated_at).toLocaleString()}>
+                            Modified {formatRelativeDate(s.updated_at)}
+                            {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {!isSubtaskSelectionMode && (
                     <>
