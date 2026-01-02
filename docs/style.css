@@ -147,6 +147,9 @@ h6 {
     align-items: center;
     justify-content: space-between;
     height: 52px;
+    padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+    padding-left: 1rem;
+    padding-right: 1rem;
 }
 
 .nav__logo {
@@ -515,9 +518,29 @@ h6 {
     border-color: var(--color-border);
 }
 
-.platform-card__icon {
+/* .platform-card__icon {
     font-size: 4rem;
     margin-bottom: var(--space-lg);
+} */
+
+/* Icon container */
+.platform-card__icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto;
+    /* center on small screens */
+    background: #f2f2f2;
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* SVG */
+.platform-card__icon img {
+    width: 28px;
+    height: 28px;
 }
 
 .platform-card__name {
