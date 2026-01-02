@@ -4,8 +4,8 @@ import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
 import Avatar from './components/Avatar'
 import Walkthrough from './components/Walkthrough'
-import { 
-  Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight, 
+import {
+  Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight,
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare, Sun,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
   LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle
@@ -65,23 +65,23 @@ const formatReminderDate = (dateString) => {
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
-  
+
   if (diffMs < 0) {
     // Overdue - calculate absolute values properly
     const absMins = Math.floor(absDiffMs / 60000)
     const absHours = Math.floor(absDiffMs / 3600000)
     const absDays = Math.floor(absDiffMs / 86400000)
-    
+
     if (absDays >= 1) return `${absDays}d overdue`
     if (absHours >= 1) return `${absHours}h overdue`
     if (absMins >= 1) return `${absMins}m overdue`
     return 'Just overdue'
   }
-  
+
   if (diffMins < 60) return `in ${diffMins}m`
   if (diffHours < 24) return `in ${diffHours}h`
   if (diffDays < 7) return `in ${diffDays}d`
-  
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -94,12 +94,12 @@ const formatRelativeDate = (dateString) => {
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
-  
+
   if (diffMins < 1) return 'Just now'
   if (diffMins < 60) return `${diffMins}m ago`
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
-  
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -124,9 +124,9 @@ const getProjectLatestUpdatedAt = (project) => {
     (project.stages || []).forEach(stage => {
       (stage.tasks || []).forEach(task => {
         if (task.updated_at && (!latest || new Date(task.updated_at) > new Date(latest))) latest = task.updated_at
-        (task.subtasks || []).forEach(st => {
-          if (st.updated_at && (!latest || new Date(st.updated_at) > new Date(latest))) latest = st.updated_at
-        })
+          (task.subtasks || []).forEach(st => {
+            if (st.updated_at && (!latest || new Date(st.updated_at) > new Date(latest))) latest = st.updated_at
+          })
       })
     })
   } catch (e) {
@@ -146,7 +146,7 @@ const loadLocal = () => {
 const saveLocal = (data) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {}
+  } catch { }
 }
 
 // ============================================
@@ -197,7 +197,7 @@ function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
+
     const { error } = await sendPasswordReset(email)
     if (error) {
       setError(error.message)
@@ -284,10 +284,10 @@ function LoginPage() {
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
           )}
           Sign in with Google
@@ -382,7 +382,7 @@ function LoginPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
                 />
               </div>
-              
+
               {!isSignUp && (
                 <div className="text-right mb-4">
                   <button
@@ -394,7 +394,7 @@ function LoginPage() {
                   </button>
                 </div>
               )}
-              
+
               {isSignUp && <div className="mb-4" />}
 
               {error && (
@@ -432,7 +432,7 @@ function LoginPage() {
           </p>
         </div>
       </div>
-      
+
       <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
         © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
       </p>
@@ -510,7 +510,7 @@ function GlobalSearch({ projects, onNavigate }) {
         onFocus={() => setIsOpen(true)}
         className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-gray-200 transition-all"
       />
-      
+
       {isOpen && query.trim() && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
@@ -678,7 +678,7 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
             )}
           </div>
         </div>
-        
+
         {/* Selection mode toolbar */}
         {isSelectionMode && notifications.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
@@ -701,7 +701,7 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
             </div>
           </div>
         )}
-        
+
         {/* Normal mode toolbar */}
         {!isSelectionMode && notifications.length > 0 && (
           <div className="flex items-center justify-end gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
@@ -721,7 +721,7 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
             </button>
           </div>
         )}
-        
+
         <div className="flex-1 overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
@@ -733,12 +733,11 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
               {notifications.map(notif => (
                 <div
                   key={notif.id}
-                  className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer ${
-                    !notif.is_read ? 'bg-blue-50/50' : ''
-                  } ${selectedIds.has(notif.id) ? 'bg-brand-50 ring-1 ring-brand-200' : ''}`}
+                  className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer ${!notif.is_read ? 'bg-blue-50/50' : ''
+                    } ${selectedIds.has(notif.id) ? 'bg-brand-50 ring-1 ring-brand-200' : ''}`}
                   onClick={() => {
                     if (isSelectionMode) {
-                      toggleSelection(notif.id, { stopPropagation: () => {} })
+                      toggleSelection(notif.id, { stopPropagation: () => { } })
                     } else {
                       if (!notif.is_read) onMarkRead(notif.id)
                       if (notif.project_id) onNavigate(notif)
@@ -750,11 +749,10 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
                       <div className="flex-shrink-0 mt-0.5">
                         <button
                           onClick={(e) => toggleSelection(notif.id, e)}
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                            selectedIds.has(notif.id)
-                              ? 'bg-brand-600 border-brand-600 text-white'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.has(notif.id)
+                            ? 'bg-brand-600 border-brand-600 text-white'
+                            : 'border-gray-300 hover:border-gray-400'
+                            }`}
                         >
                           {selectedIds.has(notif.id) && <Check className="w-2.5 h-2.5" />}
                         </button>
@@ -777,8 +775,8 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
                     {!isSelectionMode && (
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
+                          onClick={(e) => {
+                            e.stopPropagation();
                             notif.is_read ? onMarkUnread(notif.id) : onMarkRead(notif.id);
                           }}
                           className="p-1 text-gray-300 hover:text-blue-500"
@@ -879,13 +877,12 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
     <div className="relative" ref={buttonRef}>
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
-          overdue 
-            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-            : hasReminder 
-              ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' 
-              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-        }`}
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${overdue
+          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+          : hasReminder
+            ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+            : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          }`}
         title={hasReminder ? `Reminder: ${new Date(value).toLocaleString()}` : 'Set reminder'}
       >
         {overdue ? <AlertCircle className="w-3 h-3" /> : <Calendar className="w-3 h-3" />}
@@ -893,8 +890,8 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
           <span>{hasReminder ? formatReminderDate(value) : 'Remind'}</span>
         )}
       </button>
-        {isOpen && ReactDOM.createPortal(
-          <>
+      {isOpen && ReactDOM.createPortal(
+        <>
           <div
             style={{
               position: 'absolute',
@@ -913,14 +910,14 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
               <label className="text-sm font-medium text-gray-800">Set Reminder</label>
               <span className="text-[10px] text-gray-400">{userTimezone}</span>
             </div>
-            
+
             <input
               type="datetime-local"
               value={pendingValue}
               onChange={(e) => setPendingValue(e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             />
-            
+
             {/* Preview of selected time */}
             {pendingValue && (
               <div className="mt-2 px-2 py-1.5 bg-blue-50 rounded-lg">
@@ -929,7 +926,7 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
                 </p>
               </div>
             )}
-            
+
             {/* Action buttons */}
             {isShared && (
               <div className="mt-2 flex items-center gap-2 text-xs">
@@ -965,7 +962,7 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
                 Cancel
               </button>
             </div>
-            
+
             {hasReminder && (
               <button
                 onClick={() => { onChange(null); setIsOpen(false); }}
@@ -974,7 +971,7 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
                 Remove reminder
               </button>
             )}
-            
+
             <div className="mt-3 pt-3 border-t border-gray-100">
               <p className="text-[10px] text-gray-400 mb-2">Quick set:</p>
               <div className="flex flex-wrap gap-1.5">
@@ -1040,13 +1037,13 @@ function ProfileSettingsModal({ onClose }) {
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
-  
+
   // Profile state
   const [name, setName] = useState(user?.user_metadata?.full_name || user?.user_metadata?.name || '')
-  
+
   // Email state
   const [newEmail, setNewEmail] = useState('')
-  
+
   // Password state
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -1059,7 +1056,7 @@ function ProfileSettingsModal({ onClose }) {
     setMessage({ type: '', text: '' })
 
     const { error } = await updateProfile({ full_name: name, name })
-    
+
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
@@ -1080,7 +1077,7 @@ function ProfileSettingsModal({ onClose }) {
     }
 
     const { error } = await updateEmail(newEmail)
-    
+
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
@@ -1108,7 +1105,7 @@ function ProfileSettingsModal({ onClose }) {
     }
 
     const { error } = await updatePassword(newPassword)
-    
+
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
@@ -1134,11 +1131,10 @@ function ProfileSettingsModal({ onClose }) {
         <div className="flex border-b border-gray-200">
           <button
             onClick={() => { setActiveTab('profile'); setMessage({ type: '', text: '' }) }}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'profile' 
-                ? 'text-gray-900 border-b-2 border-gray-900' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'profile'
+              ? 'text-gray-900 border-b-2 border-gray-900'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             Profile
           </button>
@@ -1146,21 +1142,19 @@ function ProfileSettingsModal({ onClose }) {
             <>
               <button
                 onClick={() => { setActiveTab('email'); setMessage({ type: '', text: '' }) }}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'email' 
-                    ? 'text-gray-900 border-b-2 border-gray-900' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'email'
+                  ? 'text-gray-900 border-b-2 border-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Email
               </button>
               <button
                 onClick={() => { setActiveTab('password'); setMessage({ type: '', text: '' }) }}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'password' 
-                    ? 'text-gray-900 border-b-2 border-gray-900' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'password'
+                  ? 'text-gray-900 border-b-2 border-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Password
               </button>
@@ -1171,9 +1165,8 @@ function ProfileSettingsModal({ onClose }) {
         {/* Content */}
         <div className="p-4">
           {message.text && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${
-              message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-            }`}>
+            <div className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+              }`}>
               {message.text}
             </div>
           )}
@@ -1349,7 +1342,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                     </span>
                   )}
                 </button>
-                
+
                 {showNotifications && (
                   <NotificationPane
                     notifications={notifications || []}
@@ -1388,10 +1381,10 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                         {!isEmailAuth() && (
                           <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                             <svg className="w-3 h-3" viewBox="0 0 24 24">
-                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                             </svg>
                             Signed in with Google
                           </p>
@@ -1442,11 +1435,10 @@ function TabNav({ tab, setTab }) {
               id={`tab-${t.id}`}
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-5 py-4 font-medium text-sm border-b-2 transition-colors ${
-                tab === t.id
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-5 py-4 font-medium text-sm border-b-2 transition-colors ${tab === t.id
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <span className="mr-2">
                 {t.id === 'today' ? (
@@ -1461,7 +1453,7 @@ function TabNav({ tab, setTab }) {
                     <path d="M4.93 19.07l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     <path d="M17.66 6.34l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
-                ) : t.icon }
+                ) : t.icon}
               </span>
               {t.label}
             </button>
@@ -1486,6 +1478,7 @@ function TodayView() {
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const lastTapRef = useRef(0)
+  const [openMenuId, setOpenMenuId] = useState(null)
   // Flatten tasks and subtasks with project context for the existing-task picker
   const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
     const base = [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }]
@@ -1553,14 +1546,14 @@ function TodayView() {
                 try { removeTodayItems(toRemove) } catch (e) { dwarn('removeTodayItems failed', e) }
                 setSelectedIds(new Set())
                 setIsSelectionMode(false)
-              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"><Trash2 className="w-4 h-4"/> <span>Delete</span> <span className="opacity-80">({selectedIds.size})</span></button>
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"><Trash2 className="w-4 h-4" /> <span>Delete</span> <span className="opacity-80">({selectedIds.size})</span></button>
               <button onClick={() => {
                 const toDup = Array.from(selectedIds)
                 if (toDup.length === 0) return
                 try { duplicateTodayItems(toDup) } catch (e) { dwarn('duplicateTodayItems failed', e) }
                 setSelectedIds(new Set())
                 setIsSelectionMode(false)
-              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700 flex items-center gap-1"><Copy className="w-4 h-4"/> <span>Duplicate</span> <span className="opacity-80">({selectedIds.size})</span></button>
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700 flex items-center gap-1"><Copy className="w-4 h-4" /> <span>Duplicate</span> <span className="opacity-80">({selectedIds.size})</span></button>
               <button onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()) }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
             </div>
           )}
@@ -1659,137 +1652,161 @@ function TodayView() {
                       <FileText className="w-4 h-4" />
                     </button>
                   </div>
-                        <div className="min-w-0">
-                          {/* inline edit for local items; navigate to task detail for linked items */}
-                          {editingId === it.id ? (
-                            <div className="flex gap-2 items-center">
-                              <input autoFocus className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={async (e) => {
-                                if (e.key !== 'Enter') return
-                                e.preventDefault()
-                                const trimmed = (editText || '').trim()
-                                if (!trimmed) return
+                  <div className="min-w-0">
+                    {/* inline edit for local items; navigate to task detail for linked items */}
+                    {editingId === it.id ? (
+                      <div className="flex gap-2 items-center">
+                        <input autoFocus className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={async (e) => {
+                          if (e.key !== 'Enter') return
+                          e.preventDefault()
+                          const trimmed = (editText || '').trim()
+                          if (!trimmed) return
 
-                                // reuse same save flow as Save button
-                                if (it.isLocal) {
-                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                                  setTodayItems(next)
-                                  saveTodayItems(next)
-                                  setEditingId(null)
-                                  return
-                                }
-                                try {
-                                  if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                          // reuse same save flow as Save button
+                          if (it.isLocal) {
+                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                            setTodayItems(next)
+                            saveTodayItems(next)
+                            setEditingId(null)
+                            return
+                          }
+                          try {
+                            if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                              if (it.subtaskId) {
+                                const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
+                                if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
+                              } else if (it.taskId) {
+                                const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
+                                if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
+                              }
+                              try { await reloadProjects() } catch (e) { }
+                            } else {
+                              let updated = false
+                              const newProjects = projects.map(p => ({
+                                ...p, stages: (p.stages || []).map(s => ({
+                                  ...s, tasks: (s.tasks || []).map(t => {
                                     if (it.subtaskId) {
-                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
-                                      if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
-                                    } else if (it.taskId) {
-                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
-                                      if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
+                                      const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
+                                      if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                                      return { ...t, subtasks: newSubtasks }
                                     }
-                                    try { await reloadProjects() } catch (e) {}
-                                  } else {
-                                    let updated = false
-                                    const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
-                                      if (it.subtaskId) {
-                                        const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
-                                        if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-                                        return { ...t, subtasks: newSubtasks }
-                                      }
-                                      if (it.taskId && t.id === it.taskId) {
-                                        updated = true
-                                        return { ...t, title: trimmed }
-                                      }
-                                      return t
-                                    }) })) }))
-                                    if (updated) setProjects(newProjects)
-                                  }
+                                    if (it.taskId && t.id === it.taskId) {
+                                      updated = true
+                                      return { ...t, title: trimmed }
+                                    }
+                                    return t
+                                  })
+                                }))
+                              }))
+                              if (updated) setProjects(newProjects)
+                            }
 
-                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                                  setTodayItems(next)
-                                  saveTodayItems(next)
-                                  setEditingId(null)
-                                } catch (e) {
-                                  dwarn('Failed to save renamed item', e)
-                                  showToast('Failed to save change')
-                                }
-                              }} />
-                              <button type="button" onClick={async () => {
-                                const trimmed = (editText || '').trim()
-                                if (!trimmed) return
+                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                            setTodayItems(next)
+                            saveTodayItems(next)
+                            setEditingId(null)
+                          } catch (e) {
+                            dwarn('Failed to save renamed item', e)
+                            showToast('Failed to save change')
+                          }
+                        }} />
+                        <button type="button" onClick={async () => {
+                          const trimmed = (editText || '').trim()
+                          if (!trimmed) return
 
-                                // Local item: update locally
-                                if (it.isLocal) {
-                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                                  setTodayItems(next)
-                                  saveTodayItems(next)
-                                  setEditingId(null)
-                                  return
-                                }
+                          // Local item: update locally
+                          if (it.isLocal) {
+                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                            setTodayItems(next)
+                            saveTodayItems(next)
+                            setEditingId(null)
+                            return
+                          }
 
-                                // Linked item: attempt server update, fall back to demo-mode local update
-                                try {
-                                  if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                          // Linked item: attempt server update, fall back to demo-mode local update
+                          try {
+                            if (!demoMode && db && (it.taskId || it.subtaskId)) {
+                              if (it.subtaskId) {
+                                const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
+                                if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
+                              } else if (it.taskId) {
+                                const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
+                                if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
+                              }
+                              // refresh local projects to reflect updated title
+                              try { await reloadProjects() } catch (e) { }
+                            } else {
+                              // demo mode: update in-memory projects
+                              let updated = false
+                              const newProjects = projects.map(p => ({
+                                ...p, stages: (p.stages || []).map(s => ({
+                                  ...s, tasks: (s.tasks || []).map(t => {
                                     if (it.subtaskId) {
-                                      const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
-                                      if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
-                                    } else if (it.taskId) {
-                                      const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
-                                      if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
+                                      const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
+                                      if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                                      return { ...t, subtasks: newSubtasks }
                                     }
-                                    // refresh local projects to reflect updated title
-                                    try { await reloadProjects() } catch (e) {}
-                                  } else {
-                                    // demo mode: update in-memory projects
-                                    let updated = false
-                                    const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
-                                      if (it.subtaskId) {
-                                        const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
-                                        if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-                                        return { ...t, subtasks: newSubtasks }
-                                      }
-                                      if (it.taskId && t.id === it.taskId) {
-                                        updated = true
-                                        return { ...t, title: trimmed }
-                                      }
-                                      return t
-                                    }) })) }))
-                                    if (updated) setProjects(newProjects)
-                                  }
+                                    if (it.taskId && t.id === it.taskId) {
+                                      updated = true
+                                      return { ...t, title: trimmed }
+                                    }
+                                    return t
+                                  })
+                                }))
+                              }))
+                              if (updated) setProjects(newProjects)
+                            }
 
-                                  // Update today list to reflect new title
-                                  const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                                  setTodayItems(next)
-                                  saveTodayItems(next)
-                                  setEditingId(null)
-                                } catch (e) {
-                                  dwarn('Failed to save renamed item', e)
-                                  showToast('Failed to save change')
-                                }
-                              }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
-                              <button type="button" onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
-                            </div>
-                          ) : (
-                            <>
-                              <div
-                                className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''} cursor-pointer`}
-                                onDoubleClick={() => { setEditingId(it.id); setEditText(it.title || '') }}
-                                onTouchEnd={() => {
-                                  const now = Date.now()
-                                  if (now - lastTapRef.current < 350) {
-                                    setEditingId(it.id)
-                                    setEditText(it.title || '')
-                                    lastTapRef.current = 0
-                                  } else {
-                                    lastTapRef.current = now
-                                  }
-                                }}
-                              >{it.title}</div>
-                              <div className="text-xs text-gray-400 truncate">{proj ? proj.title : ''}</div>
-                            </>
-                          )}
-                        </div>
+                            // Update today list to reflect new title
+                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+                            setTodayItems(next)
+                            saveTodayItems(next)
+                            setEditingId(null)
+                          } catch (e) {
+                            dwarn('Failed to save renamed item', e)
+                            showToast('Failed to save change')
+                          }
+                        }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
+                        <button type="button" onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''} cursor-pointer`}
+                          onDoubleClick={() => { setEditingId(it.id); setEditText(it.title || '') }}
+                          onTouchEnd={() => {
+                            const now = Date.now()
+                            if (now - lastTapRef.current < 350) {
+                              setEditingId(it.id)
+                              setEditText(it.title || '')
+                              lastTapRef.current = 0
+                            } else {
+                              lastTapRef.current = now
+                            }
+                          }}
+                        >{it.title}</div>
+                        <div className="text-xs text-gray-400 truncate">{proj ? proj.title : ''}</div>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative">
+                  <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === it.id ? null : it.id) }} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  {openMenuId === it.id && (
+                    <>
+                      <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg rounded-xl z-40 py-1 w-32 animate-fade-in flex flex-col overflow-hidden">
+                        <button onClick={(e) => { e.stopPropagation(); duplicateTodayItems([it.id]); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                          <Copy className="w-3.5 h-3.5" /> Duplicate
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); removeTodayItems([it.id]); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -1871,7 +1888,7 @@ function ProjectsView() {
     const toDelete = Array.from(selectedProjectIDs)
     if (toDelete.length === 0) return
     if (!window.confirm(`Delete ${toDelete.length} project(s) and all their data?`)) return
-    
+
     if (demoMode) {
       setProjects(projects.filter(p => !selectedProjectIDs.has(p.id)))
     } else {
@@ -1993,7 +2010,7 @@ function ProjectsView() {
 
   const deleteProject = async (id) => {
     if (!window.confirm('Delete this project and all its data?')) return
-    
+
     if (demoMode) {
       setProjects(projects.filter(p => p.id !== id))
     } else {
@@ -2007,7 +2024,7 @@ function ProjectsView() {
     const newProjectId = uuid()
     const newPriorityRank = projects.length + 1
     const now = new Date().toISOString()
-    
+
     const duplicatedProject = {
       ...projectToDuplicate,
       id: newProjectId,
@@ -2165,42 +2182,39 @@ function ProjectsView() {
             )}
           </div>
         </div>
-        
+
         {/* Controls row - scrollable on mobile */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
           {/* View Toggle */}
           <div className="flex items-center bg-gray-100 rounded-lg p-1 flex-shrink-0">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
               title="Grid view"
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-colors ${
-                viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
               title="List view"
             >
               <List className="w-4 h-4" />
             </button>
           </div>
-          
+
           {/* Sort options */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {[{ key: 'priority', label: 'Priority' }, { key: 'progress', label: 'Progress' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
               <button
                 key={opt.key}
                 onClick={() => handleSortChange(opt.key)}
-                className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${
-                  sortOption === opt.key
-                    ? 'bg-gray-200 text-gray-900 font-medium'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${sortOption === opt.key
+                  ? 'bg-gray-200 text-gray-900 font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {opt.label}
                 {sortOption === opt.key && (
@@ -2209,7 +2223,7 @@ function ProjectsView() {
               </button>
             ))}
           </div>
-          
+
           <button id="projects-reorder-btn" onClick={() => setShowReorder(true)} className="btn-gradient flex items-center gap-2 whitespace-nowrap flex-shrink-0 text-sm px-3 py-2">
             <MoreVertical className="w-4 h-4" />
             <span className="hidden sm:inline">Reorder</span>
@@ -2229,19 +2243,19 @@ function ProjectsView() {
       ) : viewMode === 'grid' ? (
         <div className="grid gap-2 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {sortedProjects.map((project, i) => (
-            <ProjectCard 
-              key={project.id} 
+            <ProjectCard
+              key={project.id}
               rootId={i === 0 ? 'project-card-0' : undefined}
-              project={project} 
+              project={project}
               index={i}
               isSelectionMode={isSelectionMode}
               isSelected={selectedProjectIDs.has(project.id)}
               onToggleSelect={(e) => toggleProjectSelection(project.id, e)}
-              onSelect={() => { 
+              onSelect={() => {
                 if (isSelectionMode) {
                   toggleProjectSelection(project.id)
                 } else {
-                  setSelectedProject(project); setView('project'); 
+                  setSelectedProject(project); setView('project');
                 }
               }}
               onDelete={() => deleteProject(project.id)}
@@ -2252,18 +2266,18 @@ function ProjectsView() {
       ) : (
         <div className="flex flex-col gap-3">
           {sortedProjects.map((project, i) => (
-            <ProjectListItem 
-              key={project.id} 
-              project={project} 
+            <ProjectListItem
+              key={project.id}
+              project={project}
               index={i}
               isSelectionMode={isSelectionMode}
               isSelected={selectedProjectIDs.has(project.id)}
               onToggleSelect={(e) => toggleProjectSelection(project.id, e)}
-              onSelect={() => { 
+              onSelect={() => {
                 if (isSelectionMode) {
                   toggleProjectSelection(project.id)
                 } else {
-                  setSelectedProject(project); setView('project'); 
+                  setSelectedProject(project); setView('project');
                 }
               }}
               onDelete={() => deleteProject(project.id)}
@@ -2276,10 +2290,10 @@ function ProjectsView() {
       {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} />}
 
       {showReorder && (
-        <ReorderModal 
-          projects={sortedProjects} 
-          onReorder={handleReorder} 
-          onClose={() => setShowReorder(false)} 
+        <ReorderModal
+          projects={sortedProjects}
+          onReorder={handleReorder}
+          onClose={() => setShowReorder(false)}
         />
       )}
     </div>
@@ -2323,7 +2337,7 @@ function ReorderModal({ projects, onReorder, onClose }) {
   const { reorderLoading } = useApp();
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
+      <div
         className="glass-card rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto animate-fade-in"
         onClick={e => e.stopPropagation()}
       >
@@ -2338,16 +2352,15 @@ function ReorderModal({ projects, onReorder, onClose }) {
           <p className="text-gray-600 mb-4">Drag to reorder projects by priority (1 = highest)</p>
           <div className="space-y-3">
             {workingProjects.map((project, index) => (
-              <div 
-                key={project.id} 
+              <div
+                key={project.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 glass-card rounded-lg cursor-move transition-all duration-200 ${
-                  draggedIndex === index ? 'opacity-50 scale-95' : ''
-                }`}
+                className={`flex items-center gap-3 p-3 glass-card rounded-lg cursor-move transition-all duration-200 ${draggedIndex === index ? 'opacity-50 scale-95' : ''
+                  }`}
               >
                 <GripVertical className="w-5 h-5 text-gray-400" />
                 <span className="text-2xl">{project.emoji}</span>
@@ -2376,7 +2389,7 @@ function ReorderModal({ projects, onReorder, onClose }) {
 function PriorityBadge({ rank, position }) {
   const display = (position !== null && position !== undefined) ? position : rank
   return (
-    <span 
+    <span
       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gray-400"
       title={`Priority ${display}`}
     >
@@ -2434,11 +2447,10 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
           {isSelectionMode && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-              className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                isSelected 
-                  ? 'bg-brand-600 border-brand-600 text-white' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
+              className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected
+                ? 'bg-brand-600 border-brand-600 text-white'
+                : 'border-gray-300 hover:border-gray-400'
+                }`}
             >
               {isSelected && <Check className="w-3 h-3" />}
             </button>
@@ -2448,10 +2460,10 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-sm text-gray-900 truncate">{project.title}</h3>
               {isShared && (
-                    <span id={rootId ? `${rootId}-shared` : undefined} className="tag tag-shared bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 flex-shrink-0">
-                      <Share2 className="w-2 h-2" />
-                    </span>
-                  )}
+                <span id={rootId ? `${rootId}-shared` : undefined} className="tag tag-shared bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 flex-shrink-0">
+                  <Share2 className="w-2 h-2" />
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className={`tag text-[9px] py-0.5 px-1.5 ${isComplete ? 'bg-green-100 text-green-700' : 'tag-default'}`}>{isComplete ? '✓ Complete' : currentStage?.name || 'No stage'}</span>
@@ -2496,16 +2508,15 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
         {isSelectionMode && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-            className={`absolute top-3 right-3 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors z-10 ${
-              isSelected 
-                ? 'bg-brand-600 border-brand-600 text-white' 
-                : 'border-gray-300 hover:border-gray-400 bg-white'
-            }`}
+            className={`absolute top-3 right-3 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors z-10 ${isSelected
+              ? 'bg-brand-600 border-brand-600 text-white'
+              : 'border-gray-300 hover:border-gray-400 bg-white'
+              }`}
           >
             {isSelected && <Check className="w-4 h-4" />}
           </button>
         )}
-        
+
         {/* Priority Badge */}
         <div className="absolute top-3 left-3 flex items-center gap-2">
           <PriorityBadge position={index + 1} rank={project.priority_rank} />
@@ -2516,7 +2527,7 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
             </span>
           )}
         </div>
-        
+
         <div className="flex items-start gap-4 mb-4 mt-6">
           <span className="text-4xl">{project.emoji}</span>
           <div className="flex-1 min-w-0">
@@ -2590,14 +2601,14 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-8 sm:top-12 right-2 sm:right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
-            <button 
+            <button
               onClick={() => { setShowMenu(false); onDuplicate(); }}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
             >
               <Copy className="w-4 h-4" />
               Duplicate
             </button>
-            <button 
+            <button
               onClick={() => { setShowMenu(false); onDelete(); }}
               className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
             >
@@ -2659,22 +2670,21 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
         {isSelectionMode && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-              isSelected 
-                ? 'bg-brand-600 border-brand-600 text-white' 
-                : 'border-gray-300 hover:border-gray-400'
-            }`}
+            className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected
+              ? 'bg-brand-600 border-brand-600 text-white'
+              : 'border-gray-300 hover:border-gray-400'
+              }`}
           >
             {isSelected && <Check className="w-3 h-3" />}
           </button>
         )}
-        
+
         {/* Priority Badge */}
         <PriorityBadge position={index + 1} rank={project.priority_rank} />
-        
+
         {/* Emoji */}
         <span className="text-xl sm:text-2xl flex-shrink-0">{project.emoji}</span>
-        
+
         {/* Title and Stage - Takes most space */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -2709,7 +2719,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             )}
           </div>
         </div>
-        
+
         {/* Progress - Compact display */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Stage Progress Dots */}
@@ -2717,13 +2727,12 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             {project.stages?.slice(0, 7).map((stage, i) => (
               <div
                 key={stage.id}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  i < completedStages 
-                    ? 'bg-green-500' 
-                    : i === completedStages 
-                      ? 'bg-blue-500' 
-                      : 'bg-gray-200'
-                }`}
+                className={`w-2 h-2 rounded-full transition-colors ${i < completedStages
+                  ? 'bg-green-500'
+                  : i === completedStages
+                    ? 'bg-blue-500'
+                    : 'bg-gray-200'
+                  }`}
                 title={stage.name}
               />
             ))}
@@ -2731,11 +2740,11 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
               <span className="text-xs text-gray-400">+{totalStages - 7}</span>
             )}
           </div>
-          
+
           {/* Percentage */}
           <div className="hidden sm:flex items-center gap-2 min-w-[60px]">
             <div className={`w-12 h-1.5 rounded-full overflow-hidden ${isComplete ? 'bg-green-200' : 'bg-gray-200'}`}>
-              <div 
+              <div
                 className={`h-full rounded-full transition-all ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-green-500'}`}
                 style={{ width: `${progress * 100}%` }}
               />
@@ -2761,7 +2770,7 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
             <span className={`text-xs font-medium w-8 ${isComplete ? 'text-green-600' : 'text-gray-600'}`}>{Math.round(progress * 100)}%</span>
           </div>
         </div>
-        
+
         {/* Menu Button */}
         {!isSelectionMode && (
           <button
@@ -2777,14 +2786,14 @@ function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSe
         <>
           <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); setShowMenu(false); }} />
           <div className="absolute top-12 right-4 glass-card rounded-xl shadow-lg z-50 py-1 min-w-[140px] animate-fade-in" onClick={e => e.stopPropagation()}>
-            <button 
+            <button
               onClick={() => { setShowMenu(false); onDuplicate(); }}
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
             >
               <Copy className="w-4 h-4" />
               Duplicate
             </button>
-            <button 
+            <button
               onClick={() => { setShowMenu(false); onDelete(); }}
               className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
             >
@@ -2901,7 +2910,7 @@ function CreateProjectModal({ onClose }) {
           name: stage.name,
           order_index: stage.order_index,
         })
-          if (stageError) {
+        if (stageError) {
           derr('❌ Create stage failed:', stageError)
           setErrorMsg(stageError?.message || `Failed to create stage: ${stage.name}`)
           setLoading(false)
@@ -2925,7 +2934,7 @@ function CreateProjectModal({ onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
+      <div
         className="glass-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in"
         onClick={e => e.stopPropagation()}
       >
@@ -2961,9 +2970,8 @@ function CreateProjectModal({ onClose }) {
                 <button
                   key={e}
                   onClick={() => setEmoji(e)}
-                  className={`text-2xl p-2 rounded-lg transition-all ${
-                    emoji === e ? 'bg-brand-100 ring-2 ring-brand-500' : 'hover:bg-gray-100'
-                  }`}
+                  className={`text-2xl p-2 rounded-lg transition-all ${emoji === e ? 'bg-brand-100 ring-2 ring-brand-500' : 'hover:bg-gray-100'
+                    }`}
                 >
                   {e}
                 </button>
@@ -2975,11 +2983,10 @@ function CreateProjectModal({ onClose }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">Workflow Stages</label>
             <div className="space-y-2">
               {stages.map((stage, i) => (
-                <div 
-                  key={i} 
-                  className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-all ${
-                    draggedIndex === i ? 'border-brand-500 bg-brand-50 opacity-50' : 'border-transparent'
-                  }`}
+                <div
+                  key={i}
+                  className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-all ${draggedIndex === i ? 'border-brand-500 bg-brand-50 opacity-50' : 'border-transparent'
+                    }`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, i)}
                   onDragOver={handleDragOver}
@@ -3050,7 +3057,7 @@ function ProjectDetail() {
   const [showShare, setShowShare] = useState(false)
 
   if (!selectedProject) return null
-  
+
   const project = projects.find(p => p.id === selectedProject.id) || selectedProject
   const currentStageIndex = project.current_stage_index ?? 0
   const stageIndex = previewIndex ?? currentStageIndex
@@ -3103,7 +3110,7 @@ function ProjectDetail() {
       updated_at: now,
       modified_by: user?.id,
       modified_by_name: userName,
-      stages: project.stages.map((s, i) => 
+      stages: project.stages.map((s, i) =>
         i === stageIndex ? { ...s, tasks: [...(s.tasks || []), task] } : s
       )
     }
@@ -3118,21 +3125,24 @@ function ProjectDetail() {
         created_by: user?.id,
         modified_by: user?.id
       })
-      
+
       // Update local state with server-generated ID
       if (createdTask) {
         const syncedProject = {
           ...project,
-          stages: project.stages.map((s, i) => 
-            i === stageIndex 
+          stages: project.stages.map((s, i) =>
+            i === stageIndex
               ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, ...createdTask, id: createdTask.id, is_local: false } : t) }
               : s
-          )
+          ),
+          updated_at: now,
+          modified_by: user?.id,
+          modified_by_name: userName
         }
         const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
         setProjects(newProjects)
         setSelectedProject(syncedProject)
-        
+
         // Notify collaborators about the new task
         if (isShared) {
           await db.notifyCollaborators(project.id, user?.id, {
@@ -3149,20 +3159,20 @@ function ProjectDetail() {
   const toggleTask = async (taskId) => {
     const task = stage.tasks.find(t => t.id === taskId)
     if (!task) return
-    
+
     const newIsCompleted = !task.is_completed
     const now = new Date().toISOString()
-    
+
     // If completing the task, also complete all subtasks
     const updatedSubtasks = newIsCompleted && task.subtasks?.length > 0
       ? task.subtasks.map(s => ({ ...s, is_completed: true }))
       : task.subtasks
-    
+
     const updated = {
       ...project,
       updated_at: now,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
           ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, is_completed: newIsCompleted, subtasks: updatedSubtasks, updated_at: now } : t) }
           : s
       )
@@ -3185,7 +3195,7 @@ function ProjectDetail() {
   const deleteTask = async (taskId) => {
     const updated = {
       ...project,
-      stages: project.stages.map((s, i) => 
+      stages: project.stages.map((s, i) =>
         i === stageIndex ? { ...s, tasks: s.tasks.filter(t => t.id !== taskId) } : s
       )
     }
@@ -3211,8 +3221,8 @@ function ProjectDetail() {
     const task = stage.tasks.find(t => t.id === taskId)
     const updated = {
       ...project,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
           ? { ...s, tasks: s.tasks.map(t => t.id === taskId ? { ...t, reminder_date: reminderDate, updated_at: now, modified_by: user?.id, modified_by_name: userName } : t) }
           : s
       )
@@ -3221,7 +3231,7 @@ function ProjectDetail() {
 
     if (!demoMode) {
       await db.updateTask(taskId, { reminder_date: reminderDate, modified_by: user?.id })
-      
+
       // Notify collaborators about the reminder only if scope === 'all'
       if (isShared && reminderDate && task && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
@@ -3244,13 +3254,15 @@ function ProjectDetail() {
     const updated = {
       ...project,
       updated_at: now,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => 
-              t.id === taskId 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
+          ? {
+            ...s, tasks: s.tasks.map(t =>
+              t.id === taskId
                 ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: !st.is_completed } : st), updated_at: now }
                 : t
-            )}
+            )
+          }
           : s
       )
     }
@@ -3268,13 +3280,15 @@ function ProjectDetail() {
     const subtask = task?.subtasks?.find(s => s.id === subtaskId)
     const updated = {
       ...project,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => 
-              t.id === taskId 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
+          ? {
+            ...s, tasks: s.tasks.map(t =>
+              t.id === taskId
                 ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate, updated_at: now, modified_by: user?.id, modified_by_name: userName } : st), updated_at: now }
                 : t
-            )}
+            )
+          }
           : s
       )
     }
@@ -3282,7 +3296,7 @@ function ProjectDetail() {
 
     if (!demoMode) {
       await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
-      
+
       // Notify collaborators about the subtask reminder
       if (isShared && reminderDate && subtask) {
         await db.notifyCollaborators(project.id, user?.id, {
@@ -3300,16 +3314,16 @@ function ProjectDetail() {
   const sortedTasks = [...(stage?.tasks || [])].sort((a, b) => {
     const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
     const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
-    
+
     if (aOverdue && !bOverdue) return -1
     if (!aOverdue && bOverdue) return 1
-    
+
     if (a.reminder_date && b.reminder_date) {
       return new Date(a.reminder_date) - new Date(b.reminder_date)
     }
     if (a.reminder_date) return -1
     if (b.reminder_date) return 1
-    
+
     return 0
   })
 
@@ -3372,8 +3386,8 @@ function ProjectDetail() {
     })
 
     // Insert clones after last selected task index to preserve order
-    const indices = selectedIds.map(id => sortedTasks.findIndex(t => t.id === id)).filter(i => i >= 0).sort((a,b) => a-b)
-    const insertAfter = indices.length ? indices[indices.length-1] : sortedTasks.length - 1
+    const indices = selectedIds.map(id => sortedTasks.findIndex(t => t.id === id)).filter(i => i >= 0).sort((a, b) => a - b)
+    const insertAfter = indices.length ? indices[indices.length - 1] : sortedTasks.length - 1
 
     const newTasks = [...(stage.tasks || [])]
     // Insert clones after insertAfter in the stage.tasks array (map sortedTasks positions to actual positions)
@@ -3415,7 +3429,7 @@ function ProjectDetail() {
       <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-4">
-            <button 
+            <button
               onClick={() => { setView('main'); setSelectedProject(null); }}
               className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
             >
@@ -3478,10 +3492,9 @@ function ProjectDetail() {
                       setPreviewIndex(i)
                     }
                   }}
-                  className={`stage-pill ${
-                    i === currentStageIndex ? 'active' : 
+                  className={`stage-pill ${i === currentStageIndex ? 'active' :
                     previewIndex === i ? 'preview' : ''
-                  }`}
+                    }`}
                 >
                   {s.name}
                   {i === currentStageIndex && (
@@ -3585,9 +3598,8 @@ function ProjectDetail() {
               return (
                 <div
                   key={task.id}
-                  className={`glass-card glass-card-hover rounded-xl animate-fade-in transition-all ${
-                    taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
-                  }`}
+                  className={`glass-card glass-card-hover rounded-xl animate-fade-in transition-all ${taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
+                    }`}
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   <div className="p-3 sm:p-4">
@@ -3613,7 +3625,7 @@ function ProjectDetail() {
                           {task.is_completed && <Check className="w-3 h-3" />}
                         </button>
                       </div>
-                      <div 
+                      <div
                         className="flex-1 cursor-pointer min-w-0"
                         onClick={() => { setSelectedTask({ task, stageIndex }); setView('task'); }}
                       >
@@ -3651,13 +3663,13 @@ function ProjectDetail() {
                           compact
                           isShared={isShared}
                         />
-                          <button
-                            onClick={(e) => { e.stopPropagation(); addToToday(task, { projectId: project.id }) }}
-                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Add to Tod(o)ay"
-                          >
-                            <Sun className="w-4 h-4" />
-                          </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addToToday(task, { projectId: project.id }) }}
+                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Add to Tod(o)ay"
+                        >
+                          <Sun className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => deleteTask(task.id)}
                           className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -3667,14 +3679,14 @@ function ProjectDetail() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Always visible Subtasks */}
                   {hasSubtasks && (
                     <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
                       {task.subtasks.map(subtask => {
                         const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
                         return (
-                          <div 
+                          <div
                             key={subtask.id}
                             className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''}`}
                           >
@@ -3714,9 +3726,9 @@ function ProjectDetail() {
       </div>
 
       {showSettings && (
-        <ProjectSettingsModal 
-          project={project} 
-          onClose={() => setShowSettings(false)} 
+        <ProjectSettingsModal
+          project={project}
+          onClose={() => setShowSettings(false)}
           onUpdate={updateProject}
           onDelete={async () => {
             if (!window.confirm('Delete this project and all its data?')) return
@@ -3789,7 +3801,7 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
       ...stage,
       order_index: index
     }))
-    
+
     // Find the new index of the stage that was previously current
     // We track by stage ID to maintain the current stage even after reordering
     const previousCurrentStage = project.stages[project.current_stage_index ?? 0]
@@ -3798,7 +3810,7 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
       // If the current stage was deleted, default to 0
       newCurrentStageIndex = 0
     }
-    
+
     const updated = {
       ...project,
       title,
@@ -3818,7 +3830,7 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
+      <div
         className="glass-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in"
         onClick={e => e.stopPropagation()}
       >
@@ -3847,9 +3859,8 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
                 <button
                   key={e}
                   onClick={() => setEmoji(e)}
-                  className={`text-2xl p-2 rounded-lg transition-all ${
-                    emoji === e ? 'bg-brand-100 ring-2 ring-brand-500' : 'hover:bg-gray-100'
-                  }`}
+                  className={`text-2xl p-2 rounded-lg transition-all ${emoji === e ? 'bg-brand-100 ring-2 ring-brand-500' : 'hover:bg-gray-100'
+                    }`}
                 >
                   {e}
                 </button>
@@ -3861,11 +3872,10 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">Stages</label>
             <div className="space-y-2">
               {stages.map((stage, i) => (
-                <div 
-                  key={stage.id} 
-                  className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-all ${
-                    draggedIndex === i ? 'border-brand-500 bg-brand-50 opacity-50' : 'border-transparent'
-                  }`}
+                <div
+                  key={stage.id}
+                  className={`flex gap-2 items-center p-2 rounded-lg border-2 transition-all ${draggedIndex === i ? 'border-brand-500 bg-brand-50 opacity-50' : 'border-transparent'
+                    }`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, i)}
                   onDragOver={handleDragOver}
@@ -4000,7 +4010,7 @@ function ShareModal({ project, onClose, onUpdate }) {
     }
 
     const result = await db.shareProject(project.id, email.trim(), 'editor', user?.id)
-    
+
     if (result.error) {
       setError(result.error.message || 'Failed to share project')
     } else if (result.type === 'invited') {
@@ -4041,7 +4051,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 
   const handleRemoveMember = async (userId) => {
     if (demoMode) return
-    
+
     const { error } = await db.removeProjectMember(project.id, userId)
     if (!error) {
       setMembers(prev => prev.filter(m => m.user_id !== userId))
@@ -4052,7 +4062,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
+      <div
         className="glass-card rounded-2xl w-full max-w-md animate-fade-in max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
@@ -4100,7 +4110,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</p>}
           {success && <p className="text-sm text-green-600 bg-green-50 rounded-lg p-3 mb-4">{success}</p>}
-          
+
           {inviteLink && (
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800 font-medium mb-2">📧 Share this invite link:</p>
@@ -4187,7 +4197,7 @@ function ShareModal({ project, onClose, onUpdate }) {
                   </div>
                 </div>
               </div>
-              
+
               {/* Show members */}
               {members.map(member => (
                 <div key={member.user_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -4254,8 +4264,10 @@ function TaskDetail() {
     const updated = {
       ...project,
       updated_at: now,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
+      modified_by: user?.id,
+      modified_by_name: userName,
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
           ? { ...s, tasks: s.tasks.map(t => t.id === task.id ? { ...t, ...updates, updated_at: now, modified_by: user?.id, modified_by_name: userName } : t) }
           : s
       )
@@ -4267,14 +4279,14 @@ function TaskDetail() {
 
   const toggleTaskCompletion = async () => {
     const newIsCompleted = !currentTask.is_completed
-    
+
     // If completing the task, also complete all subtasks
     const updatedSubtasks = newIsCompleted && currentTask.subtasks?.length > 0
       ? currentTask.subtasks.map(s => ({ ...s, is_completed: true }))
       : currentTask.subtasks
-    
+
     updateTask({ is_completed: newIsCompleted, subtasks: updatedSubtasks })
-    
+
     if (!demoMode) {
       await db.updateTask(task.id, { is_completed: newIsCompleted, modified_by: user?.id })
       // Also update all subtasks in the database if completing parent
@@ -4292,7 +4304,7 @@ function TaskDetail() {
     updateTask({ reminder_date: reminderDate })
     if (!demoMode) {
       await db.updateTask(task.id, { reminder_date: reminderDate, modified_by: user?.id })
-      
+
       // Notify collaborators about the reminder only if scope === 'all'
       if (isShared && reminderDate && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
@@ -4327,16 +4339,16 @@ function TaskDetail() {
   const handleBulkDeleteSubtasks = async () => {
     if (selectedSubtaskIds.size === 0) return
     if (!window.confirm(`Delete ${selectedSubtaskIds.size} subtask(s)?`)) return
-    
+
     const remaining = currentTask.subtasks.filter(s => !selectedSubtaskIds.has(s.id))
     updateTask({ subtasks: remaining })
-    
+
     if (!demoMode) {
       for (const subtaskId of selectedSubtaskIds) {
         await db.deleteSubtask(subtaskId)
       }
     }
-    
+
     setSelectedSubtaskIds(new Set())
     setIsSubtaskSelectionMode(false)
   }
@@ -4344,10 +4356,10 @@ function TaskDetail() {
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
     const localId = uuid()
-    const subtask = { 
-      id: localId, 
-      title: newSubtask.trim(), 
-      is_completed: false, 
+    const subtask = {
+      id: localId,
+      title: newSubtask.trim(),
+      is_completed: false,
       reminder_date: null,
       created_by: user?.id,
       created_by_name: userName,
@@ -4358,31 +4370,35 @@ function TaskDetail() {
     setNewSubtask('')
 
     if (!demoMode) {
-      const { data: createdSubtask } = await db.createSubtask({ 
-        task_id: task.id, 
+      const { data: createdSubtask } = await db.createSubtask({
+        task_id: task.id,
         title: subtask.title,
         created_by: user?.id,
         modified_by: user?.id
       })
-      
+
       // Update local state with server-generated ID
       if (createdSubtask) {
         const now = new Date().toISOString()
         const updated = {
           ...project,
           updated_at: now,
-          stages: project.stages.map((s, i) => 
-            i === stageIndex 
-              ? { ...s, tasks: s.tasks.map(t => t.id === task.id 
+          modified_by: user?.id,
+          modified_by_name: userName,
+          stages: project.stages.map((s, i) =>
+            i === stageIndex
+              ? {
+                ...s, tasks: s.tasks.map(t => t.id === task.id
                   ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id } : st) }
                   : t
-                )}
+                )
+              }
               : s
           )
         }
         const newProjects = projects.map(p => p.id === project.id ? updated : p)
         setProjects(newProjects)
-        
+
         // Notify collaborators about the new subtask
         if (isShared) {
           await db.notifyCollaborators(project.id, user?.id, {
@@ -4419,7 +4435,7 @@ function TaskDetail() {
   const toggleSubtask = async (subtaskId) => {
     const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
-      subtasks: currentTask.subtasks.map(s => 
+      subtasks: currentTask.subtasks.map(s =>
         s.id === subtaskId ? { ...s, is_completed: !s.is_completed } : s
       )
     })
@@ -4432,14 +4448,14 @@ function TaskDetail() {
   const updateSubtaskReminder = async (subtaskId, reminderDate, scope = 'all') => {
     const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
-      subtasks: currentTask.subtasks.map(s => 
+      subtasks: currentTask.subtasks.map(s =>
         s.id === subtaskId ? { ...s, reminder_date: reminderDate, modified_by: user?.id, modified_by_name: userName } : s
       )
     })
 
     if (!demoMode) {
       await db.updateSubtask(subtaskId, { reminder_date: reminderDate, modified_by: user?.id })
-      
+
       // Notify collaborators about the subtask reminder only if scope === 'all'
       if (isShared && reminderDate && subtask && scope === 'all') {
         await db.notifyCollaborators(project.id, user?.id, {
@@ -4478,7 +4494,7 @@ function TaskDetail() {
     if (!window.confirm('Delete this task?')) return
     const updated = {
       ...project,
-      stages: project.stages.map((s, i) => 
+      stages: project.stages.map((s, i) =>
         i === stageIndex ? { ...s, tasks: s.tasks.filter(t => t.id !== task.id) } : s
       )
     }
@@ -4494,7 +4510,7 @@ function TaskDetail() {
   const sortedSubtasks = [...(currentTask.subtasks || [])].sort((a, b) => {
     const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
     const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
-    
+
     if (aOverdue && !bOverdue) return -1
     if (!aOverdue && bOverdue) return 1
     return 0
@@ -4504,7 +4520,7 @@ function TaskDetail() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-16">
       <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200 sticky top-16 z-30">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <button 
+          <button
             onClick={() => { setSelectedTask(null); setView('project'); }}
             className="flex items-center gap-2 text-gray-500 hover:text-gray-700"
           >
@@ -4616,20 +4632,18 @@ function TaskDetail() {
               const subtaskOverdue = isOverdue(s.reminder_date) && !s.is_completed
               const isSelected = selectedSubtaskIds.has(s.id)
               return (
-                <div 
-                  key={s.id} 
-                  className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors ${
-                    subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
-                  } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
+                <div
+                  key={s.id}
+                  className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors ${subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
+                    } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
                 >
                   {isSubtaskSelectionMode ? (
                     <button
                       onClick={(e) => toggleSubtaskSelection(s.id, e)}
-                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                        isSelected 
-                          ? 'bg-brand-600 border-brand-600 text-white' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                      className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected
+                        ? 'bg-brand-600 border-brand-600 text-white'
+                        : 'border-gray-300 hover:border-gray-400'
+                        }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
                     </button>
@@ -4680,7 +4694,7 @@ function TaskDetail() {
                       </div>
                     )}
                   </div>
-                      {!isSubtaskSelectionMode && (
+                  {!isSubtaskSelectionMode && (
                     <>
                       <ReminderPicker
                         value={s.reminder_date}
@@ -4799,23 +4813,23 @@ function AllTasksView() {
   }
 
   // Filter based on active sub-tab
-  const filteredTasks = activeSubTab === 'scheduled' 
+  const filteredTasks = activeSubTab === 'scheduled'
     ? allTasks.filter(({ task }) => (task.reminder_date || hasScheduledSubtasks(task)) && !task.is_completed)
     : activeSubTab === 'active'
-    ? allTasks.filter(({ task }) => !task.is_completed)
-    : activeSubTab === 'complete'
-    ? allTasks.filter(({ task }) => task.is_completed)
-    : allTasks
+      ? allTasks.filter(({ task }) => !task.is_completed)
+      : activeSubTab === 'complete'
+        ? allTasks.filter(({ task }) => task.is_completed)
+        : allTasks
 
   // Sort tasks: overdue first, then by selected option
   const dir = sortDirection === 'asc' ? 1 : -1
   filteredTasks.sort((a, b) => {
     const aOverdue = isOverdue(a.task.reminder_date) && !a.task.is_completed
     const bOverdue = isOverdue(b.task.reminder_date) && !b.task.is_completed
-    
+
     if (aOverdue && !bOverdue) return -1
     if (!aOverdue && bOverdue) return 1
-    
+
     if (sortOption === 'priority') {
       return (a.project.priority_rank - b.project.priority_rank) * dir
     } else if (sortOption === 'created') {
@@ -4851,7 +4865,7 @@ function AllTasksView() {
 
   const handleBulkComplete = async () => {
     if (selectedTaskIds.size === 0) return
-    
+
     const now = new Date().toISOString()
     const newProjects = projects.map(project => ({
       ...project,
@@ -4872,10 +4886,10 @@ function AllTasksView() {
         }) || []
       })) || []
     }))
-    
+
     setProjects(newProjects)
     if (demoMode) saveLocal(newProjects)
-    
+
     if (!demoMode) {
       for (const { task } of filteredTasks) {
         if (selectedTaskIds.has(task.id)) {
@@ -4891,14 +4905,14 @@ function AllTasksView() {
         }
       }
     }
-    
+
     setSelectedTaskIds(new Set())
     setIsSelectionMode(false)
   }
 
   const handleBulkReopen = async () => {
     if (selectedTaskIds.size === 0) return
-    
+
     const now = new Date().toISOString()
     const newProjects = projects.map(project => ({
       ...project,
@@ -4917,10 +4931,10 @@ function AllTasksView() {
         }) || []
       })) || []
     }))
-    
+
     setProjects(newProjects)
     if (demoMode) saveLocal(newProjects)
-    
+
     if (!demoMode) {
       for (const { task } of filteredTasks) {
         if (selectedTaskIds.has(task.id)) {
@@ -4928,7 +4942,7 @@ function AllTasksView() {
         }
       }
     }
-    
+
     setSelectedTaskIds(new Set())
     setIsSelectionMode(false)
   }
@@ -4936,7 +4950,7 @@ function AllTasksView() {
   const handleBulkDelete = async () => {
     if (selectedTaskIds.size === 0) return
     if (!window.confirm(`Delete ${selectedTaskIds.size} task(s)?`)) return
-    
+
     // Delete each selected task
     const newProjects = projects.map(project => ({
       ...project,
@@ -4945,16 +4959,16 @@ function AllTasksView() {
         tasks: stage.tasks?.filter(task => !selectedTaskIds.has(task.id)) || []
       })) || []
     }))
-    
+
     setProjects(newProjects)
     if (demoMode) saveLocal(newProjects)
-    
+
     if (!demoMode) {
       for (const taskId of selectedTaskIds) {
         await db.deleteTask(taskId)
       }
     }
-    
+
     setSelectedTaskIds(new Set())
     setIsSelectionMode(false)
   }
@@ -4983,13 +4997,15 @@ function AllTasksView() {
     const updatedProject = {
       ...project,
       updated_at: now,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => 
-              t.id === taskId 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
+          ? {
+            ...s, tasks: s.tasks.map(t =>
+              t.id === taskId
                 ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, is_completed: !st.is_completed } : st), updated_at: now }
                 : t
-            )}
+            )
+          }
           : s
       )
     }
@@ -5009,13 +5025,15 @@ function AllTasksView() {
     const now = new Date().toISOString()
     const updatedProject = {
       ...project,
-      stages: project.stages.map((s, i) => 
-        i === stageIndex 
-          ? { ...s, tasks: s.tasks.map(t => 
-              t.id === taskId 
+      stages: project.stages.map((s, i) =>
+        i === stageIndex
+          ? {
+            ...s, tasks: s.tasks.map(t =>
+              t.id === taskId
                 ? { ...t, subtasks: t.subtasks.map(st => st.id === subtaskId ? { ...st, reminder_date: reminderDate } : st), updated_at: now }
                 : t
-            )}
+            )
+          }
           : s
       )
     }
@@ -5054,44 +5072,40 @@ function AllTasksView() {
           <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <button
               onClick={() => { setActiveSubTab('active'); setSelectedTaskIds(new Set()) }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeSubTab === 'active'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSubTab === 'active'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <List className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
               Active ({activeCount})
             </button>
             <button
               onClick={() => { setActiveSubTab('scheduled'); setSelectedTaskIds(new Set()) }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeSubTab === 'scheduled'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSubTab === 'scheduled'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
               Scheduled ({scheduledCount})
             </button>
             <button
               onClick={() => { setActiveSubTab('complete'); setSelectedTaskIds(new Set()) }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeSubTab === 'complete'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSubTab === 'complete'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
               Complete ({completeCount})
             </button>
             <button
               onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
-              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeSubTab === 'all'
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSubTab === 'all'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
               All ({allCount})
@@ -5158,11 +5172,10 @@ function AllTasksView() {
             <button
               key={opt.key}
               onClick={() => handleSortChange(opt.key)}
-              className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
-                sortOption === opt.key
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${sortOption === opt.key
+                ? 'bg-gray-200 text-gray-900 font-medium'
+                : 'text-gray-600 hover:bg-gray-100'
+                }`}
             >
               {opt.label}
               {sortOption === opt.key && (
@@ -5176,19 +5189,19 @@ function AllTasksView() {
       {filteredTasks.length === 0 ? (
         <div className="glass-card rounded-2xl p-6 sm:p-12 text-center">
           <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2">
-            {activeSubTab === 'scheduled' ? 'No scheduled tasks' 
+            {activeSubTab === 'scheduled' ? 'No scheduled tasks'
               : activeSubTab === 'complete' ? 'No completed tasks'
-              : activeSubTab === 'active' ? 'No active tasks'
-              : 'No tasks yet'}
+                : activeSubTab === 'active' ? 'No active tasks'
+                  : 'No tasks yet'}
           </h2>
           <p className="text-gray-500 text-sm sm:text-base">
-            {activeSubTab === 'scheduled' 
+            {activeSubTab === 'scheduled'
               ? 'Tasks with reminders will appear here'
               : activeSubTab === 'complete'
-              ? 'Completed tasks will appear here'
-              : activeSubTab === 'active'
-              ? 'Active tasks will appear here'
-              : 'Create a project and add some tasks!'}
+                ? 'Completed tasks will appear here'
+                : activeSubTab === 'active'
+                  ? 'Active tasks will appear here'
+                  : 'Create a project and add some tasks!'}
           </p>
         </div>
       ) : (
@@ -5202,16 +5215,15 @@ function AllTasksView() {
             return (
               <div
                 key={`${project.id}-${task.id}`}
-                className={`glass-card glass-card-hover rounded-xl animate-fade-in ${
-                  taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
-                } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
+                className={`glass-card glass-card-hover rounded-xl animate-fade-in ${taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
+                  } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div 
+                <div
                   className="p-3 sm:p-4 cursor-pointer"
                   onClick={() => {
                     if (isSelectionMode) {
-                      toggleTaskSelection(task.id, { stopPropagation: () => {} })
+                      toggleTaskSelection(task.id, { stopPropagation: () => { } })
                     } else {
                       setSelectedProject(project)
                       setSelectedTask({ task, stageIndex })
@@ -5223,11 +5235,10 @@ function AllTasksView() {
                     {isSelectionMode && (
                       <button
                         onClick={(e) => toggleTaskSelection(task.id, e)}
-                        className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                          isSelected 
-                            ? 'bg-brand-600 border-brand-600 text-white' 
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
+                        className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected
+                          ? 'bg-brand-600 border-brand-600 text-white'
+                          : 'border-gray-300 hover:border-gray-400'
+                          }`}
                       >
                         {isSelected && <Check className="w-3 h-3" />}
                       </button>
@@ -5281,7 +5292,7 @@ function AllTasksView() {
                     {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                   </div>
                 </div>
-                
+
                 {/* Collapsible Subtasks */}
                 {hasSubtasks && isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
@@ -5289,7 +5300,7 @@ function AllTasksView() {
                       const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
                       const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
                       return (
-                        <div 
+                        <div
                           key={subtask.id}
                           className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
                         >
@@ -5385,7 +5396,7 @@ function AppContent() {
   const notifiedOverdueRef = useRef(new Set())
   const [walkVisible, setWalkVisible] = useState(false)
   // Today / daily focus state (per-date persisted)
-  const getTodayKey = (d = new Date()) => `researchos_today_${user?.id || 'anon'}_${d.toISOString().slice(0,10)}`
+  const getTodayKey = (d = new Date()) => `researchos_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // { id, title, projectId?, taskId?, isLocal, created_at }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
@@ -5396,7 +5407,7 @@ function AppContent() {
       try {
         const today = new Date()
         const key = getTodayKey(today)
-        const legacyKey = `researchos_today_${today.toISOString().slice(0,10)}`
+        const legacyKey = `researchos_today_${today.toISOString().slice(0, 10)}`
 
         // Try server if available and user is signed in
         if (!demoMode && user && db && db.getTodayItems) {
@@ -5412,9 +5423,9 @@ function AppContent() {
                 if (Array.isArray(localItems) && localItems.length > 0) {
                   // If server empty, prefer local (push to server)
                   if (!serverItems || serverItems.length === 0) {
-                    try { await db.saveTodayItems(user.id, today, localItems) } catch (e) {}
+                    try { await db.saveTodayItems(user.id, today, localItems) } catch (e) { }
                     setTodayItems(localItems)
-                    try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) {}
+                    try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) { }
                     return
                   }
 
@@ -5428,10 +5439,10 @@ function AppContent() {
                   // If merged differs from server, persist merged set
                   const mergedDifferent = merged.length !== serverItems.length || merged.some((m, idx) => JSON.stringify(m) !== JSON.stringify(serverItems[idx]))
                   if (mergedDifferent) {
-                    try { await db.saveTodayItems(user.id, today, merged) } catch (e) {}
+                    try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
                   }
                   setTodayItems(merged)
-                  try { localStorage.setItem(key, JSON.stringify(merged || [])) } catch (e) {}
+                  try { localStorage.setItem(key, JSON.stringify(merged || [])) } catch (e) { }
                   return
                 }
 
@@ -5442,7 +5453,7 @@ function AppContent() {
               if (data) {
                 setTodayItems(Array.isArray(data) ? data : [])
                 // also persist locally for offline
-                try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) {}
+                try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) { }
                 return
               }
             }
@@ -5463,7 +5474,7 @@ function AppContent() {
             setTodayItems(parsedLegacy || [])
             // If user is signed in and server available, push migration to server
             if (!demoMode && user && db && db.saveTodayItems) {
-              try { await db.saveTodayItems(user.id, today, parsedLegacy || []) } catch (e) {}
+              try { await db.saveTodayItems(user.id, today, parsedLegacy || []) } catch (e) { }
             }
             return
           } catch (e) {
@@ -5482,7 +5493,7 @@ function AppContent() {
     try {
       const key = getTodayKey()
       localStorage.setItem(key, JSON.stringify(items))
-    } catch (e) {}
+    } catch (e) { }
 
     // persist to server if available and user signed in
     try {
@@ -5490,10 +5501,10 @@ function AppContent() {
       if (!demoMode && user && db && db.saveTodayItems) {
         db.saveTodayItems(user.id, today, items).catch(e => {
           // Log in dev only
-          try { console.warn('Failed to save today items to server', e) } catch (_) {}
+          try { console.warn('Failed to save today items to server', e) } catch (_) { }
         })
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const showToast = (message, ms = 2500) => {
@@ -5507,7 +5518,7 @@ function AppContent() {
       setTimeout(() => {
         setToast(current => (current && current.id === id ? null : current))
       }, ms)
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const addToToday = (task, opts = {}) => {
@@ -5527,20 +5538,20 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
-    // Try to persist immediately to server and surface errors
-    (async () => {
-      try {
-        if (!demoMode && user && db && db.saveTodayItems) {
-          const today = new Date()
-          const { data, error } = await db.saveTodayItems(user.id, today, next)
-          if (error) {
-            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+      // Try to persist immediately to server and surface errors
+      (async () => {
+        try {
+          if (!demoMode && user && db && db.saveTodayItems) {
+            const today = new Date()
+            const { data, error } = await db.saveTodayItems(user.id, today, next)
+            if (error) {
+              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+            }
           }
+        } catch (e) {
+          dwarn('addToToday: save to server failed', e)
         }
-      } catch (e) {
-        dwarn('addToToday: save to server failed', e)
-      }
-    })()
+      })()
   }
 
   const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
@@ -5561,19 +5572,19 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
-    ;(async () => {
-      try {
-        if (!demoMode && user && db && db.saveTodayItems) {
-          const today = new Date()
-          const { data, error } = await db.saveTodayItems(user.id, today, next)
-          if (error) {
-            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+      ; (async () => {
+        try {
+          if (!demoMode && user && db && db.saveTodayItems) {
+            const today = new Date()
+            const { data, error } = await db.saveTodayItems(user.id, today, next)
+            if (error) {
+              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+            }
           }
+        } catch (e) {
+          dwarn('addSubtaskToToday: save to server failed', e)
         }
-      } catch (e) {
-        dwarn('addSubtaskToToday: save to server failed', e)
-      }
-    })()
+      })()
   }
 
   const addLocalTodayTask = (title) => {
@@ -5585,19 +5596,19 @@ function AppContent() {
     const next = [...todayItems, item]
     setTodayItems(next)
     saveTodayItems(next)
-    ;(async () => {
-      try {
-        if (!demoMode && user && db && db.saveTodayItems) {
-          const today = new Date()
-          const { data, error } = await db.saveTodayItems(user.id, today, next)
-          if (error) {
-            showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+      ; (async () => {
+        try {
+          if (!demoMode && user && db && db.saveTodayItems) {
+            const today = new Date()
+            const { data, error } = await db.saveTodayItems(user.id, today, next)
+            if (error) {
+              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
+            }
           }
+        } catch (e) {
+          dwarn('addLocalTodayTask: save to server failed', e)
         }
-      } catch (e) {
-        dwarn('addLocalTodayTask: save to server failed', e)
-      }
-    })()
+      })()
   }
 
   const toggleTodayDone = async (id) => {
@@ -5606,7 +5617,8 @@ function AppContent() {
 
     // Local-only today item
     if (item.isLocal) {
-      const next = todayItems.map(i => i.id === id ? { ...i, is_done: !i.is_done } : i)
+      let next = todayItems.map(i => i.id === id ? { ...i, is_done: !i.is_done } : i)
+      next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
       setTodayItems(next)
       saveTodayItems(next)
       return
@@ -5620,24 +5632,29 @@ function AppContent() {
       // If running in demo mode, update the in-memory `projects` state instead
       if (demoMode) {
         let updated = false
-        const newProjects = projects.map(p => ({ ...p, stages: (p.stages || []).map(s => ({ ...s, tasks: (s.tasks || []).map(t => {
-          if (item.subtaskId) {
-            // find subtask
-            const newSubtasks = (t.subtasks || []).map(st => st.id === item.subtaskId ? { ...st, is_completed: newDone } : st)
-            if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-            return { ...t, subtasks: newSubtasks }
-          }
-          if (item.taskId && t.id === item.taskId) {
-            updated = true
-            return { ...t, is_completed: newDone }
-          }
-          return t
-        }) })) }))
+        const newProjects = projects.map(p => ({
+          ...p, stages: (p.stages || []).map(s => ({
+            ...s, tasks: (s.tasks || []).map(t => {
+              if (item.subtaskId) {
+                // find subtask
+                const newSubtasks = (t.subtasks || []).map(st => st.id === item.subtaskId ? { ...st, is_completed: newDone } : st)
+                if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                return { ...t, subtasks: newSubtasks }
+              }
+              if (item.taskId && t.id === item.taskId) {
+                updated = true
+                return { ...t, is_completed: newDone }
+              }
+              return t
+            })
+          }))
+        }))
 
         if (updated) {
           setProjects(newProjects)
           // update today list to reflect new done status
-          const next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
+          let next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
+          next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
           setTodayItems(next)
           saveTodayItems(next)
           return
@@ -5701,19 +5718,19 @@ function AppContent() {
     setTodayItems(items)
     saveTodayItems(items)
   }
-  
+
   // Keep ref in sync
   useEffect(() => {
     notificationsRef.current = notifications
     // keep notifiedOverdueRef in sync for existing overdue notifications
     try {
       const set = new Set()
-      (notifications || []).forEach(n => {
-        if (n.type === 'task_overdue' && n.task_id) set.add(`task-${n.task_id}`)
-        if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
-      })
+        (notifications || []).forEach(n => {
+          if (n.type === 'task_overdue' && n.task_id) set.add(`task-${n.task_id}`)
+          if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
+        })
       notifiedOverdueRef.current = set
-    } catch (e) {}
+    } catch (e) { }
   }, [notifications])
 
   // Load notifications
@@ -5732,7 +5749,7 @@ function AppContent() {
             if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
           })
           notifiedOverdueRef.current = set
-        } catch (e) {}
+        } catch (e) { }
       } catch {
         setNotifications([])
       }
@@ -5750,7 +5767,7 @@ function AppContent() {
           if (n.type === 'subtask_overdue' && n.task_id && n.subtask_id) set.add(`subtask-${n.task_id}-${n.subtask_id}`)
         })
         notifiedOverdueRef.current = set
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
@@ -5764,14 +5781,14 @@ function AppContent() {
         // small delay so UI settles
         setTimeout(() => setWalkVisible(true), 700)
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [user])
 
   // Check for overdue tasks and create notifications
   const checkOverdueTasks = (projectsList, existingNotifications) => {
     const overdueTasks = []
     const overdueSubtasks = []
-    
+
     projectsList.forEach(project => {
       project.stages?.forEach((stage, stageIndex) => {
         stage.tasks?.forEach(task => {
@@ -5784,7 +5801,7 @@ function AppContent() {
               task
             })
           }
-          
+
           // Check subtasks
           task.subtasks?.forEach(subtask => {
             if (subtask.reminder_date && isOverdue(subtask.reminder_date) && !subtask.is_completed) {
@@ -5810,12 +5827,12 @@ function AppContent() {
         if (k.startsWith('subtask-') && currentSubtaskKeys.has(k)) keep.add(k)
       })
       notifiedOverdueRef.current = keep
-    } catch (e) {}
-    
+    } catch (e) { }
+
     // Create notifications for overdue items that don't already have one
     const newNotifications = []
     const existingNotifKeys = new Set(existingNotifications.map(n => `${n.type}-${n.task_id || ''}-${n.subtask_id || ''}`))
-    
+
     overdueTasks.forEach(({ project, task }) => {
       const key = `task-${task.id}`
       const existingKey = `task_overdue-${task.id}-`
@@ -5833,10 +5850,10 @@ function AppContent() {
           reminder_date: task.reminder_date
         })
         // mark as notified to avoid repeats
-        try { notifiedOverdueRef.current.add(key) } catch (e) {}
+        try { notifiedOverdueRef.current.add(key) } catch (e) { }
       }
     })
-    
+
     overdueSubtasks.forEach(({ project, task, subtask }) => {
       const key = `subtask-${task.id}-${subtask.id}`
       const existingKey = `subtask_overdue-${task.id}-${subtask.id}`
@@ -5853,25 +5870,25 @@ function AppContent() {
           created_at: new Date().toISOString(),
           reminder_date: subtask.reminder_date
         })
-        try { notifiedOverdueRef.current.add(key) } catch (e) {}
+        try { notifiedOverdueRef.current.add(key) } catch (e) { }
       }
     })
-    
+
     return newNotifications
   }
 
   // Effect to check for overdue tasks when projects change AND periodically
   useEffect(() => {
     if (projects.length === 0) return
-    
+
     const runOverdueCheck = async () => {
       const currentNotifications = notificationsRef.current
       const newOverdueNotifications = checkOverdueTasks(projects, currentNotifications)
-      
+
       if (newOverdueNotifications.length > 0) {
         const allNotifications = [...newOverdueNotifications, ...currentNotifications]
         setNotifications(allNotifications)
-        
+
         if (demoMode) {
           localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
         } else {
@@ -5885,13 +5902,13 @@ function AppContent() {
         }
       }
     }
-    
+
     // Run immediately
     runOverdueCheck()
-    
+
     // Also run every 30 seconds to catch newly overdue items
     const interval = setInterval(runOverdueCheck, 30000)
-    
+
     return () => clearInterval(interval)
   }, [projects, demoMode, user?.id])
 
@@ -6083,10 +6100,10 @@ function AppContent() {
   // Real-time sync subscription
   useEffect(() => {
     if (demoMode || !user || projects.length === 0) return
-    
+
     const projectIds = projects.map(p => p.id)
     let debounceTimer = null
-    
+
     const handleRealtimeChange = (payload) => {
       dlog('🔄 Realtime change detected:', payload.table, payload.eventType)
 
@@ -6129,9 +6146,9 @@ function AppContent() {
         loadNotifications()
       }, 500)
     }
-    
+
     const channel = db.subscribeToUserProjects(user.id, projectIds, handleRealtimeChange)
-    
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer)
       if (channel) db.unsubscribe(channel)
@@ -6227,8 +6244,8 @@ function AppContent() {
   return (
     <AppContext.Provider value={ctx}>
       <div className="min-h-screen pb-8">
-        <Header 
-          projects={projects} 
+        <Header
+          projects={projects}
           onSearchNavigate={handleSearchNavigate}
           notifications={notifications}
           onMarkNotificationRead={handleMarkNotificationRead}
@@ -6243,7 +6260,7 @@ function AppContent() {
         {view === 'main' && (
           <>
             <TabNav tab={activeTab} setTab={setActiveTab} />
-              {activeTab === 'projects' ? <ProjectsView /> : activeTab === 'today' ? <TodayView /> : <AllTasksView />}
+            {activeTab === 'projects' ? <ProjectsView /> : activeTab === 'today' ? <TodayView /> : <AllTasksView />}
           </>
         )}
         <Walkthrough
@@ -6256,11 +6273,11 @@ function AppContent() {
             { title: 'Tod(o)ay', body: 'Quickly pick today’s priorities or add fast local items.', selector: '#tab-today' }
           ]}
           visible={walkVisible}
-          onClose={() => { try { localStorage.setItem('researchos_walkthrough_seen_v1', '1') } catch (e) {}; setWalkVisible(false) }}
+          onClose={() => { try { localStorage.setItem('researchos_walkthrough_seen_v1', '1') } catch (e) { }; setWalkVisible(false) }}
         />
         {view === 'project' && <ProjectDetail />}
         {view === 'task' && <TaskDetail />}
-        
+
         {toast && (
           <div className="fixed bottom-20 right-6 z-50">
             <div className="px-4 py-2 bg-gray-900 text-white rounded-lg shadow-lg text-sm">{toast.message}</div>
