@@ -24,22 +24,23 @@ jobs:
         run: npm install
 
       - name: Set Version
+        run: npm version 1.0.0 --no-git-tag-version --allow-same-version
+
+      - name: Create Production Env File
         run: |
-          npm version 1.0.0 --no-git-tag-version --allow-same-version
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}" > .env.production
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}" >> .env.production
 
       - name: Build Web App
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
 
       - name: Clean Mac Detritus (Mac Only)
         if: matrix.os == 'macos-latest'
         run: xattr -cr src public electron dist index.html package.json
 
-      - name: Build Electron App (macOS Universal)
+      - name: Build Electron App (macOS)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --universal -p never
+        run: npx electron-builder --mac --universal --x64 --arm64 -p never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
