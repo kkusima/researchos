@@ -2,6 +2,8 @@
   "name": "researchos",
   "private": true,
   "version": "1.0.0",
+  "description": "Collaborative research project management",
+  "author": "Kenneth Kusima",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
