@@ -1697,8 +1697,10 @@ function TodayView() {
   }
   // Flatten tasks and subtasks with project context for the existing-task picker
   const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
-    const base = [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }]
-    const subs = (t.subtasks || []).map(st => ({ type: 'subtask', subtask: st, task: t, project: p, stage: s, stageIndex: si }))
+    // Only include non-completed tasks
+    const base = !t.is_completed ? [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }] : []
+    // Only include non-completed subtasks
+    const subs = (t.subtasks || []).filter(st => !st.is_completed).map(st => ({ type: 'subtask', subtask: st, task: t, project: p, stage: s, stageIndex: si }))
     return [...base, ...subs]
   })))
 
@@ -3396,20 +3398,27 @@ function ProjectDetail() {
   }
 
   // Sort tasks: overdue first, then by reminder date, then others
+  // Sort tasks: Completed at bottom, Newest active at top
   const sortedTasks = [...(stage?.tasks || [])].sort((a, b) => {
-    const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
-    const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
-
-    if (aOverdue && !bOverdue) return -1
-    if (!aOverdue && bOverdue) return 1
-
-    if (a.reminder_date && b.reminder_date) {
-      return new Date(a.reminder_date) - new Date(b.reminder_date)
+    // 1. Completion status: Incomplete first
+    if (a.is_completed !== b.is_completed) {
+      return a.is_completed ? 1 : -1 // Completed goes to bottom
     }
-    if (a.reminder_date) return -1
-    if (b.reminder_date) return 1
 
-    return 0
+    // 2. Overdue priority (only for incomplete tasks)
+    if (!a.is_completed) {
+      const aOverdue = isOverdue(a.reminder_date)
+      const bOverdue = isOverdue(b.reminder_date)
+      if (aOverdue !== bOverdue) {
+        return aOverdue ? -1 : 1 // Overdue goes to top
+      }
+    }
+
+    // 3. Sort by Created Date Descending (Newest first) for both active and completed
+    // This satisfies "New task should appear at the top"
+    const dateA = new Date(a.created_at || 0).getTime()
+    const dateB = new Date(b.created_at || 0).getTime()
+    return dateB - dateA
   })
 
   // Multi-select state for tasks
@@ -4910,7 +4919,7 @@ function TaskDetail() {
                           {isShared && s.created_by_name && ` by ${s.created_by === user?.id ? 'you' : s.created_by_name}`}
                         </span>
                       )}
-                      {s.updated_at && s.updated_at !== s.created_at && (
+                      {s.updated_at && (new Date(s.updated_at).getTime() > new Date(s.created_at).getTime() + 1000) && (
                         <span className="italic text-gray-300">
                           • Edited {formatRelativeDate(s.updated_at)}
                           {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
