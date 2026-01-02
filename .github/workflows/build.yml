@@ -35,7 +35,7 @@ jobs:
         run: xattr -cr src public electron dist index.html package.json
 
       - name: Build Electron App
-        run: npx electron-builder --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }}
+        run: npx electron-builder --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }} -p never
         env:
           # Using direct values since these are frontend keys meant to be bundled in the app
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
