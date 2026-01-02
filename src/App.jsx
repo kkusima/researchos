@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useRef } from 'react'
+import React, { useState, useEffect, createContext, useContext, useRef, useMemo } from 'react'
 import ReactDOM from 'react-dom'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
