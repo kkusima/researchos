@@ -4433,6 +4433,37 @@ function TaskDetail() {
     setIsSubtaskSelectionMode(false)
   }
 
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editingCommentContent, setEditingCommentContent] = useState('')
+
+  const startEditingComment = (comment) => {
+    setEditingCommentId(comment.id)
+    setEditingCommentContent(comment.content)
+  }
+
+  const saveCommentEdit = async (commentId) => {
+    if (!editingCommentContent.trim()) return
+    const now = new Date().toISOString()
+    const updatedComments = currentTask.comments.map(c =>
+      c.id === commentId
+        ? { ...c, content: editingCommentContent, updated_at: now }
+        : c
+    )
+    updateTask({ comments: updatedComments })
+    setEditingCommentId(null)
+
+    if (!demoMode) {
+      await db.updateComment(commentId, { content: editingCommentContent })
+    }
+  }
+
+  const deleteComment = async (commentId) => {
+    if (!window.confirm('Delete this comment?')) return
+    const updatedComments = currentTask.comments.filter(c => c.id !== commentId)
+    updateTask({ comments: updatedComments })
+    if (!demoMode) await db.deleteComment(commentId)
+  }
+
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
     const localId = uuid()
@@ -4824,18 +4855,68 @@ function TaskDetail() {
         <div className="glass-card rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Comments</h3>
           <div className="space-y-4 mb-4">
-            {currentTask.comments?.map(c => (
-              <div key={c.id} className="flex gap-3">
-                <div className="avatar text-xs flex-shrink-0">{c.user_name?.[0] || '?'}</div>
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{c.user_name}</div>
-                  <div className="text-sm text-gray-600 mt-1">{c.content}</div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {new Date(c.created_at).toLocaleString()}
+            {currentTask.comments?.map(c => {
+              const isOwner = c.user_id === user?.id
+              const isEditing = editingCommentId === c.id
+              const wasEdited = c.updated_at && c.created_at && c.updated_at !== c.created_at
+
+              return (
+                <div key={c.id} className="flex gap-3 group">
+                  <div className="avatar text-xs flex-shrink-0">{c.user_name?.[0] || '?'}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-gray-900">{c.user_name}</div>
+                      {isOwner && !isEditing && (
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startEditingComment(c)}
+                            className="p-1 text-gray-400 hover:text-blue-500"
+                            title="Edit"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          </button>
+                          <button
+                            onClick={() => deleteComment(c.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {isEditing ? (
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          value={editingCommentContent}
+                          onChange={e => setEditingCommentContent(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveCommentEdit(c.id)
+                            if (e.key === 'Escape') setEditingCommentId(null)
+                          }}
+                          className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-2 text-xs">
+                          <button onClick={() => saveCommentEdit(c.id)} className="text-blue-600 hover:underline font-medium">Save</button>
+                          <button onClick={() => setEditingCommentId(null)} className="text-gray-500 hover:underline">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{c.content}</div>
+                        <div className="text-xs text-gray-400 mt-1 flex gap-2">
+                          <span>{new Date(c.created_at).toLocaleString()}</span>
+                          {wasEdited && <span className="italic text-gray-300">• Edited {formatRelativeDate(c.updated_at)}</span>}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="flex gap-2">
             <input

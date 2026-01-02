@@ -650,6 +650,37 @@ export const db = {
     }
   },
 
+  async updateComment(id, updates) {
+    if (!supabase) return { data: null, error: null }
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) logError('updateComment', error)
+      return { data, error }
+    } catch (error) {
+      logError('updateComment:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  async deleteComment(id) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', id)
+      if (error) logError('deleteComment', error)
+      return { error }
+    } catch (error) {
+      logError('deleteComment:catch', error)
+      return { error }
+    }
+  },
+
+
+
   // Project sharing - share by email
   // If user exists, add them directly. If not, create an invitation.
   async shareProject(projectId, email, role = 'editor', invitedBy = null) {

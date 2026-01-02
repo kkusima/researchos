@@ -82,8 +82,21 @@ CREATE TABLE IF NOT EXISTS public.comments (
   task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Safe migration for existing tables
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'comments' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE public.comments ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END;
+$$;
 
 -- Notifications table
 CREATE TABLE IF NOT EXISTS public.notifications (
