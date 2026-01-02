@@ -15,13 +15,17 @@ const isValidSupabaseKey = (key) => {
 
 const hasValidConfig = supabaseUrl && supabaseAnonKey && isValidSupabaseKey(supabaseAnonKey)
 
-devLog('🔧 Supabase config present:', { url: !!supabaseUrl, keyLooksValid: isValidSupabaseKey(supabaseAnonKey), mode: hasValidConfig ? 'LIVE' : 'DEMO' })
+// ALWAYS log basic config info in production to help debug injection issues
+console.log('🔗 Supabase Config Check:', {
+  urlPrefix: supabaseUrl ? supabaseUrl.substring(0, 20) + '...' : 'MISSING',
+  keyPrefix: supabaseAnonKey ? supabaseAnonKey.substring(0, 10) + '...' : 'MISSING',
+  keyLength: supabaseAnonKey ? supabaseAnonKey.length : 0,
+  isValid: hasValidConfig,
+  mode: import.meta.env.MODE
+})
 
 if (!hasValidConfig) {
   devWarn('⚠️ Supabase credentials missing or invalid. Running in demo mode.')
-  if (supabaseAnonKey && !isValidSupabaseKey(supabaseAnonKey)) {
-    devWarn('⚠️ Your VITE_SUPABASE_ANON_KEY does not look like a valid Supabase key. (dev only)')
-  }
 }
 
 export const supabase = hasValidConfig
