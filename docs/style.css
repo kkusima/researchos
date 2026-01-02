@@ -57,27 +57,7 @@
     --transition-slow: 400ms ease;
 }
 
-/* Dark Mode */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --color-bg: #000000;
-        --color-bg-secondary: #1d1d1f;
-        --color-bg-tertiary: #0d0d0d;
-        --color-text-primary: #f5f5f7;
-        --color-text-secondary: #a1a1a6;
-        --color-text-tertiary: #6e6e73;
-        --color-accent: #86868b;
-        --color-accent-hover: #a1a1a6;
-        --color-btn-text: #000000;
-        --color-border: rgba(255, 255, 255, 0.1);
-        --color-card-bg: rgba(29, 29, 31, 0.8);
-        --color-card-border: rgba(255, 255, 255, 0.06);
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-        --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
-        --shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.5);
-    }
-}
+/* No dark mode - always light theme */
 
 /* Reset & Base */
 *,
@@ -160,11 +140,7 @@ h6 {
     border-bottom: 1px solid var(--color-border);
 }
 
-@media (prefers-color-scheme: dark) {
-    .nav {
-        background-color: rgba(0, 0, 0, 0.72);
-    }
-}
+/* Nav always light */
 
 .nav__inner {
     display: flex;
@@ -296,27 +272,38 @@ h6 {
 }
 
 .btn--primary {
-    background: var(--color-accent);
-    color: var(--color-btn-text);
+    background: rgba(120, 120, 128, 0.2);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #1d1d1f;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .btn--primary:hover {
-    background: var(--color-accent-hover);
-    color: var(--color-btn-text);
+    background: rgba(120, 120, 128, 0.32);
+    color: #1d1d1f;
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .btn--secondary {
-    background: transparent;
-    color: var(--color-accent);
-    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #1d1d1f;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .btn--secondary:hover {
-    background: var(--color-bg-secondary);
-    color: var(--color-accent);
+    background: rgba(255, 255, 255, 0.8);
+    color: #1d1d1f;
     transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .btn--large {
