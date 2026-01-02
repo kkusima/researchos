@@ -4405,6 +4405,20 @@ function TaskDetail() {
     setLocalDescription(currentTask?.description || '')
   }, [currentTask?.id, currentTask?.description])
 
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
+
+  const saveDescription = async () => {
+    if (localDescription !== currentTask.description) {
+      await updateTask({ description: localDescription })
+    }
+    setIsEditingDescription(false)
+  }
+
+  const cancelDescriptionEdit = () => {
+    setLocalDescription(currentTask?.description || '')
+    setIsEditingDescription(false)
+  }
+
   const toggleSubtaskSelection = (subtaskId, e) => {
     e?.stopPropagation()
     const newSelected = new Set(selectedSubtaskIds)
@@ -4703,18 +4717,59 @@ function TaskDetail() {
 
         {/* Description */}
         <div className="glass-card rounded-xl p-4 sm:p-5">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Description</h3>
-          <textarea
-            value={localDescription}
-            onChange={e => setLocalDescription(e.target.value)}
-            onBlur={() => {
-              if (localDescription !== currentTask.description) {
-                updateTask({ description: localDescription })
-              }
-            }}
-            placeholder="Add a description..."
-            className="w-full min-h-[100px] bg-transparent resize-y outline-none text-gray-700"
-          />
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Description</h3>
+            {!isEditingDescription && (
+              <button
+                onClick={() => setIsEditingDescription(true)}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Edit Description"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+              </button>
+            )}
+          </div>
+
+          {isEditingDescription ? (
+            <div className="space-y-3">
+              <textarea
+                value={localDescription}
+                onChange={e => setLocalDescription(e.target.value)}
+                placeholder="Add a description..."
+                className="w-full min-h-[100px] bg-white border border-gray-200 rounded-lg p-3 resize-y outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-gray-700"
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={cancelDescriptionEdit}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveDescription}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 rounded-lg shadow-sm transition-all"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="group">
+              <div
+                className={`text-gray-700 whitespace-pre-wrap ${!currentTask.description ? 'text-gray-400 italic' : ''}`}
+                onDoubleClick={() => setIsEditingDescription(true)}
+              >
+                {currentTask.description || 'No description provided.'}
+              </div>
+              {currentTask.updated_at && (
+                <div className="mt-3 text-xs text-gray-400 border-t border-gray-100 pt-2 flex items-center gap-1">
+                  <span>Modified {formatRelativeDate(currentTask.updated_at)}</span>
+                  {isShared && currentTask.modified_by_name && <span>by {currentTask.modified_by === user?.id ? 'you' : currentTask.modified_by_name}</span>}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Subtasks */}
