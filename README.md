@@ -2,12 +2,12 @@
 
 A modern, collaborative research project management application designed for researchers, academics, and teams working on complex projects.
 
-![ResearchOS](https://img.shields.io/badge/version-1.0.2-blue)
+![ResearchOS](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 🔗 **Live App**: [researchos.vercel.app](https://researchos.vercel.app/)
 
-### 🖥️ Desktop Apps (v1.0.0)
+### 🖥️ Desktop Apps 
 Get the native experience for your workstation:
 *   🍎 **macOS**: [Download .dmg](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055714) (~101 MB)
 *   🪟 **Windows**: [Download .exe](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055096) (~112 MB)
