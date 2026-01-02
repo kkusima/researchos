@@ -1892,7 +1892,12 @@ function ProjectsView() {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
       setSortOption(newOption)
-      setSortDirection('asc')
+      // Default to descending for time-based sorts so the newest/most recent is first
+      if (newOption === 'created' || newOption === 'modified') {
+        setSortDirection('desc')
+      } else {
+        setSortDirection('asc')
+      }
     }
   }
 
@@ -4748,7 +4753,7 @@ function TaskDetail() {
                 </button>
                 <button
                   onClick={saveDescription}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 rounded-lg shadow-sm transition-all"
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-lg shadow-sm transition-all"
                 >
                   Save
                 </button>
@@ -4842,51 +4847,74 @@ function TaskDetail() {
                       {s.is_completed && <Check className="w-3 h-3" />}
                     </button>
                   )}
-                  <div className="flex-1 min-w-0">
-                    {editingSubtaskId === s.id ? (
-                      <input
-                        type="text"
-                        value={editingSubtaskTitle}
-                        onChange={e => setEditingSubtaskTitle(e.target.value)}
-                        onBlur={() => updateSubtaskTitle(s.id, editingSubtaskTitle)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') updateSubtaskTitle(s.id, editingSubtaskTitle)
-                          if (e.key === 'Escape') setEditingSubtaskId(null)
-                        }}
-                        className="w-full bg-white rounded px-1 py-0.5 border border-gray-300 text-sm"
-                        autoFocus
-                        onClick={e => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span
-                        className={`text-sm ${s.is_completed ? 'line-through text-gray-400 cursor-default' : subtaskOverdue ? 'text-red-700' : 'cursor-pointer'}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (!s.is_completed) {
-                            setEditingSubtaskId(s.id)
-                            setEditingSubtaskTitle(s.title)
-                          }
-                        }}
-                      >
-                        {s.title}
-                      </span>
-                    )}
-                    {/* Timestamp & Attribution Row */}
-                    <div className="text-[10px] text-gray-400 mt-1 flex flex-wrap items-center gap-2">
+                  <div className="flex-1 min-w-0 group">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 mr-2">
+                        {editingSubtaskId === s.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editingSubtaskTitle}
+                              onChange={e => setEditingSubtaskTitle(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') updateSubtaskTitle(s.id, editingSubtaskTitle)
+                                if (e.key === 'Escape') setEditingSubtaskId(null)
+                              }}
+                              className="flex-1 bg-white rounded px-2 py-1 border border-gray-300 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                              autoFocus
+                              onClick={e => e.stopPropagation()}
+                            />
+                            <button onClick={() => updateSubtaskTitle(s.id, editingSubtaskTitle)} className="text-xs font-medium text-blue-600 hover:text-blue-700">Save</button>
+                            <button onClick={() => setEditingSubtaskId(null)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                              {s.title}
+                            </span>
+                            {/* Edit/Delete Actions (Hidden by default, shown on group hover) */}
+                            {!isSubtaskSelectionMode && !s.is_completed && (
+                              <div className="hidden group-hover:flex items-center gap-1 opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingSubtaskId(s.id)
+                                    setEditingSubtaskTitle(s.title)
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50"
+                                  title="Edit"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    deleteSubtask(s.id)
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Timestamp & Attribution Row (Styled like comments) */}
+                    <div className="text-xs text-gray-400 mt-1 flex flex-wrap items-center gap-2">
                       {s.created_at && (
                         <span title={new Date(s.created_at).toLocaleString()}>
-                          Created {formatRelativeDate(s.created_at)}
+                          {formatRelativeDate(s.created_at)}
                           {isShared && s.created_by_name && ` by ${s.created_by === user?.id ? 'you' : s.created_by_name}`}
                         </span>
                       )}
                       {s.updated_at && s.updated_at !== s.created_at && (
-                        <>
-                          <span>•</span>
-                          <span title={new Date(s.updated_at).toLocaleString()}>
-                            Modified {formatRelativeDate(s.updated_at)}
-                            {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
-                          </span>
-                        </>
+                        <span className="italic text-gray-300">
+                          • Edited {formatRelativeDate(s.updated_at)}
+                          {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -5039,7 +5067,11 @@ function AllTasksView() {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
       setSortOption(newOption)
-      setSortDirection('asc')
+      if (newOption === 'created' || newOption === 'modified') {
+        setSortDirection('desc')
+      } else {
+        setSortDirection('asc')
+      }
     }
   }
 
@@ -5861,76 +5893,98 @@ function AppContent() {
     const item = todayItems.find(i => i.id === id)
     if (!item) return
 
-    // Local-only today item
-    if (item.isLocal) {
-      let next = todayItems.map(i => i.id === id ? { ...i, is_done: !i.is_done } : i)
-      next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
-      setTodayItems(next)
-      saveTodayItems(next)
-      return
-    }
-
-    // Linked to a task or subtask in the DB — persist change
     const currentlyDone = !!item.is_done
     const newDone = !currentlyDone
 
-    try {
-      // If running in demo mode, update the in-memory `projects` state instead
-      if (demoMode) {
-        let updated = false
-        const newProjects = projects.map(p => ({
-          ...p, stages: (p.stages || []).map(s => ({
-            ...s, tasks: (s.tasks || []).map(t => {
-              if (item.subtaskId) {
-                // find subtask
-                const newSubtasks = (t.subtasks || []).map(st => st.id === item.subtaskId ? { ...st, is_completed: newDone } : st)
-                if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-                return { ...t, subtasks: newSubtasks }
-              }
-              if (item.taskId && t.id === item.taskId) {
-                updated = true
-                return { ...t, is_completed: newDone }
-              }
-              return t
-            })
-          }))
-        }))
+    // 1. Optimistically update Today items
+    let next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
+    // Sort completed items to bottom
+    next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
 
-        if (updated) {
-          setProjects(newProjects)
-          // update today list to reflect new done status
-          let next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
-          next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
-          setTodayItems(next)
-          saveTodayItems(next)
-          return
+    setTodayItems(next)
+    saveTodayItems(next)
+
+    // 2. If it's a local-only item, we are done
+    if (item.isLocal) return
+
+    // 3. For linked items, update the Projects state (for both Demo and Real modes)
+    // This ensures "Modified" and "Completion" status is reflected immediately in Project views
+    const now = new Date().toISOString()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
+    const userId = user?.id
+
+    let projectsUpdated = false
+    const newProjects = projects.map(p => {
+      // Deep map to find the task/subtask and update it
+      let projectChanged = false
+      const newStages = (p.stages || []).map(s => {
+        const newTasks = (s.tasks || []).map(t => {
+          // Case A: Linked Task
+          if (item.taskId && t.id === item.taskId) {
+            projectChanged = true
+            return {
+              ...t,
+              is_completed: newDone,
+              updated_at: now,
+              modified_by: userId,
+              modified_by_name: userName
+            }
+          }
+          // Case B: Linked Subtask (Task is parent)
+          if (item.subtaskId && t.subtasks && t.subtasks.some(st => st.id === item.subtaskId)) {
+            // Sync the subtask state locally
+            const newSubtasks = t.subtasks.map(st =>
+              st.id === item.subtaskId ? { ...st, is_completed: newDone, updated_at: now } : st
+            )
+            projectChanged = true
+            // Note: updating subtask updates task's updated_at too logic-wise
+            return {
+              ...t,
+              subtasks: newSubtasks,
+              updated_at: now,
+              modified_by: userId,
+              modified_by_name: userName
+            }
+          }
+          return t
+        })
+        return { ...s, tasks: newTasks }
+      })
+
+      if (projectChanged) {
+        projectsUpdated = true
+        return {
+          ...p,
+          stages: newStages,
+          updated_at: now,
+          modified_by: userId,
+          modified_by_name: userName
         }
-        // if not found, fall through to attempt server update
       }
+      return p
+    })
 
+    if (projectsUpdated) {
+      setProjects(newProjects)
+      if (demoMode) saveLocal(newProjects)
+    }
+
+    // 4. Server Update (Real Mode)
+    if (!demoMode) {
       if (item.subtaskId) {
-        const { data, error } = await db.updateSubtask(item.subtaskId, { is_completed: newDone })
+        const { error } = await db.updateSubtask(item.subtaskId, { is_completed: newDone })
         if (error) {
           dwarn('Failed to update subtask completion:', error)
           showToast('Failed to update subtask')
-          return
         }
       } else if (item.taskId) {
-        const { data, error } = await db.updateTask(item.taskId, { is_completed: newDone })
+        const { error } = await db.updateTask(item.taskId, { is_completed: newDone })
         if (error) {
           dwarn('Failed to update task completion:', error)
           showToast('Failed to update task')
-          return
         }
       }
-
-      // Update local today item to reflect new state
-      const next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
-      setTodayItems(next)
-      saveTodayItems(next)
-    } catch (e) {
-      dwarn('toggleTodayDone error', e)
-      showToast('Error updating completion')
+      // Note: We don't force-fetch getProjects here because we optimistically updated
     }
   }
 

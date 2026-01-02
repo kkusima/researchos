@@ -513,7 +513,7 @@ export const db = {
       devLog('📝 Updating subtask:', id, updates)
       const { data, error } = await supabase
         .from('subtasks')
-        .update(updates)
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()
