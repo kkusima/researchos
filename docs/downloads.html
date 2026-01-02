@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downloads — ResearchOS</title>
+    <meta name="description"
+        content="Download ResearchOS for macOS and Windows. Get the native desktop experience for your research project management.">
+
+    <!-- Favicon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container nav__inner">
+            <a href="index.html" class="nav__logo">
+                <span class="nav__logo-icon">🔬</span>
+                <span>ResearchOS</span>
+            </a>
+            <div class="nav__links">
+                <a href="index.html#features" class="nav__link">Features</a>
+                <a href="downloads.html" class="nav__link">Downloads</a>
+                <a href="https://github.com/kkusima/researchos" class="nav__link" target="_blank"
+                    rel="noopener">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Downloads Hero -->
+    <section class="downloads-hero">
+        <div class="container">
+            <h1 class="downloads-hero__title">Download ResearchOS</h1>
+            <p class="downloads-hero__subtitle">
+                Get the native desktop experience.<br>Available for macOS and Windows.
+            </p>
+        </div>
+    </section>
+
+    <!-- Platform Cards -->
+    <section class="platforms">
+        <div class="container">
+            <div class="platforms__grid">
+                <!-- macOS -->
+                <div class="platform-card">
+                    <div class="platform-card__icon">🍎</div>
+                    <h2 class="platform-card__name">macOS</h2>
+                    <p class="platform-card__version">Version 1.0.0 • Universal (Intel + Apple Silicon)</p>
+                    <a href="https://github.com/kkusima/researchos/releases/latest/download/ResearchOS-v1.0.0-macos-14.zip"
+                        class="btn btn--primary btn--large" target="_blank" rel="noopener">
+                        Download .zip
+                    </a>
+                    <p class="platform-card__info">
+                        Requires macOS 10.15 or later
+                    </p>
+                </div>
+
+                <!-- Windows -->
+                <div class="platform-card">
+                    <div class="platform-card__icon">🪟</div>
+                    <h2 class="platform-card__name">Windows</h2>
+                    <p class="platform-card__version">Version 1.0.0 • 64-bit</p>
+                    <a href="https://github.com/kkusima/researchos/releases/latest/download/ResearchOS-v1.0.0-windows-latest.zip"
+                        class="btn btn--primary btn--large" target="_blank" rel="noopener">
+                        Download .zip
+                    </a>
+                    <p class="platform-card__info">
+                        Requires Windows 10 or later
+                    </p>
+                </div>
+            </div>
+
+            <!-- Release Note -->
+            <div class="release-note">
+                <h3 class="release-note__title">Looking for a specific version?</h3>
+                <p class="release-note__text">
+                    View all releases on <a href="https://github.com/kkusima/researchos/releases" target="_blank"
+                        rel="noopener">GitHub Releases</a>.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Prefer Web? -->
+    <section class="cta">
+        <div class="container">
+            <h2 class="cta__title">Prefer the browser?</h2>
+            <p class="cta__subtitle">
+                Use ResearchOS directly in your web browser. No download required.
+            </p>
+            <div class="hero__actions">
+                <a href="https://researchos.vercel.app/" class="btn btn--primary btn--large" target="_blank"
+                    rel="noopener">
+                    Launch Web App
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer__content">
+            <div class="footer__links">
+                <a href="https://github.com/kkusima/researchos" class="footer__link" target="_blank"
+                    rel="noopener">GitHub</a>
+                <a href="downloads.html" class="footer__link">Downloads</a>
+                <a href="https://researchos.vercel.app/" class="footer__link" target="_blank" rel="noopener">Web App</a>
+            </div>
+            <p class="footer__copyright">
+                © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener">Kenneth Kusima</a>. All
+                rights reserved.
+            </p>
+        </div>
+    </footer>
+</body>
+
+</html>

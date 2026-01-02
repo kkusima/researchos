@@ -6,3 +6,4 @@ dist_electron/*
 !dist_electron/*.exe
 .env
 .DS_Store
+desktopapps/
