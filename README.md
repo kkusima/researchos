@@ -44,7 +44,32 @@ ResearchOS is a lightweight project management tool built specifically for resea
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: Supabase (PostgreSQL + Auth + Real-time)
 - **Hosting**: Vercel
-- **Desktop App development**: Electron
+- **Desktop App**: Electron
+
+## Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/kkusima/researchos.git
+cd researchos
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Add your Supabase credentials to .env
+
+# Run development server
+npm run dev
+```
+
+## Environment Variables
+
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
 ## License
 
