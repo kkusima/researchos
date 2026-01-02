@@ -17,7 +17,7 @@ Get the native experience for your workstation:
 
 ## What is ResearchOS?
 
-ResearchOS is a lightweight project management tool built specifically for research workflows. It helps you organize projects into customizable stages, track tasks with subtasks, and collaborate with team members in real-time.
+ResearchOS is a lightweight project management tool built specifically for research workflows. Created to address the pain point of needing a simple, practical tool for everyday research work, it allows users to create projects, collaborate in shared workspaces, and keep project information synchronized in real time, without unnecessary complexity. The tool is free to use and focuses on a straightforward, intuitive UI that centralizes tasks and project data to support core research workflows in a single interface.
 
 ![v1GIF.gif](v1GIF.gif)
 
