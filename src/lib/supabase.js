@@ -98,6 +98,10 @@ export const db = {
                 *,
                 creator:users!created_by (name, email),
                 modifier:users!modified_by (name, email)
+              ),
+              comments (
+                *,
+                user:users!user_id (name, email)
               )
             )
           ),
@@ -146,11 +150,19 @@ export const db = {
                     modified_by_name: st.modifier?.name || st.modifier?.email
                   }))
 
+                const comments = (task.comments || [])
+                  .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                  .map(c => ({
+                    ...c,
+                    user_name: c.user?.name || c.user?.email || 'Unknown'
+                  }))
+
                 return {
                   ...task,
                   created_by_name: task.creator?.name || task.creator?.email,
                   modified_by_name: task.modifier?.name || task.modifier?.email,
-                  subtasks
+                  subtasks,
+                  comments
                 }
               })
             return { ...stage, tasks }
