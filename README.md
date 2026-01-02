@@ -5,12 +5,13 @@ A modern, collaborative research project management application designed for res
 ![ResearchOS](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-🔗 **Live App**: [researchos.vercel.app](https://researchos.vercel.app/)
+🔗 **Live WebApp**: [researchos.vercel.app](https://researchos.vercel.app/)
 
-### 🖥️ Desktop Apps 
+
+### 🖥️  Desktop Apps 
 Get the native experience for your workstation:
-*   🍎 **macOS**: [Download .dmg](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055714) (~101 MB)
-*   🪟 **Windows**: [Download .exe](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055096) (~112 MB)
+*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055714) (~101 MB)
+*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/researchos/actions/runs/20651462520/artifacts/5006055096) (~112 MB)
 
 ## What is ResearchOS?
 
@@ -44,32 +45,8 @@ ResearchOS is a lightweight project management tool built specifically for resea
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: Supabase (PostgreSQL + Auth + Real-time)
 - **Hosting**: Vercel
-- **Desktop App**: Electron
+- **Desktop App Development**: Electron
 
-## Getting Started
-
-```bash
-# Clone the repository
-git clone https://github.com/kkusima/researchos.git
-cd researchos
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Add your Supabase credentials to .env
-
-# Run development server
-npm run dev
-```
-
-## Environment Variables
-
-```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
 
 ## License
 
