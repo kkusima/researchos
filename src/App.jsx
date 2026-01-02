@@ -4505,7 +4505,7 @@ function TaskDetail() {
 
     updateTask({
       subtasks: currentTask.subtasks.map(s =>
-        s.id === subtaskId ? { ...s, title: newTitle } : s
+        s.id === subtaskId ? { ...s, title: newTitle, updated_at: new Date().toISOString() } : s
       )
     })
 
@@ -4519,7 +4519,7 @@ function TaskDetail() {
     const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
       subtasks: currentTask.subtasks.map(s =>
-        s.id === subtaskId ? { ...s, is_completed: !s.is_completed } : s
+        s.id === subtaskId ? { ...s, is_completed: !s.is_completed, updated_at: new Date().toISOString() } : s
       )
     })
 
@@ -4532,7 +4532,7 @@ function TaskDetail() {
     const subtask = currentTask.subtasks?.find(s => s.id === subtaskId)
     updateTask({
       subtasks: currentTask.subtasks.map(s =>
-        s.id === subtaskId ? { ...s, reminder_date: reminderDate, modified_by: user?.id, modified_by_name: userName } : s
+        s.id === subtaskId ? { ...s, reminder_date: reminderDate, modified_by: user?.id, modified_by_name: userName, updated_at: new Date().toISOString() } : s
       )
     })
 
@@ -4575,8 +4575,12 @@ function TaskDetail() {
 
   const deleteTask = async () => {
     if (!window.confirm('Delete this task?')) return
+    const now = new Date().toISOString()
     const updated = {
       ...project,
+      updated_at: now,
+      modified_by: user?.id,
+      modified_by_name: userName,
       stages: project.stages.map((s, i) =>
         i === stageIndex ? { ...s, tasks: s.tasks.filter(t => t.id !== task.id) } : s
       )
