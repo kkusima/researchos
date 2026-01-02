@@ -10,31 +10,30 @@ CREATE TABLE IF NOT EXISTS public.users (
   email TEXT UNIQUE NOT NULL,
   name TEXT,
   avatar_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Projects table
 CREATE TABLE IF NOT EXISTS public.projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  owner_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  emoji TEXT DEFAULT '🧪',
-  priority_rank INTEGER DEFAULT 2,
-  current_stage_index INTEGER DEFAULT 0,
-  publication_target TEXT,
+  emoji TEXT DEFAULT '🚀',
+  owner_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
+  priority_rank INTEGER DEFAULT 999,
+  current_stage_index INTEGER DEFAULT 0,
+  modified_by UUID REFERENCES public.users(id),
+  archived BOOLEAN DEFAULT FALSE
 );
 
--- Project members (for sharing)
+-- Project Members table (for sharing)
 CREATE TABLE IF NOT EXISTS public.project_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'editor', -- 'viewer', 'editor', 'admin'
-  priority_rank INTEGER DEFAULT 999, -- User-specific priority for this shared project
+  role TEXT DEFAULT 'editor', -- 'editor', 'viewer'
+  priority_rank INTEGER DEFAULT 999, -- Personal priority for this user
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(project_id, user_id)
 );
@@ -54,13 +53,13 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   stage_id UUID NOT NULL REFERENCES public.stages(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
+  order_index INTEGER DEFAULT 0,
   is_completed BOOLEAN DEFAULT FALSE,
   reminder_date TIMESTAMPTZ,
-  order_index INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
+  created_by UUID REFERENCES public.users(id),
+  modified_by UUID REFERENCES public.users(id)
 );
 
 -- Subtasks table
@@ -73,8 +72,8 @@ CREATE TABLE IF NOT EXISTS public.subtasks (
   order_index INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  modified_by UUID REFERENCES public.users(id) ON DELETE SET NULL
+  created_by UUID REFERENCES public.users(id),
+  modified_by UUID REFERENCES public.users(id)
 );
 
 -- Comments table
@@ -159,6 +158,67 @@ ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.today_items ENABLE ROW LEVEL SECURITY;
 
--- Note: All policies and triggers from original schema should remain.
--- (For brevity, I am not repeating all policies here, but users should run the full schema if starting fresh.
--- If updating, just run the CREATE INDEX commands.)
+-- 
+-- TRIGGERS & FUNCTIONS FOR AUTOMATIC TIMESTAMP UPDATES
+--
+
+-- Function to handle project timestamp updates
+CREATE OR REPLACE FUNCTION public.handle_project_updated_at()
+RETURNS TRIGGER AS $$
+DECLARE
+  project_id_val UUID;
+  user_id_val UUID;
+BEGIN
+  -- Determine project_id and user_id based on table
+  IF TG_TABLE_NAME = 'tasks' THEN
+    IF (TG_OP = 'DELETE') THEN
+       SELECT project_id INTO project_id_val FROM public.stages WHERE id = OLD.stage_id;
+       user_id_val := OLD.modified_by; 
+    ELSE
+       SELECT project_id INTO project_id_val FROM public.stages WHERE id = NEW.stage_id;
+       user_id_val := NEW.modified_by;
+    END IF;
+  ELSIF TG_TABLE_NAME = 'subtasks' THEN
+     IF (TG_OP = 'DELETE') THEN
+       SELECT s.project_id INTO project_id_val 
+       FROM public.stages s
+       JOIN public.tasks t ON t.stage_id = s.id
+       WHERE t.id = OLD.task_id;
+       user_id_val := OLD.modified_by;
+     ELSE
+       SELECT s.project_id INTO project_id_val 
+       FROM public.stages s
+       JOIN public.tasks t ON t.stage_id = s.id
+       WHERE t.id = NEW.task_id;
+       user_id_val := NEW.modified_by;
+     END IF;
+  END IF;
+
+  -- Update Project
+  IF project_id_val IS NOT NULL THEN
+    UPDATE public.projects 
+    SET updated_at = NOW(), 
+        modified_by = user_id_val
+    WHERE id = project_id_val;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop existing triggers if any to avoid errors
+DROP TRIGGER IF EXISTS on_task_change ON public.tasks;
+DROP TRIGGER IF EXISTS on_subtask_change ON public.subtasks;
+
+-- Create Triggers
+CREATE TRIGGER on_task_change
+  AFTER INSERT OR UPDATE OR DELETE ON public.tasks
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
+
+CREATE TRIGGER on_subtask_change
+  AFTER INSERT OR UPDATE OR DELETE ON public.subtasks
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_project_updated_at();
+
+-- Policies (examples, ensure specific policies match your auth requirements)
+-- Users can see their own data and shared projects data
+-- ... (Existing policies assumed to be managed via Supabase UI or earlier scripts)
