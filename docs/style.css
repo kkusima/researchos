@@ -518,12 +518,7 @@ h6 {
     border-color: var(--color-border);
 }
 
-/* .platform-card__icon {
-    font-size: 4rem;
-    margin-bottom: var(--space-lg);
-} */
 
-/* Icon container */
 .platform-card__icon {
     width: 64px;
     height: 64px;
@@ -535,9 +530,9 @@ h6 {
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 0.65rem;
 }
 
-/* SVG */
 .platform-card__icon img {
     width: 28px;
     height: 28px;
