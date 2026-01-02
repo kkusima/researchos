@@ -30,9 +30,9 @@ jobs:
       - name: Build Electron App
         run: npm run electron:build
         env:
-          # These will need to be added to GitHub Secrets in your repo settings
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Using direct values since these are frontend keys meant to be bundled in the app
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2pyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
           # Skip code signing in CI for now to ensure builds complete
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
