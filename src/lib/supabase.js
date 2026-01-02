@@ -26,13 +26,13 @@ if (!hasValidConfig) {
 
 export const supabase = hasValidConfig
   ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        flowType: 'pkce',
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true
-      }
-    })
+    auth: {
+      flowType: 'pkce',
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  })
   : null
 
 // Helper to log errors (dev only)
@@ -46,211 +46,133 @@ export const db = {
   // Projects - Get owned AND shared projects
   async getProjects(userId) {
     if (!supabase) return { data: [], error: null }
-    
+
     try {
       devLog('📦 Loading projects for user:', userId)
-      
-      // Get projects where user is owner OR member
-      // First get owned projects
-      const { data: ownedProjects, error: ownedError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('owner_id', userId)
-      
-      if (ownedError) {
-        logError('getOwnedProjects', ownedError)
-      }
 
-      // Then get projects where user is a member (including their personal priority)
-      // Try with priority_rank first, fall back to just project_id if column doesn't exist
-      let membershipData = null
-      let memberError = null
-      
-      const { data: memberData, error: memberErr } = await supabase
+      // 1. Get List of Project IDs (Owned + Shared) efficiently
+      // We do two small queries to get the IDs, then one distinct list
+
+      const { data: owned, error: ownedErr } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('owner_id', userId)
+
+      if (ownedErr) logError('getOwnedIDs', ownedErr)
+
+      const { data: member, error: memberErr } = await supabase
         .from('project_members')
         .select('project_id, priority_rank')
         .eq('user_id', userId)
-      
-      if (memberErr) {
-        // If error mentions priority_rank column, try without it
-        if (memberErr.message?.includes('priority_rank') || memberErr.code === 'PGRST204') {
-          devWarn('⚠️ priority_rank column not found, falling back to basic query')
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('project_members')
-            .select('project_id')
-            .eq('user_id', userId)
-          membershipData = fallbackData
-          memberError = fallbackError
-        } else {
-          memberError = memberErr
-        }
-      } else {
-        membershipData = memberData
-      }
-      
-      if (memberError) {
-        logError('getMemberships', memberError)
+
+      if (memberErr && !memberErr.message?.includes('priority_rank')) {
+        logError('getMemberIDs', memberErr)
       }
 
-      // Get shared projects
-      let sharedProjects = []
-      if (membershipData && membershipData.length > 0) {
-        const sharedProjectIds = membershipData.map(m => m.project_id)
-        const { data: shared, error: sharedError } = await supabase
-          .from('projects')
-          .select('*')
-          .in('id', sharedProjectIds)
-        
-        if (sharedError) {
-          logError('getSharedProjects', sharedError)
-        } else {
-          sharedProjects = shared || []
-        }
-      }
+      const projectIds = new Set([
+        ...(owned || []).map(p => p.id),
+        ...(member || []).map(m => m.project_id)
+      ])
 
-      // Combine and deduplicate
-      // Build a map of member priorities for shared projects
-      const memberPriorityMap = new Map()
-      if (membershipData) {
-        membershipData.forEach(m => memberPriorityMap.set(m.project_id, m.priority_rank))
-      }
-      
-      const allProjectsMap = new Map()
-      ;(ownedProjects || []).forEach(p => {
-        allProjectsMap.set(p.id, { ...p, isOwner: true })
-      })
-      sharedProjects.forEach(p => {
-        if (!allProjectsMap.has(p.id)) {
-          // Use member's personal priority if set, otherwise use project's priority
-          const memberPriority = memberPriorityMap.get(p.id)
-          const effectivePriority = (memberPriority !== null && memberPriority !== undefined && memberPriority !== 999) 
-            ? memberPriority 
-            : p.priority_rank
-          allProjectsMap.set(p.id, { ...p, isOwner: false, priority_rank: effectivePriority, _memberPriority: memberPriority })
-        }
-      })
-      
-      const projects = Array.from(allProjectsMap.values())
-        .sort((a, b) => a.priority_rank - b.priority_rank)
-
-      if (projects.length === 0) {
+      if (projectIds.size === 0) {
         devLog('📦 No projects found')
         return { data: [], error: null }
       }
 
-      devLog(`📦 Found ${projects.length} projects (${ownedProjects?.length || 0} owned, ${sharedProjects.length} shared), loading details...`)
-
-      // Then get related data for each project
-      const projectsWithData = await Promise.all(
-        projects.map(async (project) => {
-          // Get stages
-          const { data: stages, error: stagesError } = await supabase
-            .from('stages')
-            .select('*')
-            .eq('project_id', project.id)
-            .order('order_index', { ascending: true })
-          
-          if (stagesError) {
-            logError('getStages', stagesError)
-            return { ...project, stages: [], project_members: [] }
-          }
-
-          // Get tasks for each stage
-          const stagesWithTasks = await Promise.all(
-            (stages || []).map(async (stage) => {
-              const { data: tasks } = await supabase
-                .from('tasks')
-                .select('*')
-                .eq('stage_id', stage.id)
-                .order('order_index', { ascending: true })
-              
-              // Get subtasks for each task
-              const tasksWithSubtasks = await Promise.all(
-                (tasks || []).map(async (task) => {
-                  const { data: subtasks } = await supabase
-                    .from('subtasks')
-                    .select('*')
-                    .eq('task_id', task.id)
-                    .order('order_index', { ascending: true })
-                  
-                  return { ...task, subtasks: subtasks || [] }
-                })
-              )
-
-              return { ...stage, tasks: tasksWithSubtasks }
-            })
-          )
-
-          // Get project members with user info
-          const { data: members } = await supabase
-            .from('project_members')
-            .select(`
+      // 2. Deep Fetch Everything in ONE Query
+      // We fetch projects with all nested relations. 
+      // Note: We rename joined user tables to avoid collisions and semantic clarity.
+      const { data: bulkData, error: bulkError } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          owner:users!owner_id (id, name, email),
+          modifier:users!modified_by (name, email),
+          stages (
+            *,
+            tasks (
               *,
-              user:users(id, email, name, avatar_url)
-            `)
-            .eq('project_id', project.id)
-          
-          // Build a map of user IDs to names for looking up modified_by names
-          const userMap = new Map()
-          if (members) {
-            members.forEach(m => {
-              if (m.user) userMap.set(m.user.id, m.user.name || m.user.email)
-            })
-          }
-          // Also add the owner
-          if (project.owner_id) {
-            const { data: ownerData } = await supabase
-              .from('users')
-              .select('id, name, email')
-              .eq('id', project.owner_id)
-              .single()
-            if (ownerData) {
-              userMap.set(ownerData.id, ownerData.name || ownerData.email)
-            }
-          }
-          
-          // Add modified_by_name to tasks and subtasks
-          const stagesWithNames = stagesWithTasks.map(stage => ({
-            ...stage,
-            tasks: stage.tasks.map(task => ({
-              ...task,
-              created_by_name: task.created_by ? userMap.get(task.created_by) : null,
-              modified_by_name: task.modified_by ? userMap.get(task.modified_by) : null,
-              subtasks: task.subtasks.map(st => ({
-                ...st,
-                created_by_name: st.created_by ? userMap.get(st.created_by) : null,
-                modified_by_name: st.modified_by ? userMap.get(st.modified_by) : null
-              }))
-            }))
-          }))
-          
-          // Get project modified_by_name
-          let projectModifiedByName = null
-          if (project.modified_by) {
-            projectModifiedByName = userMap.get(project.modified_by)
-            if (!projectModifiedByName) {
-              const { data: modifierData } = await supabase
-                .from('users')
-                .select('id, name, email')
-                .eq('id', project.modified_by)
-                .single()
-              if (modifierData) {
-                projectModifiedByName = modifierData.name || modifierData.email
-              }
-            }
-          }
+              creator:users!created_by (name, email),
+              modifier:users!modified_by (name, email),
+              subtasks (
+                *,
+                creator:users!created_by (name, email),
+                modifier:users!modified_by (name, email)
+              )
+            )
+          ),
+          project_members (
+            *,
+            user:users (id, email, name, avatar_url)
+          )
+        `)
+        .in('id', Array.from(projectIds))
 
-          return { 
-            ...project, 
-            modified_by_name: projectModifiedByName,
-            stages: stagesWithNames,
-            project_members: members || []
-          }
-        })
-      )
+      if (bulkError) {
+        logError('getProjectsBulk', bulkError)
+        return { data: [], error: bulkError }
+      }
 
-      devLog('✅ Projects loaded successfully:', projectsWithData.length)
-      return { data: projectsWithData, error: null }
+      // 3. Process, Sort, and Format Data in Memory
+      // Supabase nested sort is limited, so we sort arrays here.
+
+      // Build Member Priority Map
+      const memberPriorityMap = new Map()
+      if (member) {
+        member.forEach(m => memberPriorityMap.set(m.project_id, m.priority_rank))
+      }
+
+      const formattedProjects = bulkData.map(p => {
+        // Determine Priority (Personal vs Project)
+        const isOwner = p.owner_id === userId
+        let effectivePriority = p.priority_rank
+        if (!isOwner && memberPriorityMap.has(p.id)) {
+          const mp = memberPriorityMap.get(p.id)
+          if (mp !== null && mp !== undefined && mp !== 999) effectivePriority = mp
+        }
+
+        // Format Stages -> Tasks -> Subtasks
+        const stages = (p.stages || [])
+          .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+          .map(stage => {
+            const tasks = (stage.tasks || [])
+              .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+              .map(task => {
+                const subtasks = (task.subtasks || [])
+                  .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                  .map(st => ({
+                    ...st,
+                    created_by_name: st.creator?.name || st.creator?.email,
+                    modified_by_name: st.modifier?.name || st.modifier?.email
+                  }))
+
+                return {
+                  ...task,
+                  created_by_name: task.creator?.name || task.creator?.email,
+                  modified_by_name: task.modifier?.name || task.modifier?.email,
+                  subtasks
+                }
+              })
+            return { ...stage, tasks }
+          })
+
+        return {
+          ...p,
+          isOwner,
+          priority_rank: effectivePriority,
+          modified_by_name: p.modifier?.name || p.modifier?.email,
+          stages,
+          // Simplify project_members structure if needed, or keep as is
+          project_members: p.project_members || []
+        }
+      })
+
+      // Sort Projects
+      formattedProjects.sort((a, b) => (a.priority_rank || 0) - (b.priority_rank || 0))
+
+      devLog('✅ Projects loaded successfully (Optimized):', formattedProjects.length)
+      return { data: formattedProjects, error: null }
+
     } catch (error) {
       logError('getProjects:catch', error)
       return { data: [], error }
@@ -259,7 +181,7 @@ export const db = {
 
   async createProject(project) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       devLog('📝 Creating project:', project.title)
       const { data, error } = await supabase
@@ -267,12 +189,12 @@ export const db = {
         .insert(project)
         .select()
         .single()
-      
+
       if (error) {
         logError('createProject', error)
         return { data: null, error }
       }
-      
+
       devLog('✅ Project created:', data.id)
       return { data, error: null }
     } catch (error) {
@@ -305,19 +227,19 @@ export const db = {
 
   async deleteProject(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       devLog('🗑️ Deleting project:', id)
       const { error } = await supabase
         .from('projects')
         .delete()
         .eq('id', id)
-      
+
       if (error) {
         logError('deleteProject', error)
         return { error }
       }
-      
+
       devLog('✅ Project deleted')
       return { error: null }
     } catch (error) {
@@ -330,7 +252,7 @@ export const db = {
   async getTodayItems(userId, day) {
     if (!supabase) return { data: null, error: null }
     try {
-      const dayStr = (day instanceof Date) ? day.toISOString().slice(0,10) : day
+      const dayStr = (day instanceof Date) ? day.toISOString().slice(0, 10) : day
       const { data, error } = await supabase
         .from('today_items')
         .select('items')
@@ -349,7 +271,7 @@ export const db = {
   async saveTodayItems(userId, day, items) {
     if (!supabase) return { data: null, error: null }
     try {
-      const dayStr = (day instanceof Date) ? day.toISOString().slice(0,10) : day
+      const dayStr = (day instanceof Date) ? day.toISOString().slice(0, 10) : day
       // upsert row for (user_id, day)
       const payload = { user_id: userId, day: dayStr, items: items, updated_at: new Date().toISOString() }
       const { data, error } = await supabase
@@ -367,7 +289,7 @@ export const db = {
   // Stages
   async createStage(stage) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       devLog('📝 Creating stage:', stage.name)
       const { data, error } = await supabase
@@ -375,7 +297,7 @@ export const db = {
         .insert(stage)
         .select()
         .single()
-      
+
       if (error) logError('createStage', error)
       else devLog('✅ Stage created:', data.id)
       return { data, error }
@@ -387,7 +309,7 @@ export const db = {
 
   async updateStage(id, updates) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       const { data, error } = await supabase
         .from('stages')
@@ -395,7 +317,7 @@ export const db = {
         .eq('id', id)
         .select()
         .single()
-      
+
       if (error) logError('updateStage', error)
       return { data, error }
     } catch (error) {
@@ -406,13 +328,13 @@ export const db = {
 
   async deleteStage(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('stages')
         .delete()
         .eq('id', id)
-      
+
       if (error) logError('deleteStage', error)
       return { error }
     } catch (error) {
@@ -424,7 +346,7 @@ export const db = {
   // Tasks
   async createTask(task) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       devLog('📝 Creating task:', task.title)
       const { data, error } = await supabase
@@ -432,7 +354,7 @@ export const db = {
         .insert(task)
         .select()
         .single()
-      
+
       if (error) logError('createTask', error)
       else devLog('✅ Task created:', data.id)
       return { data, error }
@@ -444,7 +366,7 @@ export const db = {
 
   async updateTask(id, updates) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       devLog('📝 Updating task:', id, updates)
       const { data, error } = await supabase
@@ -453,7 +375,7 @@ export const db = {
         .eq('id', id)
         .select()
         .single()
-      
+
       if (error) {
         logError('updateTask', error)
         return { data, error }
@@ -511,7 +433,7 @@ export const db = {
   },
   async deleteTask(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       // Fetch task info to notify collaborators before deletion
       const { data: task } = await supabase
@@ -557,14 +479,14 @@ export const db = {
   // Subtasks
   async createSubtask(subtask) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       const { data, error } = await supabase
         .from('subtasks')
         .insert(subtask)
         .select()
         .single()
-      
+
       if (error) logError('createSubtask', error)
       return { data, error }
     } catch (error) {
@@ -653,13 +575,13 @@ export const db = {
 
   async deleteSubtask(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('subtasks')
         .delete()
         .eq('id', id)
-      
+
       if (error) logError('deleteSubtask', error)
       return { error }
     } catch (error) {
@@ -671,14 +593,14 @@ export const db = {
   // Comments
   async createComment(comment) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       const { data, error } = await supabase
         .from('comments')
         .insert(comment)
         .select('*')
         .single()
-      
+
       if (error) logError('createComment', error)
       // Notify collaborators about new comment
       try {
@@ -720,22 +642,22 @@ export const db = {
   // If user exists, add them directly. If not, create an invitation.
   async shareProject(projectId, email, role = 'editor', invitedBy = null) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       const normalizedEmail = email.toLowerCase().trim()
       devLog('🔍 shareProject: Looking up user by email:', normalizedEmail)
-      
+
       // Try to find existing user
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, email, name')
         .ilike('email', normalizedEmail)
         .maybeSingle()
-      
+
       if (userError && userError.code !== 'PGRST116') {
         devErr('Error looking up user:', userError)
       }
-      
+
       devLog('🔍 shareProject: User lookup result:', { found: !!user, user, error: userError })
 
       // If user exists, add them directly
@@ -759,20 +681,20 @@ export const db = {
           .insert({ project_id: projectId, user_id: user.id, role })
           .select()
           .single()
-        
+
         if (error) {
           logError('shareProject:insert', error)
           devErr('Insert error details:', { code: error.code, message: error.message, details: error.details, hint: error.hint })
           return { data: null, error: { message: `Failed to add member: ${error.message || 'Unknown error'}` } }
         }
-        
+
         // Get project details for the notification
         const { data: project } = await supabase
           .from('projects')
           .select('title, emoji')
           .eq('id', projectId)
           .single()
-        
+
         // Create a notification for the new member
         await supabase
           .from('notifications')
@@ -784,7 +706,7 @@ export const db = {
             project_id: projectId,
             is_read: false
           })
-        
+
         // Fetch user details separately to avoid potential join issues
         const memberWithUser = { ...data, user }
         devLog('✅ Member added successfully:', memberWithUser)
@@ -803,9 +725,9 @@ export const db = {
       if (existingInvite) {
         if (existingInvite.status === 'pending') {
           // Return the existing invitation so user can copy the link
-          return { 
-            data: existingInvite, 
-            error: null, 
+          return {
+            data: existingInvite,
+            error: null,
             type: 'existing',
             message: `An invitation was already sent to ${email}. Here's the link again!`
           }
@@ -834,9 +756,9 @@ export const db = {
         return { data: null, error: { message: 'Failed to create invitation.' } }
       }
 
-      return { 
-        data: invitation, 
-        error: null, 
+      return {
+        data: invitation,
+        error: null,
         type: 'invited',
         message: `Invitation created! Share this link with ${email}`
       }
@@ -849,7 +771,7 @@ export const db = {
   // Get pending invitations for a project
   async getProjectInvitations(projectId) {
     if (!supabase) return { data: [], error: null }
-    
+
     try {
       const { data, error } = await supabase
         .from('project_invitations')
@@ -869,7 +791,7 @@ export const db = {
   // Cancel a pending invitation
   async cancelInvitation(invitationId) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('project_invitations')
@@ -887,7 +809,7 @@ export const db = {
   // Accept a specific invitation by token
   async acceptInvitationByToken(token, userId) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       // First, get the invitation
       const { data: invitation, error: fetchError } = await supabase
@@ -955,7 +877,7 @@ export const db = {
   // Check and accept pending invitations for current user
   async acceptPendingInvitations(userEmail) {
     if (!supabase) return { data: [], error: null }
-    
+
     try {
       // Get pending invitations for this email
       const { data: invitations, error: fetchError } = await supabase
@@ -979,14 +901,14 @@ export const db = {
 
   async removeProjectMember(projectId, userId) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('project_members')
         .delete()
         .eq('project_id', projectId)
         .eq('user_id', userId)
-      
+
       if (error) logError('removeProjectMember', error)
       return { error }
     } catch (error) {
@@ -998,7 +920,7 @@ export const db = {
   // Update member's personal priority for a shared project
   async updateMemberPriority(projectId, userId, priorityRank) {
     if (!supabase) return { error: null }
-    
+
     try {
       devLog('📝 Updating member priority:', { projectId, userId, priorityRank })
       const { error } = await supabase
@@ -1006,12 +928,12 @@ export const db = {
         .update({ priority_rank: priorityRank })
         .eq('project_id', projectId)
         .eq('user_id', userId)
-      
+
       if (error) {
         logError('updateMemberPriority', error)
         return { error }
       }
-      
+
       devLog('✅ Member priority updated')
       return { error: null }
     } catch (error) {
@@ -1025,10 +947,10 @@ export const db = {
     if (!supabase) return null
     return supabase
       .channel(`project:${projectId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        filter: `project_id=eq.${projectId}` 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        filter: `project_id=eq.${projectId}`
       }, callback)
       .subscribe()
   },
@@ -1036,9 +958,9 @@ export const db = {
   // Subscribe to all changes for a user's projects (for real-time sync)
   subscribeToUserProjects(userId, projectIds, callback) {
     if (!supabase || !projectIds || projectIds.length === 0) return null
-    
+
     const channel = supabase.channel(`user-projects:${userId}`)
-    
+
     // Subscribe to project changes
     channel.on('postgres_changes', {
       event: '*',
@@ -1049,7 +971,7 @@ export const db = {
         callback(payload)
       }
     })
-    
+
     // Subscribe to stage changes  
     channel.on('postgres_changes', {
       event: '*',
@@ -1060,33 +982,33 @@ export const db = {
         callback(payload)
       }
     })
-    
+
     // Subscribe to task changes
     channel.on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'tasks'
     }, callback)
-    
+
     // Subscribe to subtask changes
     channel.on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'subtasks'
     }, callback)
-    
+
     // Subscribe to project_members changes (for sharing updates)
     channel.on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'project_members'
     }, (payload) => {
-      if (payload.new?.user_id === userId || payload.old?.user_id === userId || 
-          projectIds.includes(payload.new?.project_id) || projectIds.includes(payload.old?.project_id)) {
+      if (payload.new?.user_id === userId || payload.old?.user_id === userId ||
+        projectIds.includes(payload.new?.project_id) || projectIds.includes(payload.old?.project_id)) {
         callback(payload)
       }
     })
-    
+
     // Subscribe to notification changes
     channel.on('postgres_changes', {
       event: '*',
@@ -1094,7 +1016,7 @@ export const db = {
       table: 'notifications',
       filter: `user_id=eq.${userId}`
     }, callback)
-    
+
     // Start the subscription and return the channel object so callers
     // can remove it later with `db.unsubscribe(channel)`.
     try {
@@ -1128,7 +1050,7 @@ export const db = {
   // Notifications
   async getNotifications(userId) {
     if (!supabase) return { data: [], error: null }
-    
+
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -1147,7 +1069,7 @@ export const db = {
 
   async createNotification(notification) {
     if (!supabase) return { data: null, error: null }
-    
+
     try {
       // Use upsert with onConflict to avoid creating duplicate notifications
       // for the same (user_id, type, task_id, subtask_id) combination.
@@ -1192,7 +1114,7 @@ export const db = {
 
   async markNotificationRead(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -1209,7 +1131,7 @@ export const db = {
 
   async markNotificationUnread(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -1226,7 +1148,7 @@ export const db = {
 
   async markAllNotificationsRead(userId) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -1244,7 +1166,7 @@ export const db = {
 
   async deleteNotification(id) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -1261,7 +1183,7 @@ export const db = {
 
   async clearAllNotifications(userId) {
     if (!supabase) return { error: null }
-    
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -1279,7 +1201,7 @@ export const db = {
   // Notify all project collaborators about a change (excludes the person who made the change)
   async notifyCollaborators(projectId, excludeUserId, notification) {
     if (!supabase) return { error: null }
-    
+
     try {
       // Get project owner and members
       const { data: project } = await supabase
@@ -1287,14 +1209,14 @@ export const db = {
         .select('owner_id, title, emoji')
         .eq('id', projectId)
         .single()
-      
+
       if (!project) return { error: null }
-      
+
       const { data: members } = await supabase
         .from('project_members')
         .select('user_id')
         .eq('project_id', projectId)
-      
+
       // Collect all user IDs to notify (owner + members, excluding the one who made the change)
       const userIds = new Set()
       if (project.owner_id !== excludeUserId) {
@@ -1307,9 +1229,9 @@ export const db = {
           }
         })
       }
-      
+
       if (userIds.size === 0) return { error: null }
-      
+
       // Create notifications for all collaborators (use upsert to avoid duplicates)
       const conflictCols = ['user_id', 'type', 'task_id', 'subtask_id']
       const notifications = Array.from(userIds).map(userId => ({
