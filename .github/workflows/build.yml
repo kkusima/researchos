@@ -8,8 +8,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-14, windows-latest]
-
+        # We split macOS into two architectures for maximum compatibility
+        os: [macos-latest, windows-latest]
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,19 +32,29 @@ jobs:
           URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
           KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
         run: |
-          echo "VITE_SUPABASE_URL=$URL" > .env
-          echo "VITE_SUPABASE_ANON_KEY=$KEY" >> .env
+          # Use printf to avoid shell interpretation of special characters
+          printf "VITE_SUPABASE_URL=%s\nVITE_SUPABASE_ANON_KEY=%s\nVITE_AUTH_REDIRECT_URL=http://localhost:3000\n" "$URL" "$KEY" > .env.local
+          # Verify file exists and has content (but hide sensitive key)
+          ls -la .env.local
+          grep "VITE_SUPABASE_URL" .env.local
 
       - name: Build Web App
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://geqdrllnzjjrciojriuy.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcWRybGxuempqcmNpb2jyaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAwMTEsImV4cCI6MjA4MTQxNjAxMX0.CI5JNxac4i8jfOMTgOUBXwwFpuq7R1t8jVXA_8vJPcA' }}
 
       - name: Clean Mac Detritus (Mac Only)
-        if: matrix.os == 'macos-14'
+        if: startsWith(matrix.os, 'macos')
         run: xattr -cr src public electron dist index.html package.json
 
       - name: Build Electron App (macOS)
-        if: matrix.os == 'macos-14'
-        run: npx electron-builder --mac --universal -p never
+        if: startsWith(matrix.os, 'macos')
+        # We build separate architectures to ensure they run natively on each machine
+        run: npx electron-builder --mac --x64 --arm64 --universal -p never
+        env:
+          # Use false to prevent electron-builder from failing when it finds no certs
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build Electron App (Windows)
         if: matrix.os == 'windows-latest'
