@@ -1467,6 +1467,165 @@ function TabNav({ tab, setTab }) {
 // ============================================
 // PROJECTS VIEW
 // ============================================
+// Optimized Today Item Component
+const TodayItem = React.memo(({
+  item,
+  project,
+  index,
+  isSelectionMode,
+  isSelected,
+  isMenuOpen,
+  isEditing,
+  onToggleSelect,
+  onToggleDone,
+  onMenuToggle,
+  onEditStart,
+  onEditCancel,
+  onRename,
+  onDelete,
+  onDuplicate,
+  onDragStart,
+  onDragOver,
+  onDrop
+}) => {
+  const [editText, setEditText] = useState(item.title || '')
+  const lastTapRef = useRef(0)
+
+  // Sync local edit text when item changes or editing starts
+  useEffect(() => {
+    if (isEditing) setEditText(item.title || '')
+  }, [isEditing, item.title])
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const trimmed = editText.trim()
+      if (trimmed) onRename(item, trimmed)
+    } else if (e.key === 'Escape') {
+      onEditCancel()
+    }
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDrop={(e) => onDrop(e, index)}
+      className={`glass-card p-2 rounded-lg flex items-center justify-between ${item.is_done ? 'opacity-60' : ''} ${isMenuOpen ? 'z-20 relative' : 'z-0'}`}
+      style={{ transition: 'opacity 0.2s, transform 0.2s' }}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isSelectionMode && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleSelect(item.id) }}
+              className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}
+            >
+              {isSelected && <Check className="w-3 h-3" />}
+            </button>
+          )}
+          <button
+            onClick={() => onToggleDone(item.id)}
+            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${item.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}
+          >
+            {item.is_done ? <Check className="w-3 h-3" /> : null}
+          </button>
+          <button
+            type="button"
+            title="Edit"
+            onClick={() => onEditStart(item.id)}
+            className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {isEditing ? (
+            <div className="flex gap-2 items-center">
+              <input
+                autoFocus
+                className="input-sleek py-1 px-2 text-sm h-8"
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onClick={e => e.stopPropagation()}
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); if (editText.trim()) onRename(item, editText.trim()) }}
+                className="px-2 py-1 bg-gray-800 text-white rounded text-xs h-8 hover:bg-gray-700"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onEditCancel() }}
+                className="px-2 py-1 bg-gray-100 rounded text-xs h-8 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div
+              className="group cursor-pointer"
+              onDoubleClick={() => onEditStart(item.id)}
+              onTouchEnd={() => {
+                const now = Date.now()
+                if (now - lastTapRef.current < 350) {
+                  onEditStart(item.id)
+                  lastTapRef.current = 0
+                } else {
+                  lastTapRef.current = now
+                }
+              }}
+            >
+              <div className={`font-medium text-gray-900 truncate ${item.is_done ? 'line-through text-gray-400' : ''}`}>
+                {item.title}
+              </div>
+              {project && (
+                <div className="text-xs text-gray-400 truncate flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"></span>
+                  {project.title}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 relative flex-shrink-0 ml-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); onMenuToggle(item.id) }}
+          className={`p-1.5 rounded-lg transition-colors ${isMenuOpen ? 'bg-gray-100 text-gray-800' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+        {isMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); onMenuToggle(null); }} />
+            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-xl rounded-xl z-40 py-1 w-36 animate-fade-in flex flex-col overflow-hidden">
+              <button
+                onClick={(e) => { e.stopPropagation(); onDuplicate([item.id]); onMenuToggle(null); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+              >
+                <Copy className="w-4 h-4 text-gray-400" /> Duplicate
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete([item.id]); onMenuToggle(null); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+})
+
 function TodayView() {
   const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView, setTodayItems, saveTodayItems, showToast, user, demoMode, reloadProjects, setProjects } = useApp()
   const [newTitle, setNewTitle] = useState('')
@@ -1479,6 +1638,63 @@ function TodayView() {
   const [editText, setEditText] = useState('')
   const lastTapRef = useRef(0)
   const [openMenuId, setOpenMenuId] = useState(null)
+
+  const onRenameItem = async (it, trimmed) => {
+    if (!trimmed) return
+
+    // Local item: update locally
+    if (it.isLocal) {
+      const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+      setTodayItems(next)
+      saveTodayItems(next)
+      setEditingId(null)
+      return
+    }
+
+    // Linked item: attempt server update, fall back to demo-mode local update
+    try {
+      if (!demoMode && db && (it.taskId || it.subtaskId)) {
+        if (it.subtaskId) {
+          const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
+          if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
+        } else if (it.taskId) {
+          const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
+          if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
+        }
+        // refresh local projects to reflect updated title
+        try { await reloadProjects() } catch (e) { }
+      } else {
+        // demo mode: update in-memory projects
+        let updated = false
+        const newProjects = projects.map(p => ({
+          ...p, stages: (p.stages || []).map(s => ({
+            ...s, tasks: (s.tasks || []).map(t => {
+              if (it.subtaskId) {
+                const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
+                if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
+                return { ...t, subtasks: newSubtasks }
+              }
+              if (it.taskId && t.id === it.taskId) {
+                updated = true
+                return { ...t, title: trimmed }
+              }
+              return t
+            })
+          }))
+        }))
+        if (updated) setProjects(newProjects)
+      }
+
+      // Update today list to reflect new title
+      const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
+      setTodayItems(next)
+      saveTodayItems(next)
+      setEditingId(null)
+    } catch (e) {
+      dwarn('Failed to save renamed item', e)
+      showToast('Failed to save change')
+    }
+  }
   // Flatten tasks and subtasks with project context for the existing-task picker
   const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
     const base = [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }]
@@ -1626,189 +1842,32 @@ function TodayView() {
           todayItems.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
             return (
-              <div key={it.id}
-                draggable
-                onDragStart={(e) => onDragStart(e, i)}
-                onDragOver={(e) => onDragOver(e, i)}
-                onDrop={(e) => onDrop(e, i)}
-                className={`glass-card p-2 rounded-lg flex items-center justify-between ${it.is_done ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {isSelectionMode && (
-                      <button onClick={() => {
-                        const s = new Set(selectedIds)
-                        if (s.has(it.id)) s.delete(it.id)
-                        else s.add(it.id)
-                        setSelectedIds(s)
-                      }} aria-pressed={selectedIds.has(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${selectedIds.has(it.id) ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
-                        {selectedIds.has(it.id) ? <Check className="w-3 h-3" /> : null}
-                      </button>
-                    )}
-                    <button onClick={() => toggleTodayDone(it.id)} className={`w-5 h-5 rounded border flex items-center justify-center ${it.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}>
-                      {it.is_done ? <Check className="w-3 h-3" /> : null}
-                    </button>
-                    <button type="button" title="Edit" onClick={() => { setEditingId(it.id); setEditText(it.title || '') }} className="text-gray-500 hover:text-gray-800 px-2 py-1 rounded">
-                      <FileText className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="min-w-0">
-                    {/* inline edit for local items; navigate to task detail for linked items */}
-                    {editingId === it.id ? (
-                      <div className="flex gap-2 items-center">
-                        <input autoFocus className="input-sleek" value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={async (e) => {
-                          if (e.key !== 'Enter') return
-                          e.preventDefault()
-                          const trimmed = (editText || '').trim()
-                          if (!trimmed) return
-
-                          // reuse same save flow as Save button
-                          if (it.isLocal) {
-                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                            setTodayItems(next)
-                            saveTodayItems(next)
-                            setEditingId(null)
-                            return
-                          }
-                          try {
-                            if (!demoMode && db && (it.taskId || it.subtaskId)) {
-                              if (it.subtaskId) {
-                                const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
-                                if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
-                              } else if (it.taskId) {
-                                const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
-                                if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
-                              }
-                              try { await reloadProjects() } catch (e) { }
-                            } else {
-                              let updated = false
-                              const newProjects = projects.map(p => ({
-                                ...p, stages: (p.stages || []).map(s => ({
-                                  ...s, tasks: (s.tasks || []).map(t => {
-                                    if (it.subtaskId) {
-                                      const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
-                                      if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-                                      return { ...t, subtasks: newSubtasks }
-                                    }
-                                    if (it.taskId && t.id === it.taskId) {
-                                      updated = true
-                                      return { ...t, title: trimmed }
-                                    }
-                                    return t
-                                  })
-                                }))
-                              }))
-                              if (updated) setProjects(newProjects)
-                            }
-
-                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                            setTodayItems(next)
-                            saveTodayItems(next)
-                            setEditingId(null)
-                          } catch (e) {
-                            dwarn('Failed to save renamed item', e)
-                            showToast('Failed to save change')
-                          }
-                        }} />
-                        <button type="button" onClick={async () => {
-                          const trimmed = (editText || '').trim()
-                          if (!trimmed) return
-
-                          // Local item: update locally
-                          if (it.isLocal) {
-                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                            setTodayItems(next)
-                            saveTodayItems(next)
-                            setEditingId(null)
-                            return
-                          }
-
-                          // Linked item: attempt server update, fall back to demo-mode local update
-                          try {
-                            if (!demoMode && db && (it.taskId || it.subtaskId)) {
-                              if (it.subtaskId) {
-                                const { data, error } = await db.updateSubtask(it.subtaskId, { title: trimmed, modified_by: user?.id })
-                                if (error) { showToast('Failed to update subtask: ' + (error.message || error)); return }
-                              } else if (it.taskId) {
-                                const { data, error } = await db.updateTask(it.taskId, { title: trimmed, modified_by: user?.id })
-                                if (error) { showToast('Failed to update task: ' + (error.message || error)); return }
-                              }
-                              // refresh local projects to reflect updated title
-                              try { await reloadProjects() } catch (e) { }
-                            } else {
-                              // demo mode: update in-memory projects
-                              let updated = false
-                              const newProjects = projects.map(p => ({
-                                ...p, stages: (p.stages || []).map(s => ({
-                                  ...s, tasks: (s.tasks || []).map(t => {
-                                    if (it.subtaskId) {
-                                      const newSubtasks = (t.subtasks || []).map(st => st.id === it.subtaskId ? { ...st, title: trimmed } : st)
-                                      if (newSubtasks.some((ns, idx) => ns !== (t.subtasks || [])[idx])) updated = true
-                                      return { ...t, subtasks: newSubtasks }
-                                    }
-                                    if (it.taskId && t.id === it.taskId) {
-                                      updated = true
-                                      return { ...t, title: trimmed }
-                                    }
-                                    return t
-                                  })
-                                }))
-                              }))
-                              if (updated) setProjects(newProjects)
-                            }
-
-                            // Update today list to reflect new title
-                            const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
-                            setTodayItems(next)
-                            saveTodayItems(next)
-                            setEditingId(null)
-                          } catch (e) {
-                            dwarn('Failed to save renamed item', e)
-                            showToast('Failed to save change')
-                          }
-                        }} className="px-2 py-1 bg-gray-800 text-white rounded">Save</button>
-                        <button type="button" onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-100 rounded">Cancel</button>
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          className={`font-medium text-gray-900 truncate ${it.is_done ? 'line-through text-gray-400' : ''} cursor-pointer`}
-                          onDoubleClick={() => { setEditingId(it.id); setEditText(it.title || '') }}
-                          onTouchEnd={() => {
-                            const now = Date.now()
-                            if (now - lastTapRef.current < 350) {
-                              setEditingId(it.id)
-                              setEditText(it.title || '')
-                              lastTapRef.current = 0
-                            } else {
-                              lastTapRef.current = now
-                            }
-                          }}
-                        >{it.title}</div>
-                        <div className="text-xs text-gray-400 truncate">{proj ? proj.title : ''}</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 relative">
-                  <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === it.id ? null : it.id) }} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  {openMenuId === it.id && (
-                    <>
-                      <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} />
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg rounded-xl z-40 py-1 w-32 animate-fade-in flex flex-col overflow-hidden">
-                        <button onClick={(e) => { e.stopPropagation(); duplicateTodayItems([it.id]); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                          <Copy className="w-3.5 h-3.5" /> Duplicate
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); removeTodayItems([it.id]); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+              <TodayItem
+                key={it.id}
+                item={it}
+                project={proj}
+                index={i}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedIds.has(it.id)}
+                isMenuOpen={openMenuId === it.id}
+                isEditing={editingId === it.id}
+                onToggleSelect={(id) => {
+                  const s = new Set(selectedIds)
+                  if (s.has(id)) s.delete(id)
+                  else s.add(id)
+                  setSelectedIds(s)
+                }}
+                onToggleDone={toggleTodayDone}
+                onMenuToggle={(id) => setOpenMenuId(openMenuId === id ? null : id)}
+                onEditStart={setEditingId}
+                onEditCancel={() => setEditingId(null)}
+                onRename={onRenameItem}
+                onDelete={removeTodayItems}
+                onDuplicate={duplicateTodayItems}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+              />
             )
           })
         )}
@@ -2403,29 +2462,42 @@ function PriorityBadge({ rank, position }) {
 // ============================================
 function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
-  const { projects } = useApp()
   const [showMenu, setShowMenu] = useState(false)
-  const liveProject = projects.find(p => p.id === project.id) || project
-  const progress = getProgress(liveProject)
+  const liveProject = project
+
+  // Memoize expensive calculations
+  const stats = useMemo(() => {
+    const prog = getProgress(liveProject)
+    const activeData = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+
+    // Count reminders set on tasks and subtasks
+    const remData = (liveProject.stages || []).reduce((pAcc, s) => {
+      const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
+        const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
+        return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
+      }, 0)
+      return pAcc + tasksWithReminders
+    }, 0)
+
+    // Count overdue reminders (reminder date in past and not completed)
+    const overdueData = (liveProject.stages || []).reduce((pAcc, s) => {
+      const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
+        const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
+        const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
+        return tAcc + taskOverdue + subtaskOverdue
+      }, 0)
+      return pAcc + tasksOverdue
+    }, 0)
+
+    return { progress: prog, activeTasksCount: activeData, reminderCount: remData, overdueCount: overdueData }
+  }, [liveProject])
+
+  const { progress, activeTasksCount, reminderCount, overdueCount } = stats
+
+  const latestModified = useMemo(() => getProjectLatestUpdatedAt(liveProject), [liveProject])
+
   const currentStage = liveProject.stages?.[liveProject.current_stage_index]
-  const activeTasksCount = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
-  // Count reminders set on tasks and subtasks
-  const reminderCount = (liveProject.stages || []).reduce((pAcc, s) => {
-    const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
-      const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
-      return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
-    }, 0)
-    return pAcc + tasksWithReminders
-  }, 0)
-  // Count overdue reminders (reminder date in past and not completed)
-  const overdueCount = (liveProject.stages || []).reduce((pAcc, s) => {
-    const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
-      const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
-      const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
-      return tAcc + taskOverdue + subtaskOverdue
-    }, 0)
-    return pAcc + tasksOverdue
-  }, 0)
+
   // Show shared badge if: user is not owner (shared with them) OR project has members (owner has shared it)
   const isCollaborator = liveProject.owner_id !== user?.id
   const hasMembers = liveProject.project_members?.length > 0
@@ -2627,28 +2699,36 @@ function ProjectCard({ rootId, project, index, onSelect, onDelete, onDuplicate, 
 // ============================================
 function ProjectListItem({ project, index, onSelect, onDelete, onDuplicate, isSelectionMode, isSelected, onToggleSelect }) {
   const { user } = useAuth()
-  const { projects } = useApp()
   const [showMenu, setShowMenu] = useState(false)
-  const liveProject = projects.find(p => p.id === project.id) || project
-  const progress = getProgress(liveProject)
-  const activeTasksCount = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
-  // Count reminders set on tasks and subtasks
-  const reminderCount = (liveProject.stages || []).reduce((pAcc, s) => {
-    const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
-      const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
-      return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
+  const liveProject = project
+
+  // Memoize stats
+  const stats = useMemo(() => {
+    const prog = getProgress(liveProject)
+    const activeData = (liveProject.stages || []).reduce((acc, s) => acc + ((s.tasks || []).filter(t => !t.is_completed).length), 0)
+
+    // Count reminders set on tasks and subtasks
+    const remData = (liveProject.stages || []).reduce((pAcc, s) => {
+      const tasksWithReminders = (s.tasks || []).reduce((tAcc, t) => {
+        const subtaskReminders = (t.subtasks || []).filter(st => !!st.reminder_date).length
+        return tAcc + (t.reminder_date ? 1 : 0) + subtaskReminders
+      }, 0)
+      return pAcc + tasksWithReminders
     }, 0)
-    return pAcc + tasksWithReminders
-  }, 0)
-  // Count overdue reminders (reminder date in past and not completed)
-  const overdueCount = (liveProject.stages || []).reduce((pAcc, s) => {
-    const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
-      const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
-      const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
-      return tAcc + taskOverdue + subtaskOverdue
+
+    // Count overdue reminders (reminder date in past and not completed)
+    const overdueData = (liveProject.stages || []).reduce((pAcc, s) => {
+      const tasksOverdue = (s.tasks || []).reduce((tAcc, t) => {
+        const subtaskOverdue = (t.subtasks || []).filter(st => st.reminder_date && isOverdue(st.reminder_date) && !st.is_completed).length
+        const taskOverdue = (t.reminder_date && isOverdue(t.reminder_date) && !t.is_completed) ? 1 : 0
+        return tAcc + taskOverdue + subtaskOverdue
+      }, 0)
+      return pAcc + tasksOverdue
     }, 0)
-    return pAcc + tasksOverdue
-  }, 0)
+    return { progress: prog, activeTasksCount: activeData, reminderCount: remData, overdueCount: overdueData }
+  }, [liveProject])
+
+  const { progress, activeTasksCount, reminderCount, overdueCount } = stats
   const currentStage = liveProject.stages?.[liveProject.current_stage_index]
   const totalStages = liveProject.stages?.length || 0
   const completedStages = liveProject.current_stage_index || 0
@@ -4356,6 +4436,7 @@ function TaskDetail() {
   const addSubtask = async () => {
     if (!newSubtask.trim()) return
     const localId = uuid()
+    const now = new Date().toISOString()
     const subtask = {
       id: localId,
       title: newSubtask.trim(),
@@ -4364,7 +4445,9 @@ function TaskDetail() {
       created_by: user?.id,
       created_by_name: userName,
       modified_by: user?.id,
-      modified_by_name: userName
+      modified_by_name: userName,
+      created_at: now,
+      updated_at: now
     }
     updateTask({ subtasks: [...(currentTask.subtasks || []), subtask] })
     setNewSubtask('')
