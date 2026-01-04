@@ -7,15 +7,15 @@ A modern, collaborative research project management application designed for res
 ![HypotheSys](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-📄 **Github Pages**: [https://kkusima.github.io/researchos/](https://kkusima.github.io/researchos/)
+📄 **Github Pages**: [https://kkusima.github.io/hypothesys/](https://kkusima.github.io/hypothesys/)
 
-🔗 **Live WebApp**: [researchos.vercel.app](https://researchos.vercel.app/)
+🔗 **Live WebApp**: [hypothesys.vercel.app](https://hypothesys.vercel.app/)
 
 
 ### 🖥️  Desktop Apps 
 Get the native experience for your workstation:
-*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/researchos/releases/download/v1.0.0/ReseachOS_Mac_v1.0.0.zip) (~180 MB)
-*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/researchos/releases/download/v1.0.0/ReseachOS_Windows_v1.0.0.zip) (~80 MB)
+*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/hypothesys_Mac_v1.0.0.zip) (~180 MB)
+*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/hypothesys_Windows_v1.0.0.zip) (~80 MB)
 
 ## What is HypotheSys™?
 
@@ -60,7 +60,7 @@ MIT License
 
 ## Trademark Notice
 
-**HypotheSys™** is a trademark. The name and associated branding are proprietary. Use of the HypotheSys™ name, logo, or branding for derivative works or commercial purposes requires prior written permission.
+**HypotheSys™** is a trademark. The name and associated branding are proprietary. Use of the HypotheSys™ name, or branding for derivative works or commercial purposes requires prior written permission.
 
 ---
 
