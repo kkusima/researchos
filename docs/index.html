@@ -76,6 +76,43 @@
         </div>
     </section>
 
+    <!-- App Screenshots Carousel -->
+    <section class="screenshots">
+        <div class="container">
+            <div class="carousel">
+                <div class="carousel__track" id="carouselTrack">
+                    <div class="carousel__item">
+                        <img src="screenshots/1.png" alt="HypotheSys Screenshot 1" loading="lazy">
+                    </div>
+                    <div class="carousel__item">
+                        <img src="screenshots/2.png" alt="HypotheSys Screenshot 2" loading="lazy">
+                    </div>
+                    <div class="carousel__item">
+                        <img src="screenshots/3.png" alt="HypotheSys Screenshot 3" loading="lazy">
+                    </div>
+                    <div class="carousel__item">
+                        <img src="screenshots/4.png" alt="HypotheSys Screenshot 4" loading="lazy">
+                    </div>
+                    <div class="carousel__item">
+                        <img src="screenshots/5.png" alt="HypotheSys Screenshot 5" loading="lazy">
+                    </div>
+                </div>
+                <button class="carousel__btn carousel__btn--prev" id="prevBtn" aria-label="Previous slide">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <button class="carousel__btn carousel__btn--next" id="nextBtn" aria-label="Next slide">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </section>
+
     <!-- Features Section -->
     <section class="features" id="features">
         <div class="container">
@@ -180,6 +217,38 @@
             </p>
         </div>
     </footer>
+    <script>
+        const track = document.getElementById('carouselTrack');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        if (track && prevBtn && nextBtn) {
+            prevBtn.addEventListener('click', () => {
+                const itemWidth = track.querySelector('.carousel__item').offsetWidth + 24;
+                track.scrollBy({ left: -itemWidth, behavior: 'smooth' });
+            });
+
+            nextBtn.addEventListener('click', () => {
+                const itemWidth = track.querySelector('.carousel__item').offsetWidth + 24;
+                track.scrollBy({ left: itemWidth, behavior: 'smooth' });
+            });
+
+            // Update button visibility (optional but nice)
+            track.addEventListener('scroll', () => {
+                const isAtStart = track.scrollLeft <= 5;
+                const isAtEnd = track.scrollLeft + track.offsetWidth >= track.scrollWidth - 5;
+                prevBtn.style.opacity = isAtStart ? '0.3' : '1';
+                prevBtn.style.pointerEvents = isAtStart ? 'none' : 'auto';
+                nextBtn.style.opacity = isAtEnd ? '0.3' : '1';
+                nextBtn.style.pointerEvents = isAtEnd ? 'none' : 'auto';
+            });
+
+            // Initial check
+            const isAtStart = track.scrollLeft <= 5;
+            prevBtn.style.opacity = isAtStart ? '0.3' : '1';
+            prevBtn.style.pointerEvents = isAtStart ? 'none' : 'auto';
+        }
+    </script>
 </body>
 
 </html>
