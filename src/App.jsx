@@ -4803,6 +4803,35 @@ function TaskDetail() {
             />
             {/* Timestamps and Reminder */}
             <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveTagPicker(activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? null : { taskId: task.id })
+                  }}
+                  className={`p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
+                  title="Manage Tags"
+                >
+                  <Tag className="w-4 h-4" />
+                </button>
+                {/* Task Tags Pills - displayed next to button in header if room, or just handled via picker. 
+                    User didn't explicitly ask for pills in header, but it's good practice. 
+                    For now, I'll just add the button as requested. */}
+                {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
+                  <div className="absolute left-0 top-full mt-1 z-[100]" onClick={e => e.stopPropagation()}>
+                    <TagPicker
+                      tags={tags}
+                      assignedTagIds={new Set((currentTask.tags || []).map(t => t.id))}
+                      onAssign={(tagId) => assignTag(task.id, tagId)}
+                      onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                      onCreate={createTag}
+                      onEdit={editTag}
+                      onDelete={deleteTag}
+                      onClose={() => setActiveTagPicker(null)}
+                    />
+                  </div>
+                )}
+              </div>
               <ReminderPicker
                 value={currentTask.reminder_date}
                 onChange={updateTaskReminder}
@@ -4995,6 +5024,39 @@ function TaskDetail() {
                                 >
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
+                                {/* Tag Button for Subtask */}
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setActiveTagPicker(activeTagPicker?.subtaskId === s.id ? null : { taskId: task.id, subtaskId: s.id })
+                                    }}
+                                    className={`p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 ${activeTagPicker?.subtaskId === s.id ? 'bg-gray-100 text-gray-900' : ''}`}
+                                    title="Tags"
+                                  >
+                                    <Tag className="w-3 h-3" />
+                                  </button>
+                                  {activeTagPicker?.subtaskId === s.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-[100]" onClick={e => e.stopPropagation()}>
+                                      <TagPicker
+                                        tags={tags}
+                                        assignedTagIds={new Set((s.tags || []).map(t => t.id))}
+                                        onAssign={(tagId) => assignTag(task.id, tagId, s.id)}
+                                        onUnassign={(tagId) => unassignTag(task.id, tagId, s.id)}
+                                        onCreate={createTag}
+                                        onEdit={editTag}
+                                        onDelete={deleteTag}
+                                        onClose={() => setActiveTagPicker(null)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <ReminderPicker
+                                  value={s.reminder_date}
+                                  onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
+                                  compact
+                                  isShared={isShared}
+                                />
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
@@ -5027,26 +5089,28 @@ function TaskDetail() {
                       )}
                     </div>
                   </div>
-                  {!isSubtaskSelectionMode && (
-                    <>
-                      <ReminderPicker
-                        value={s.reminder_date}
-                        onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
-                        compact
-                        isShared={isShared}
-                      />
-                      <button
-                        onClick={(e) => { e.stopPropagation(); addSubtaskToToday(s, currentTask, { projectId: project.id }) }}
-                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Add subtask to Tod(o)ay"
-                      >
-                        <Sun className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
+                  {
+                    !isSubtaskSelectionMode && (
+                      <>
+                        <ReminderPicker
+                          value={s.reminder_date}
+                          onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
+                          compact
+                          isShared={isShared}
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addSubtaskToToday(s, currentTask, { projectId: project.id }) }}
+                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Add subtask to Tod(o)ay"
+                        >
+                          <Sun className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )
+                  }
                 </div>
               )
             })}
@@ -5154,7 +5218,7 @@ function TaskDetail() {
           Delete Task
         </button>
       </div>
-    </div>
+    </div >
   )
 }
 

@@ -80,7 +80,7 @@ export default function TagPicker({
     return (
         <div
             ref={containerRef}
-            className="absolute right-0 top-8 z-50 w-72 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fade-in"
+            className="absolute right-0 top-8 z-[100] w-72 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-fade-in"
         >
             {/* Edit Mode */}
             {editingTag ? (
