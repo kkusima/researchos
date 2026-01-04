@@ -23,9 +23,11 @@ HypotheSys™ is a lightweight project management tool built specifically for re
 
 ### 📸 App Screenshots
 
-| Dashboard Overview | Project Workspace | Task Management |
-| :---: | :---: | :---: |
-| ![Dashboard](docs/screenshots/1.png) | ![Project](docs/screenshots/2.png) | ![Tasks](docs/screenshots/4.png) |
+| Dashboard Overview | Project Workspace |
+| :---: | :---: |
+| ![Dashboard](docs/screenshots/1.png) | ![Project](docs/screenshots/2.png) |
+| **Workflow Stages** | **Task Management** |
+| ![Stages](docs/screenshots/3.png) | ![Tasks](docs/screenshots/4.png) |
 
 ## Key Features
 
