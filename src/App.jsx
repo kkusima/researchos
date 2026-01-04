@@ -5590,27 +5590,30 @@ function AllTasksView() {
           </div>
         </div>
 
-        {/* Sort options */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
-          {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => handleSortChange(opt.key)}
-              className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${sortOption === opt.key
-                ? 'bg-gray-200 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-100'
-                }`}
-            >
-              {opt.label}
-              {sortOption === opt.key && (
-                sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-              )}
-            </button>
-          ))}
+        {/* Sort and Filter Bar */}
+        <div className="flex items-center gap-2 mb-2 relative z-40">
+          {/* Sort options (scrollable) */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 flex-1 no-scrollbar">
+            {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => handleSortChange(opt.key)}
+                className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${sortOption === opt.key
+                  ? 'bg-gray-200 text-gray-900 font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                {opt.label}
+                {sortOption === opt.key && (
+                  sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            ))}
+          </div>
 
-          {/* Tag Filter Dropdown */}
+          {/* Tag Filter Dropdown (Fixed, not scrollable) */}
           {activeSubTab === 'tagged' && (
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <button
                 onClick={() => setTagFilterOpen(!tagFilterOpen)}
                 className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${selectedFilterTags.size > 0
@@ -5623,9 +5626,9 @@ function AllTasksView() {
               </button>
               {tagFilterOpen && (
                 <>
-                  {/* Click outside backdrop */}
-                  <div className="fixed inset-0 z-10" onClick={() => setTagFilterOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-20 p-2 animate-fade-in">
+                  {/* Click outside backdrop - fixed to viewport */}
+                  <div className="fixed inset-0 z-[45]" onClick={() => setTagFilterOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-[50] p-2 animate-fade-in">
                     <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
                     <div className="max-h-48 overflow-y-auto space-y-1">
                       {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
