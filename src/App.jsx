@@ -4,11 +4,12 @@ import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
 import Avatar from './components/Avatar'
 import Walkthrough from './components/Walkthrough'
+import TagPicker from './components/TagPicker'
 import {
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight,
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare, Sun,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
-  LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle
+  LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle, Tag
 } from 'lucide-react'
 
 // App Context
@@ -25,7 +26,8 @@ const EMOJIS = [
   '🧪', '🔬', '📊', '🧬', '🔥', '💡', '🌱', '⚗️', '🔭', '💻', '📝', '🎯', '🚀', '⚡', '🧠', '🌍',
   '📚', '✨', '🎨', '🔧', '📈', '🏆', '💎', '🌟', '🎓', '📱', '🖥️', '🔐', '📡', '🛠️', '🏗️', '💼'
 ]
-const STORAGE_KEY = 'researchos_local'
+const STORAGE_KEY = 'hypothesys_local'
+const TAGS_STORAGE_KEY = 'hypothesys_tags_local'
 
 // Helpers
 const uuid = () => crypto.randomUUID?.() || Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
@@ -1783,18 +1785,17 @@ function TodayView() {
             placeholder="+ New task for today"
             className="input-sleek min-w-0"
           />
-          <button onClick={() => { addLocalTodayTask(newTitle); setNewTitle('') }} className="px-3 py-2 bg-gray-800 text-white rounded">Add</button>
           <button
             id="today-add-existing"
             onClick={() => { setShowExistingPicker(s => !s); setExistingQuery('') }}
-            className="p-2 bg-white border border-gray-200 rounded text-gray-700 hover:bg-gray-50"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-gray-700 hover:bg-gray-50 text-sm font-medium"
             title="Add an existing task"
           >
-            <Plus className="w-4 h-4" />
+            Add Existing
           </button>
 
           {showExistingPicker && (
-            <div ref={pickerRef} className="absolute right-0 mt-12 w-80 bg-white border border-gray-100 rounded shadow-lg z-40 p-2">
+            <div ref={pickerRef} className="absolute right-0 mt-12 w-[34rem] bg-white border border-gray-100 rounded shadow-lg z-40 p-2">
               <input
                 className="w-full px-3 py-2 border border-gray-200 rounded mb-2"
                 placeholder="Search tasks..."
@@ -4142,7 +4143,7 @@ function ShareModal({ project, onClose, onUpdate }) {
       // User doesn't exist - invitation created
       const link = `${window.location.origin}?invite=${result.data.token}`
       setInviteLink(link)
-      setSuccess(`${email} hasn't joined HypotheSys™ yet. Share the invite link below!`)
+      setSuccess(`${email} hasn't joined HypotheSys™ yet. Share the invite link below to give them access!`)
       setPendingInvites(prev => [...prev, result.data])
       setEmail('')
     } else if (result.type === 'existing') {
@@ -4200,7 +4201,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 
         <div className="p-6">
           <p className="text-gray-500 text-sm mb-4">
-            Invite collaborators to work on "{project.title}" with you.
+            Invite collaborators to work on "{project.title}" with you. You can invite anyone by email, even if they don't have an account yet.
           </p>
 
           {isOwner && (
@@ -5093,14 +5094,18 @@ function TaskDetail() {
 // ALL TASKS VIEW
 // ============================================
 function AllTasksView() {
-  const { projects, setProjects, setSelectedProject, setSelectedTask, setView } = useApp()
+  const { projects, setProjects, setSelectedProject, setSelectedTask, setView, tags, assignTag, unassignTag, createTag } = useApp()
   const { demoMode, user } = useAuth()
   const [activeSubTab, setActiveSubTab] = useState('active') // 'active', 'scheduled', 'complete', 'all'
   const [sortOption, setSortOption] = useState('priority')
   const [sortDirection, setSortDirection] = useState('asc')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
+
   const [expandedTasks, setExpandedTasks] = useState(new Set())
+  const [activeTagPicker, setActiveTagPicker] = useState(null) // { taskId, subtaskId } | null
+  const [selectedFilterTags, setSelectedFilterTags] = useState(new Set())
+  const [tagFilterOpen, setTagFilterOpen] = useState(false)
 
   const handleSortChange = (newOption) => {
     if (newOption === sortOption) {
@@ -5130,6 +5135,11 @@ function AllTasksView() {
     return task.subtasks?.some(s => s.reminder_date && !s.is_completed) || false
   }
 
+  // Helper to check if a task has tags (or its subtasks if we want to include them in the count)
+  const hasTags = (task) => {
+    return (task.tags && task.tags.length > 0) || (task.subtasks?.some(s => s.tags && s.tags.length > 0))
+  }
+
   // Filter based on active sub-tab
   const filteredTasks = activeSubTab === 'scheduled'
     ? allTasks.filter(({ task }) => (task.reminder_date || hasScheduledSubtasks(task)) && !task.is_completed)
@@ -5137,11 +5147,26 @@ function AllTasksView() {
       ? allTasks.filter(({ task }) => !task.is_completed)
       : activeSubTab === 'complete'
         ? allTasks.filter(({ task }) => task.is_completed)
-        : allTasks
+        : activeSubTab === 'tagged'
+          ? allTasks.filter(({ task }) => hasTags(task))
+          : allTasks
+
+  // Apply Tag Filters
+  const displayedTasks = (activeSubTab === 'tagged' && selectedFilterTags.size > 0)
+    ? filteredTasks.filter(({ task }) => {
+      const taskTagIds = new Set((task.tags || []).map(t => t.id))
+      const subtaskTagIds = new Set((task.subtasks || []).flatMap(s => (s.tags || []).map(t => t.id)))
+      // Use OR logic matching any selected filter
+      for (const tagId of selectedFilterTags) {
+        if (taskTagIds.has(tagId) || subtaskTagIds.has(tagId)) return true
+      }
+      return false
+    })
+    : filteredTasks
 
   // Sort tasks: overdue first, then by selected option
   const dir = sortDirection === 'asc' ? 1 : -1
-  filteredTasks.sort((a, b) => {
+  displayedTasks.sort((a, b) => {
     const aOverdue = isOverdue(a.task.reminder_date) && !a.task.is_completed
     const bOverdue = isOverdue(b.task.reminder_date) && !b.task.is_completed
 
@@ -5377,9 +5402,11 @@ function AllTasksView() {
     }
   }
 
+
   const activeCount = allTasks.filter(({ task }) => !task.is_completed).length
   const scheduledCount = allTasks.filter(({ task }) => (task.reminder_date || hasScheduledSubtasks(task)) && !task.is_completed).length
   const completeCount = allTasks.filter(({ task }) => task.is_completed).length
+  const taggedCount = allTasks.filter(({ task }) => hasTags(task)).length
   const allCount = allTasks.length
 
   return (
@@ -5414,9 +5441,16 @@ function AllTasksView() {
                 ? 'border-brand-600 text-brand-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
+
+            <button
+              onClick={() => { setActiveSubTab('tagged'); setSelectedTaskIds(new Set()) }}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeSubTab === 'tagged'
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
-              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
-              Complete ({completeCount})
+              <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              Tagged ({taggedCount})
             </button>
             <button
               onClick={() => { setActiveSubTab('all'); setSelectedTaskIds(new Set()) }}
@@ -5501,16 +5535,68 @@ function AllTasksView() {
               )}
             </button>
           ))}
+
+          {/* Tag Filter Dropdown */}
+          {activeSubTab === 'tagged' && (
+            <div className="relative">
+              <button
+                onClick={() => setTagFilterOpen(!tagFilterOpen)}
+                className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${selectedFilterTags.size > 0
+                  ? 'bg-brand-100 text-brand-700 font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                <Tag className="w-3 h-3" />
+                Filter {selectedFilterTags.size > 0 ? `(${selectedFilterTags.size})` : ''}
+              </button>
+              {tagFilterOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-20 p-2 animate-fade-in">
+                  <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
+                    {tags.map(tag => (
+                      <label key={tag.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedFilterTags.has(tag.id)}
+                          onChange={() => {
+                            const newSet = new Set(selectedFilterTags)
+                            if (newSet.has(tag.id)) newSet.delete(tag.id)
+                            else newSet.add(tag.id)
+                            setSelectedFilterTags(newSet)
+                          }}
+                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
+                        />
+                        <span className="text-sm truncate">{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedFilterTags.size > 0 && (
+                    <button
+                      onClick={() => setSelectedFilterTags(new Set())}
+                      className="w-full mt-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                  {/* Click outside to close handled by parent generic click handler if implemented, 
+                      for now simplistic: */}
+                  <div className="fixed inset-0 z-[-1]" onClick={() => setTagFilterOpen(false)} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {filteredTasks.length === 0 ? (
+      {displayedTasks.length === 0 ? (
         <div className="glass-card rounded-2xl p-6 sm:p-12 text-center">
           <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2">
             {activeSubTab === 'scheduled' ? 'No scheduled tasks'
               : activeSubTab === 'complete' ? 'No completed tasks'
                 : activeSubTab === 'active' ? 'No active tasks'
-                  : 'No tasks yet'}
+                  : activeSubTab === 'tagged' ? 'No tagged tasks found'
+                    : 'No tasks yet'}
           </h2>
           <p className="text-gray-500 text-sm sm:text-base">
             {activeSubTab === 'scheduled'
@@ -5524,7 +5610,7 @@ function AllTasksView() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredTasks.map(({ project, stage, stageIndex, task }, i) => {
+          {displayedTasks.map(({ project, stage, stageIndex, task }, i) => {
             const taskOverdue = isOverdue(task.reminder_date) && !task.is_completed
             const isSelected = selectedTaskIds.has(task.id)
             const isExpanded = expandedTasks.has(task.id)
@@ -5604,66 +5690,155 @@ function AllTasksView() {
                               : task.created_by_name && `Created by ${task.created_by === user?.id ? 'you' : task.created_by_name}`
                             }
                           </span>
+                            }
+                      </span>
                         )}
-                      </div>
+                      {/* Tags Display */}
+                      {task.tags?.map(tag => (
+                        <span key={tag.id} className={`tag text-[9px] px-1.5 py-0.5 border border-transparent ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                          tag.color === 'red' ? 'bg-red-100 text-red-700' :
+                            tag.color === 'green' ? 'bg-green-100 text-green-700' :
+                              tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-gray-100 text-gray-700'
+                          }`}>
+                          {tag.name}
+                        </span>
+                      ))}
                     </div>
-                    {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                   </div>
+                  {/* Tag Button - Persistent next to right chevron if we want it there, 
+                         User said "right side next to the reminder button".
+                         In this view, there is no reminder button for tasks.
+                         So placing it before the chevron. */}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTagPicker(activeTagPicker?.taskId === task.id ? null : { taskId: task.id })
+                      }}
+                      className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id ? 'bg-gray-100 text-gray-900' : ''}`}
+                      title="Add Tag"
+                    >
+                      <Tag className="w-4 h-4" />
+                    </button>
+                    {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
+                      <div onClick={e => e.stopPropagation()}>
+                        <TagPicker
+                          tags={tags}
+                          assignedTagIds={new Set((task.tags || []).map(t => t.id))}
+                          onAssign={(tagId) => assignTag(task.id, tagId)}
+                          onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                          onCreate={createTag}
+                          onClose={() => setActiveTagPicker(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
                 </div>
+              </div>
 
-                {/* Collapsible Subtasks */}
-                {hasSubtasks && isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
-                    {task.subtasks.map(subtask => {
-                      const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
-                      const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
-                      return (
-                        <div
-                          key={subtask.id}
-                          className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
+                {/* Collapsible Subtasks */ }
+            {
+              hasSubtasks && isExpanded && (
+                <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
+                  {task.subtasks.map(subtask => {
+                    const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                    const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
+                    return (
+                      <div
+                        key={subtask.id}
+                        className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
+                      >
+                        <button
+                          onClick={() => !isCompleted && toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
+                          className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''} ${isCompleted ? 'cursor-not-allowed' : ''}`}
+                          style={{ width: 16, height: 16 }}
+                          disabled={isCompleted}
                         >
-                          <button
-                            onClick={() => !isCompleted && toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
-                            className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''} ${isCompleted ? 'cursor-not-allowed' : ''}`}
-                            style={{ width: 16, height: 16 }}
-                            disabled={isCompleted}
-                          >
-                            {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
-                              {subtask.title}
+                          {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
+                        </button>
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                            {subtask.title}
+                          </span>
+                          {/* Subtask Tags Pills */}
+                          {subtask.tags?.length > 0 && (
+                            <div className="flex gap-0.5">
+                              {subtask.tags.map(tag => (
+                                <span key={tag.id} className={`w-2 h-2 rounded-full ${tag.color === 'blue' ? 'bg-blue-400' :
+                                  tag.color === 'red' ? 'bg-red-400' :
+                                    tag.color === 'green' ? 'bg-green-400' :
+                                      tag.color === 'amber' ? 'bg-amber-400' :
+                                        tag.color === 'purple' ? 'bg-purple-400' :
+                                          'bg-gray-400'
+                                  }`} title={tag.name} />
+                              ))}
+                            </div>
+                          )}
+
+                          {isSharedProject && (subtask.created_by_name || subtask.modified_by_name) && (
+                            <span className="text-[10px] text-gray-400 ml-2">
+                              {subtask.modified_by_name && subtask.updated_at !== subtask.created_at
+                                ? `by ${subtask.modified_by === user?.id ? 'you' : subtask.modified_by_name}`
+                                : subtask.created_by_name && `by ${subtask.created_by === user?.id ? 'you' : subtask.created_by_name}`
+                              }
                             </span>
-                            {isSharedProject && (subtask.created_by_name || subtask.modified_by_name) && (
-                              <span className="text-[10px] text-gray-400 ml-2">
-                                {subtask.modified_by_name && subtask.updated_at !== subtask.created_at
-                                  ? `by ${subtask.modified_by === user?.id ? 'you' : subtask.modified_by_name}`
-                                  : subtask.created_by_name && `by ${subtask.created_by === user?.id ? 'you' : subtask.created_by_name}`
-                                }
-                              </span>
-                            )}
-                          </div>
-                          {!isCompleted && (
-                            <ReminderPicker
-                              value={subtask.reminder_date}
-                              onChange={(date, scope) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date, scope)}
-                              compact
-                              isShared={isSharedProject}
-                            />
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+
+                        {/* Subtask Tag Button */}
+                        {!isCompleted && (
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
+                              }}
+                              className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
+                              title="Add Tag"
+                            >
+                              <Tag className="w-3 h-3" />
+                            </button>
+                            {activeTagPicker?.subtaskId === subtask.id && (
+                              <div className="absolute right-0 top-6 z-50 origin-top-right transform">
+                                <TagPicker
+                                  tags={tags}
+                                  assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
+                                  onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
+                                  onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
+                                  onCreate={createTag}
+                                  onClose={() => setActiveTagPicker(null)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {!isCompleted && (
+                          <ReminderPicker
+                            value={subtask.reminder_date}
+                            onChange={(date, scope) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date, scope)}
+                            compact
+                            isShared={isSharedProject}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+            </div>
+      )
+      })}
+
     </div>
   )
 }
+
+
 
 // ============================================
 // MAIN APP
@@ -5714,93 +5889,233 @@ function AppContent() {
   const notifiedOverdueRef = useRef(new Set())
   const [walkVisible, setWalkVisible] = useState(false)
   // Today / daily focus state (per-date persisted)
-  const getTodayKey = (d = new Date()) => `researchos_today_${user?.id || 'anon'}_permanent`
+  const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // { id, title, projectId?, taskId?, isLocal, created_at }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
 
+  // Tags State
+  const [tags, setTags] = useState([])
+  const [isLoadingTags, setIsLoadingTags] = useState(false)
+
+  // Load Tags
   useEffect(() => {
-    // load today's items: prefer server when available, migrate legacy localStorage if needed
+    const loadTags = async () => {
+      setIsLoadingTags(true)
+      if (demoMode) {
+        try {
+          const raw = localStorage.getItem(TAGS_STORAGE_KEY)
+          if (raw) setTags(JSON.parse(raw))
+        } catch (e) { console.error('Error loading local tags', e) }
+      } else if (user) {
+        const { data } = await db.getTags(user.id)
+        if (data) setTags(data)
+      }
+      setIsLoadingTags(false)
+    }
+    loadTags()
+  }, [user, demoMode])
+
+  // Save local tags helper
+  const saveTagsLocal = (newTags) => {
+    setTags(newTags)
+    localStorage.setItem(TAGS_STORAGE_KEY, JSON.stringify(newTags))
+  }
+
+  const createTag = async (name, color) => {
+    const newTag = {
+      id: uuid(),
+      user_id: user?.id || 'anon',
+      name,
+      color,
+      created_at: new Date().toISOString()
+    }
+
+    if (demoMode) {
+      saveTagsLocal([...tags, newTag])
+      return newTag
+    } else {
+      const { data, error } = await db.createTag({
+        user_id: user.id,
+        name,
+        color
+      })
+      if (data) {
+        setTags([...tags, data])
+        return data
+      }
+      return null
+    }
+  }
+
+  const assignTag = async (taskId, tagId, subtaskId = null) => {
+    // Optimistic update in UI 
+    const tag = tags.find(t => t.id === tagId)
+    if (!tag) return
+
+    const updateProjectWithTag = (p) => {
+      return {
+        ...p,
+        stages: p.stages.map(s => ({
+          ...s,
+          tasks: s.tasks.map(t => {
+            if (t.id === taskId) {
+              if (subtaskId) {
+                // Update subtask
+                return {
+                  ...t,
+                  subtasks: t.subtasks?.map(st => {
+                    if (st.id === subtaskId) {
+                      const existing = st.tags || []
+                      if (existing.some(et => et.id === tagId)) return st
+                      return { ...st, tags: [...existing, tag] }
+                    }
+                    return st
+                  }) || []
+                }
+              } else {
+                // Update task
+                const existingTags = t.tags || []
+                if (existingTags.some(et => et.id === tagId)) return t
+                return { ...t, tags: [...existingTags, tag] }
+              }
+            }
+            return t
+          })
+        }))
+      }
+    }
+
+    const newProjects = projects.map(updateProjectWithTag)
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      if (subtaskId) await db.addTagToSubtask(subtaskId, tagId)
+      else await db.addTagToTask(taskId, tagId)
+    }
+  }
+
+  const unassignTag = async (taskId, tagId, subtaskId = null) => {
+    const updateProjectRemoveTag = (p) => {
+      return {
+        ...p,
+        stages: p.stages.map(s => ({
+          ...s,
+          tasks: s.tasks.map(t => {
+            if (t.id === taskId) {
+              if (subtaskId) {
+                return {
+                  ...t,
+                  subtasks: t.subtasks?.map(st => {
+                    if (st.id === subtaskId) {
+                      const existing = st.tags || []
+                      return { ...st, tags: existing.filter(et => et.id !== tagId) }
+                    }
+                    return st
+                  }) || []
+                }
+              } else {
+                const existingTags = t.tags || []
+                return { ...t, tags: existingTags.filter(et => et.id !== tagId) }
+              }
+            }
+            return t
+          })
+        }))
+      }
+    }
+
+    const newProjects = projects.map(updateProjectRemoveTag)
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      if (subtaskId) await db.removeTagFromSubtask(subtaskId, tagId)
+      else await db.removeTagFromTask(taskId, tagId)
+    }
+  }
+
+  // load today's items: prefer server when available, migrate legacy localStorage if needed
+  useEffect(() => {
     (async () => {
       try {
         const today = new Date()
         const key = getTodayKey(today)
-        const legacyKey = `researchos_today_${today.toISOString().slice(0, 10)}`
 
         // Try server if available and user is signed in
         if (!demoMode && user && db && db.getTodayItems) {
+          let serverData = null
           try {
             const { data, error } = await db.getTodayItems(user.id, today)
-            if (!error) {
-              // Merge server data and local copy when both exist to preserve unsynced local additions
-              try {
-                const rawLocal = localStorage.getItem(key)
-                const localItems = rawLocal ? JSON.parse(rawLocal) : null
-                const serverItems = Array.isArray(data) ? data : []
+            if (!error && data) serverData = data
+          } catch (e) { }
 
-                if (Array.isArray(localItems) && localItems.length > 0) {
-                  // If server empty, prefer local (push to server)
-                  if (!serverItems || serverItems.length === 0) {
-                    try { await db.saveTodayItems(user.id, today, localItems) } catch (e) { }
-                    setTodayItems(localItems)
-                    try { localStorage.setItem(key, JSON.stringify(localItems || [])) } catch (e) { }
-                    return
-                  }
+          if (serverData) {
+            // Merge with local if exists
+            try {
+              const rawLocal = localStorage.getItem(key)
+              const localItems = rawLocal ? JSON.parse(rawLocal) : []
+              if (Array.isArray(localItems) && localItems.length > 0) {
+                // Simple merge: ID based
+                const merged = [...serverData]
+                const exists = new Set(merged.map(i => i.id))
+                localItems.forEach(i => {
+                  if (!exists.has(i.id)) merged.push(i)
+                })
 
-                  // Both server and local have items: merge intelligently (dedupe by id/source ids/title)
-                  const merged = [...serverItems]
-                  const existsCheck = (item) => {
-                    return merged.some(m => (item.id && m.id === item.id) || (item.sourceTaskId && (m.sourceTaskId === item.sourceTaskId || m.taskId === item.sourceTaskId)) || (item.sourceSubtaskId && (m.sourceSubtaskId === item.sourceSubtaskId || m.subtaskId === item.sourceSubtaskId)) || (item.title && m.title === item.title))
-                  }
-                  localItems.forEach(li => { if (!existsCheck(li)) merged.push(li) })
-
-                  // If merged differs from server, persist merged set
-                  const mergedDifferent = merged.length !== serverItems.length || merged.some((m, idx) => JSON.stringify(m) !== JSON.stringify(serverItems[idx]))
-                  if (mergedDifferent) {
-                    try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
-                  }
-                  setTodayItems(merged)
-                  try { localStorage.setItem(key, JSON.stringify(merged || [])) } catch (e) { }
-                  return
-                }
-
-              } catch (e) {
-                // ignore JSON parse errors and continue
-              }
-
-              if (data) {
-                setTodayItems(Array.isArray(data) ? data : [])
-                // also persist locally for offline
-                try { localStorage.setItem(key, JSON.stringify(data || [])) } catch (e) { }
+                // Save back merged
+                try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
+                setTodayItems(merged)
+                localStorage.setItem(key, JSON.stringify(merged))
                 return
               }
-            }
-          } catch (e) {
-            // fall back to local
-          }
-        }
+            } catch (e) { }
 
-        // No server or not signed in: load from localStorage and migrate legacy
-        const rawUser = localStorage.getItem(key)
-        const parsedUser = rawUser ? JSON.parse(rawUser) : null
-
-        if ((parsedUser === null || parsedUser === undefined) && localStorage.getItem(legacyKey)) {
-          try {
-            const rawLegacy = localStorage.getItem(legacyKey)
-            const parsedLegacy = rawLegacy ? JSON.parse(rawLegacy) : []
-            localStorage.setItem(key, JSON.stringify(parsedLegacy || []))
-            setTodayItems(parsedLegacy || [])
-            // If user is signed in and server available, push migration to server
-            if (!demoMode && user && db && db.saveTodayItems) {
-              try { await db.saveTodayItems(user.id, today, parsedLegacy || []) } catch (e) { }
-            }
+            setTodayItems(serverData)
+            localStorage.setItem(key, JSON.stringify(serverData))
             return
-          } catch (e) {
-            // fallback to empty
           }
         }
 
-        setTodayItems(parsedUser || [])
+        // Fallback or No Server: Local Storage
+        const rawLocal = localStorage.getItem(key)
+        if (rawLocal) {
+          try {
+            const parsed = JSON.parse(rawLocal)
+            if (Array.isArray(parsed)) {
+              setTodayItems(parsed)
+              return
+            }
+          } catch (e) { }
+        }
+
+        // Valid Migration Check
+        const legacyKey = `researchos_today_${today.toISOString().slice(0, 10)}`
+        const legacyStored = localStorage.getItem(legacyKey)
+        if (legacyStored) {
+          try {
+            const parsedLegacy = JSON.parse(legacyStored)
+            if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+              const merged = parsedLegacy.map(i => ({ ...i, id: i.id || uuid(), created_at: i.created_at || new Date().toISOString() }))
+              localStorage.setItem(key, JSON.stringify(merged))
+              if (!demoMode && user && db && db.saveTodayItems) {
+                try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
+              }
+              setTodayItems(merged)
+              return
+            }
+          } catch (e) { }
+        }
+
+        // Notifications Migration
+        const legacyNotifs = localStorage.getItem('researchos_notifications')
+        if (legacyNotifs) {
+          localStorage.setItem('hypothesys_notifications', legacyNotifs)
+          localStorage.removeItem('researchos_notifications')
+        }
+
+        setTodayItems([])
       } catch (e) {
         setTodayItems([])
       }
@@ -5853,7 +6168,11 @@ function AppContent() {
       sourceTaskId: task.id,
       created_at: new Date().toISOString()
     }
-    const next = [...todayItems, item]
+    // New tasks go above completed tasks
+    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
+    const next = firstCompletedIndex === -1
+      ? [...todayItems, item]
+      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
     setTodayItems(next)
     saveTodayItems(next)
       // Try to persist immediately to server and surface errors
@@ -5887,7 +6206,11 @@ function AppContent() {
       sourceSubtaskId: subtask.id,
       created_at: new Date().toISOString()
     }
-    const next = [...todayItems, item]
+    // New tasks go above completed tasks
+    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
+    const next = firstCompletedIndex === -1
+      ? [...todayItems, item]
+      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
     setTodayItems(next)
     saveTodayItems(next)
       ; (async () => {
@@ -5911,7 +6234,11 @@ function AppContent() {
     const exists = todayItems.find(i => i.isLocal && i.title === trimmed)
     if (exists) { showToast('Item already in Tod(o)ay'); return }
     const item = { id: uuid(), title: trimmed, isLocal: true, is_done: false, created_at: new Date().toISOString() }
-    const next = [...todayItems, item]
+    // New tasks go above completed tasks
+    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
+    const next = firstCompletedIndex === -1
+      ? [...todayItems, item]
+      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
     setTodayItems(next)
     saveTodayItems(next)
       ; (async () => {
@@ -6078,7 +6405,7 @@ function AppContent() {
     if (demoMode) {
       // Load from localStorage for demo
       try {
-        const stored = localStorage.getItem('researchos_notifications')
+        const stored = localStorage.getItem('hypothesys_notifications')
         const parsed = stored ? JSON.parse(stored) : []
         setNotifications(parsed)
         // populate notifiedOverdueRef from stored notifications
@@ -6112,7 +6439,7 @@ function AppContent() {
   }
 
   // Walkthrough: show on first login
-  const WALK_KEY = 'researchos_walkthrough_seen_v1'
+  const WALK_KEY = 'hypothesys_walkthrough_seen_v1'
   useEffect(() => {
     if (!user) return
     try {
@@ -6230,7 +6557,7 @@ function AppContent() {
         setNotifications(allNotifications)
 
         if (demoMode) {
-          localStorage.setItem('researchos_notifications', JSON.stringify(allNotifications))
+          localStorage.setItem('hypothesys_notifications', JSON.stringify(allNotifications))
         } else {
           // Save new notifications to the database
           for (const notif of newOverdueNotifications) {
@@ -6257,7 +6584,7 @@ function AppContent() {
     if (demoMode) {
       const updated = notifications.map(n => n.id === id ? { ...n, is_read: true } : n)
       setNotifications(updated)
-      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
     } else {
       await db.markNotificationRead(id)
       setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n))
@@ -6268,7 +6595,7 @@ function AppContent() {
     if (demoMode) {
       const updated = notifications.map(n => n.id === id ? { ...n, is_read: false } : n)
       setNotifications(updated)
-      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
     } else {
       await db.markNotificationUnread(id)
       setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: false } : n))
@@ -6279,7 +6606,7 @@ function AppContent() {
     if (demoMode) {
       const updated = notifications.map(n => ({ ...n, is_read: true }))
       setNotifications(updated)
-      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
     } else {
       await db.markAllNotificationsRead(user.id)
       setNotifications(notifications.map(n => ({ ...n, is_read: true })))
@@ -6290,7 +6617,7 @@ function AppContent() {
     if (demoMode) {
       const updated = notifications.filter(n => n.id !== id)
       setNotifications(updated)
-      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
     } else {
       await db.deleteNotification(id)
       setNotifications(notifications.filter(n => n.id !== id))
@@ -6302,7 +6629,7 @@ function AppContent() {
       const idsSet = new Set(ids)
       const updated = notifications.filter(n => !idsSet.has(n.id))
       setNotifications(updated)
-      localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
     } else {
       // Delete each notification
       for (const id of ids) {
@@ -6316,7 +6643,7 @@ function AppContent() {
   const handleClearAllNotifications = async () => {
     if (demoMode) {
       setNotifications([])
-      localStorage.setItem('researchos_notifications', JSON.stringify([]))
+      localStorage.setItem('hypothesys_notifications', JSON.stringify([]))
     } else {
       await db.clearAllNotifications(user.id)
       setNotifications([])
@@ -6377,7 +6704,7 @@ function AppContent() {
         }
         const updated = [newNotif, ...notifications]
         setNotifications(updated)
-        localStorage.setItem('researchos_notifications', JSON.stringify(updated))
+        localStorage.setItem('hypothesys_notifications', JSON.stringify(updated))
       }
     }
 
@@ -6508,7 +6835,7 @@ function AppContent() {
         }
       })
       if (Object.keys(memberPriorities).length > 0) {
-        localStorage.setItem('researchos_member_priorities', JSON.stringify(memberPriorities))
+        localStorage.setItem('hypothesys_member_priorities', JSON.stringify(memberPriorities))
       }
       return
     }
@@ -6578,7 +6905,8 @@ function AppContent() {
     saveTodayItems,
     showToast,
     user,
-    demoMode
+    demoMode,
+    tags, createTag, assignTag, unassignTag
   }
 
   return (
@@ -6613,7 +6941,7 @@ function AppContent() {
             { title: 'Tod(o)ay', body: 'Quickly pick today’s priorities or add fast local items.', selector: '#tab-today' }
           ]}
           visible={walkVisible}
-          onClose={() => { try { localStorage.setItem('researchos_walkthrough_seen_v1', '1') } catch (e) { }; setWalkVisible(false) }}
+          onClose={() => { try { localStorage.setItem('hypothesys_walkthrough_seen_v1', '1') } catch (e) { }; setWalkVisible(false) }}
         />
         {view === 'project' && <ProjectDetail />}
         {view === 'task' && <TaskDetail />}

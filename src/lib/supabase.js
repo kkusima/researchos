@@ -96,10 +96,16 @@ export const db = {
             *,
             tasks (
               *,
+              tags (
+                *
+              ),
               creator:users!created_by (name, email),
               modifier:users!modified_by (name, email),
               subtasks (
                 *,
+                tags (
+                  *
+                ),
                 creator:users!created_by (name, email),
                 modifier:users!modified_by (name, email)
               ),
@@ -1301,6 +1307,125 @@ export const db = {
       return { error }
     } catch (error) {
       logError('notifyCollaborators:catch', error)
+      return { error }
+    }
+  },
+
+  // Tags
+  async getTags(userId) {
+    if (!supabase) return { data: [], error: null }
+    try {
+      const { data, error } = await supabase
+        .from('tags')
+        .select('*')
+        .eq('user_id', userId)
+        .order('name')
+
+      if (error) logError('getTags', error)
+      return { data: data || [], error }
+    } catch (error) {
+      logError('getTags:catch', error)
+      return { data: [], error }
+    }
+  },
+
+  async createTag(tag) {
+    if (!supabase) return { data: null, error: null }
+    try {
+      const { data, error } = await supabase
+        .from('tags')
+        .insert(tag)
+        .select()
+        .single()
+
+      if (error) logError('createTag', error)
+      return { data, error }
+    } catch (error) {
+      logError('createTag:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  async deleteTag(id) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase
+        .from('tags')
+        .delete()
+        .eq('id', id)
+
+      if (error) logError('deleteTag', error)
+      return { error }
+    } catch (error) {
+      logError('deleteTag:catch', error)
+      return { error }
+    }
+  },
+
+  async addTagToTask(taskId, tagId) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase
+        .from('task_tags')
+        .insert({ task_id: taskId, tag_id: tagId })
+        .select()
+        .single()
+
+      if (error && error.code !== '23505') logError('addTagToTask', error) // Ignore duplicate key
+      return { error }
+    } catch (error) {
+      logError('addTagToTask:catch', error)
+      return { error }
+    }
+  },
+
+  async removeTagFromTask(taskId, tagId) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase
+        .from('task_tags')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('tag_id', tagId)
+
+      if (error) logError('removeTagFromTask', error)
+      return { error }
+    } catch (error) {
+      logError('removeTagFromTask:catch', error)
+      return { error }
+    }
+  },
+
+  async addTagToSubtask(subtaskId, tagId) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase
+        .from('subtask_tags')
+        .insert({ subtask_id: subtaskId, tag_id: tagId })
+        .select()
+        .single()
+
+      if (error && error.code !== '23505') logError('addTagToSubtask', error)
+      return { error }
+    } catch (error) {
+      logError('addTagToSubtask:catch', error)
+      return { error }
+    }
+  },
+
+  async removeTagFromSubtask(subtaskId, tagId) {
+    if (!supabase) return { error: null }
+    try {
+      const { error } = await supabase
+        .from('subtask_tags')
+        .delete()
+        .eq('subtask_id', subtaskId)
+        .eq('tag_id', tagId)
+
+      if (error) logError('removeTagFromSubtask', error)
+      return { error }
+    } catch (error) {
+      logError('removeTagFromSubtask:catch', error)
       return { error }
     }
   }

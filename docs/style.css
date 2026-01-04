@@ -592,7 +592,11 @@ h6 {
 /* Responsive */
 @media (max-width: 768px) {
     .nav__links {
-        gap: var(--space-lg);
+        gap: var(--space-sm);
+    }
+
+    .nav__link {
+        font-size: 0.8rem;
     }
 
     .hero__title {

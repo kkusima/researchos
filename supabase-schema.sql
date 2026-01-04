@@ -113,6 +113,32 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Tags table
+CREATE TABLE IF NOT EXISTS public.tags (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, name)
+);
+
+-- Task Tags table (Many-to-Many)
+CREATE TABLE IF NOT EXISTS public.task_tags (
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  tag_id UUID NOT NULL REFERENCES public.tags(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (task_id, tag_id)
+);
+
+-- Subtask Tags table (Many-to-Many)
+CREATE TABLE IF NOT EXISTS public.subtask_tags (
+  subtask_id UUID NOT NULL REFERENCES public.subtasks(id) ON DELETE CASCADE,
+  tag_id UUID NOT NULL REFERENCES public.tags(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (subtask_id, tag_id)
+);
+
 -- Prevent duplicate notifications for the same user and entity/type combination.
 DO $$
 BEGIN
@@ -158,6 +184,10 @@ CREATE INDEX IF NOT EXISTS idx_subtasks_task ON public.subtasks(task_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task ON public.comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_today_items_user_day ON public.today_items(user_id, day);
+CREATE INDEX IF NOT EXISTS idx_tags_user ON public.tags(user_id);
+CREATE INDEX IF NOT EXISTS idx_task_tags_task ON public.task_tags(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_tags_tag ON public.task_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_subtask_tags_subtask ON public.subtask_tags(subtask_id);
 
 -- Enable Row Level Security (Schema continues same as before...)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
