@@ -6078,6 +6078,7 @@ function AppContent() {
   // Tags State
   const [tags, setTags] = useState([])
   const [isLoadingTags, setIsLoadingTags] = useState(false)
+  const [activeTagPicker, setActiveTagPicker] = useState(null) // { taskId, subtaskId? }
 
   // Load Tags
   useEffect(() => {
