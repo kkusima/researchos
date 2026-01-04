@@ -1,8 +1,10 @@
-# ResearchOS 🔬
+# HypotheSys™ 🔬
+
+*Systematizing your way from hypothesis to discovery*
 
 A modern, collaborative research project management application designed for researchers, academics, and teams working on complex projects.
 
-![ResearchOS](https://img.shields.io/badge/version-1.0.0-blue)
+![HypotheSys](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 📄 **Github Pages**: [https://kkusima.github.io/researchos/](https://kkusima.github.io/researchos/)
@@ -15,9 +17,9 @@ Get the native experience for your workstation:
 *   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/researchos/releases/download/v1.0.0/ReseachOS_Mac_v1.0.0.zip) (~180 MB)
 *   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/researchos/releases/download/v1.0.0/ReseachOS_Windows_v1.0.0.zip) (~80 MB)
 
-## What is ResearchOS?
+## What is HypotheSys™?
 
-ResearchOS is a lightweight project management tool built specifically for research workflows. Created to address the pain point of needing a simple, practical tool for everyday research work, it allows users to create projects, collaborate in shared workspaces, and keep project information synchronized in real time, without unnecessary complexity. The tool is free to use and focuses on a straightforward, intuitive UI that centralizes tasks and project data to support core research workflows in a single interface.
+HypotheSys™ is a lightweight project management tool built specifically for research workflows. Created to address the pain point of needing a simple, practical tool for everyday research work, it allows users to create projects, collaborate in shared workspaces, and keep project information synchronized in real time, without unnecessary complexity. The tool is free to use and focuses on a straightforward, intuitive UI that centralizes tasks and project data to support core research workflows in a single interface.
 
 ![v1GIF.gif](v1GIF.gif)
 
@@ -53,6 +55,12 @@ ResearchOS is a lightweight project management tool built specifically for resea
 ## License
 
 MIT License
+
+---
+
+## Trademark Notice
+
+**HypotheSys™** is a trademark. The name and associated branding are proprietary. Use of the HypotheSys™ name, logo, or branding for derivative works or commercial purposes requires prior written permission.
 
 ---
 

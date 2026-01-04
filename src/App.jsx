@@ -271,8 +271,8 @@ function LoginPage() {
         <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center text-4xl" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
           🔬
         </div>
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">ResearchOS</h1>
-        <p className="text-gray-500 mb-6">Collaborative research project management</p>
+        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">HypotheSys™</h1>
+        <p className="text-gray-500 mb-6">Systematizing your way from hypothesis to discovery</p>
 
         {/* Google Sign In - First */}
         <button
@@ -1318,7 +1318,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
                   🔬
                 </div>
-                <span className="font-bold text-lg sm:text-xl text-gray-900 hidden sm:block">ResearchOS</span>
+                <span className="font-bold text-lg sm:text-xl text-gray-900 hidden sm:block">HypotheSys™</span>
               </div>
               {demoMode && (
                 <span className="tag tag-warning text-[10px] hidden sm:inline-flex">DEMO</span>
@@ -4142,7 +4142,7 @@ function ShareModal({ project, onClose, onUpdate }) {
       // User doesn't exist - invitation created
       const link = `${window.location.origin}?invite=${result.data.token}`
       setInviteLink(link)
-      setSuccess(`${email} hasn't joined ResearchOS yet. Share the invite link below!`)
+      setSuccess(`${email} hasn't joined HypotheSys™ yet. Share the invite link below!`)
       setPendingInvites(prev => [...prev, result.data])
       setEmail('')
     } else if (result.type === 'existing') {
@@ -6605,7 +6605,7 @@ function AppContent() {
         )}
         <Walkthrough
           steps={[
-            { title: 'Welcome to ResearchOS', body: 'Tip: Tap the logo to return to this dashboard anytime.', selector: '#app-logo' },
+            { title: 'Welcome to HypotheSys™', body: 'Tip: Tap the logo to return to this dashboard anytime.', selector: '#app-logo' },
             { title: 'Projects', body: 'Create and organize projects here.', selector: '#tab-projects' },
             { title: 'Reorder Projects', body: 'Reorder your projects to change priority.', selector: '#projects-reorder-btn' },
             { title: 'Sharing', body: 'Share projects with collaborators and see shared badges.', selector: '#project-card-0-shared-desktop' },

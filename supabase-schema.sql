@@ -1,4 +1,4 @@
--- ResearchOS Database Schema for Supabase
+-- HypotheSys™ Database Schema for Supabase
 -- Idempotent version: safe to run multiple times
 
 -- Enable UUID extension

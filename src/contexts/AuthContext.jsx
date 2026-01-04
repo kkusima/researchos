@@ -28,8 +28,8 @@ const getInviteToken = () => {
       sessionStorage.setItem('pendingInviteToken', invite)
       // Clean the invite param from URL
       params.delete('invite')
-      const newUrl = params.toString() 
-        ? `${window.location.pathname}?${params.toString()}` 
+      const newUrl = params.toString()
+        ? `${window.location.pathname}?${params.toString()}`
         : window.location.pathname
       window.history.replaceState({}, document.title, newUrl)
       return invite
@@ -79,11 +79,11 @@ export function AuthProvider({ children }) {
         supabase.from('users').upsert({
           id: authUser.id,
           email: authUser.email,
-          name: authUser.user_metadata?.full_name || 
-                authUser.user_metadata?.name || 
-                authUser.email?.split('@')[0] || 'User',
-          avatar_url: authUser.user_metadata?.avatar_url || 
-                      authUser.user_metadata?.picture || null
+          name: authUser.user_metadata?.full_name ||
+            authUser.user_metadata?.name ||
+            authUser.email?.split('@')[0] || 'User',
+          avatar_url: authUser.user_metadata?.avatar_url ||
+            authUser.user_metadata?.picture || null
         }, { onConflict: 'id' }),
         5000,
         'Profile sync timed out'
@@ -111,11 +111,11 @@ export function AuthProvider({ children }) {
 
     dlog('✅ Authenticated:', session.user.email)
     setUser(session.user)
-    
+
     // Profile sync in background - don't block UI
     ensureUserProfile(session.user).then(async (ready) => {
       setProfileReady(ready)
-      
+
       // Check for pending invite token after profile is ready
       const inviteToken = sessionStorage.getItem('pendingInviteToken')
       if (inviteToken && ready) {
@@ -127,7 +127,7 @@ export function AuthProvider({ children }) {
           } else if (data) {
             dlog('✅ Joined project:', data.projectId)
             // Could dispatch an event here to reload projects
-            window.dispatchEvent(new CustomEvent('invitation-accepted', { 
+            window.dispatchEvent(new CustomEvent('invitation-accepted', {
               detail: { projectId: data.projectId, role: data.role }
             }))
           }
@@ -154,7 +154,7 @@ export function AuthProvider({ children }) {
       dlog('🎭 Demo mode - no Supabase configured')
       setUser({
         id: 'demo-user',
-        email: 'demo@researchos.app',
+        email: 'demo@hypothesys.app',
         user_metadata: { name: 'Demo User', avatar_url: null }
       })
       setProfileReady(true)
@@ -166,7 +166,7 @@ export function AuthProvider({ children }) {
 
     const initialize = async () => {
       dlog('🔐 Initializing auth...')
-      
+
       try {
         // Check for OAuth callback code
         const params = new URLSearchParams(window.location.search)
@@ -185,7 +185,7 @@ export function AuthProvider({ children }) {
         if (code) {
           dlog('🔄 Exchanging OAuth code...')
           cleanUrl() // Clean URL immediately to prevent re-processing
-          
+
           try {
             const { data, error: exchangeError } = await withTimeout(
               supabase.auth.exchangeCodeForSession(code),
@@ -245,7 +245,7 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         dlog('🔔 Auth event:', event)
-        
+
         if (!mounted) return
 
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -280,7 +280,7 @@ export function AuthProvider({ children }) {
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { 
+      options: {
         redirectTo,
         queryParams: {
           access_type: 'offline',
