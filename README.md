@@ -14,8 +14,8 @@ A modern, collaborative research project management application designed for res
 
 ### 🖥️  Desktop Apps 
 Get the native experience for your workstation:
-*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/hypothesys_Mac_v1.0.0.zip) (~180 MB)
-*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/hypothesys_Windows_v1.0.0.zip) (~80 MB)
+*   🍎 **macOS**: [Download zipped .dmg](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/HypotheSys_Mac_v1.0.0.zip) (~180 MB)
+*   🪟 **Windows**: [Download zipped .exe](https://github.com/kkusima/hypothesys/releases/download/v1.0.0/HypotheSys_Windows_v1.0.0.zip) (~80 MB)
 
 ## What is HypotheSys™?
 
@@ -64,4 +64,4 @@ MIT License
 
 ---
 
-© 2026 [Kenneth Kusima](http://tinyurl.com/kennethkusima). All rights reserved.
+HypotheSys™ © 2026 [Kenneth Kusima](http://tinyurl.com/kennethkusima). All rights reserved.

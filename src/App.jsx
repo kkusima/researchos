@@ -1723,13 +1723,13 @@ function TodayView() {
     }
   }
   // Flatten tasks and subtasks with project context for the existing-task picker
-  const allEntries = projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
+  const allEntries = useMemo(() => projects.flatMap(p => (p.stages || []).flatMap((s, si) => (s.tasks || []).flatMap(t => {
     // Only include non-completed tasks
     const base = !t.is_completed ? [{ type: 'task', task: t, project: p, stage: s, stageIndex: si }] : []
     // Only include non-completed subtasks
     const subs = (t.subtasks || []).filter(st => !st.is_completed).map(st => ({ type: 'subtask', subtask: st, task: t, project: p, stage: s, stageIndex: si }))
     return [...base, ...subs]
-  })))
+  }))), [projects])
 
   useEffect(() => {
     if (!existingPicker) return
@@ -1890,7 +1890,8 @@ function TodayView() {
                   <div className="text-sm text-gray-400 p-4 text-center">No tasks available</div>
                 )}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
@@ -7163,7 +7164,13 @@ function AppContent() {
       }
 
       if (user) {
-        const { data, error } = await db.getProjects(user.id)
+        // Parallelize projects and notifications loading
+        const [projectsResult, _] = await Promise.all([
+          db.getProjects(user.id),
+          loadNotifications()
+        ])
+
+        const { data, error } = projectsResult
         if (!error && data) {
           // Merge local optimistic items (those marked `is_local`) into server response
           try {
@@ -7193,7 +7200,7 @@ function AppContent() {
             setProjects(data)
           }
         }
-        loadNotifications()
+        // Notification loading already handled in Promise.all above
       }
       setLoading(false)
     }
@@ -7392,7 +7399,7 @@ function AppContent() {
         )}
 
         <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-[10px] text-gray-400 bg-white/80 backdrop-blur-sm border-t border-gray-100">
-          © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+          HypotheSys™ © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </footer>
       </div>
     </AppContext.Provider >
