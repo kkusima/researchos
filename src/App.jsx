@@ -894,18 +894,20 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
       </button>
       {isOpen && ReactDOM.createPortal(
         <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setIsOpen(false)} />
           <div
             style={{
-              position: 'absolute',
+              position: 'fixed',
               zIndex: 9999,
               top: buttonRef.current ? buttonRef.current.getBoundingClientRect().bottom + 8 : 100,
-              left: buttonRef.current ? Math.min(
+              left: buttonRef.current ? Math.max(8, Math.min(
                 buttonRef.current.getBoundingClientRect().left,
-                window.innerWidth - 300
-              ) : 100,
-              maxHeight: 'calc(100vh - 100px)',
+                window.innerWidth - 292
+              )) : 8,
+              maxHeight: 'calc(100vh - 40px)',
               overflowY: 'auto'
             }}
+            className="w-72 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 animate-fade-in"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -1592,6 +1594,29 @@ const TodayItem = React.memo(({
                   {project.title}
                 </div>
               )}
+              {/* Tags Display in TodayItem */}
+              {item.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {item.tags.map(tag => {
+                    const colorMap = {
+                      blue: 'bg-blue-100 text-blue-700',
+                      green: 'bg-green-100 text-green-700',
+                      red: 'bg-red-100 text-red-700',
+                      amber: 'bg-amber-100 text-amber-700',
+                      purple: 'bg-purple-100 text-purple-700',
+                      pink: 'bg-pink-100 text-pink-700',
+                      indigo: 'bg-indigo-100 text-indigo-700',
+                      gray: 'bg-gray-100 text-gray-700'
+                    }
+                    const colorClasses = colorMap[tag.color] || colorMap.blue
+                    return (
+                      <span key={tag.id} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colorClasses}`}>
+                        {tag.name}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1631,7 +1656,7 @@ const TodayItem = React.memo(({
 function TodayView() {
   const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView, setTodayItems, saveTodayItems, showToast, user, demoMode, reloadProjects, setProjects } = useApp()
   const [newTitle, setNewTitle] = useState('')
-  const [showExistingPicker, setShowExistingPicker] = useState(false)
+  const [existingPicker, setExistingPicker] = useState(null) // { position }
   const [existingQuery, setExistingQuery] = useState('')
   const pickerRef = useRef(null)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -1707,12 +1732,12 @@ function TodayView() {
   })))
 
   useEffect(() => {
-    if (!showExistingPicker) return
+    if (!existingPicker) return
     const onDocDown = (e) => {
       if (!pickerRef.current) return
-      if (!pickerRef.current.contains(e.target)) setShowExistingPicker(false)
+      if (!pickerRef.current.contains(e.target)) setExistingPicker(null)
     }
-    const onKey = (e) => { if (e.key === 'Escape') setShowExistingPicker(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setExistingPicker(null) }
     document.addEventListener('mousedown', onDocDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -1787,15 +1812,34 @@ function TodayView() {
           />
           <button
             id="today-add-existing"
-            onClick={() => { setShowExistingPicker(s => !s); setExistingQuery('') }}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setExistingPicker(existingPicker ? null : {
+                position: {
+                  top: rect.bottom + window.scrollY + 8,
+                  right: window.innerWidth - rect.right
+                }
+              });
+              setExistingQuery('');
+            }}
             className="px-3 py-2 bg-white border border-gray-200 rounded text-gray-700 hover:bg-gray-50 text-sm font-medium"
             title="Add an existing task"
           >
             Add Existing
           </button>
 
-          {showExistingPicker && (
-            <div ref={pickerRef} className="absolute right-0 mt-12 w-[90vw] sm:w-[48rem] lg:w-[51rem] max-w-[51rem] bg-white border border-gray-100 rounded-xl shadow-xl z-40 p-3">
+          {existingPicker && ReactDOM.createPortal(
+            <div
+              ref={pickerRef}
+              style={{
+                position: 'fixed',
+                top: `${Math.min(existingPicker.position.top - window.scrollY, window.innerHeight - 450)}px`,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000
+              }}
+              className="w-[calc(100vw-32px)] sm:w-[52rem] max-w-[52rem] bg-white border border-gray-100 rounded-xl shadow-2xl p-3 max-h-[80vh] overflow-y-auto animate-fade-in"
+            >
               <input
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-2 text-sm"
                 placeholder="Search tasks..."
@@ -1818,7 +1862,7 @@ function TodayView() {
                       } else {
                         addToToday(entry.task, { projectId: entry.project?.id })
                       }
-                      setShowExistingPicker(false)
+                      setExistingPicker(null)
                     }}>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
@@ -3863,9 +3907,34 @@ function ProjectDetail() {
                             >
                               {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
                             </button>
-                            <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
-                              {subtask.title}
-                            </span>
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                                {subtask.title}
+                              </span>
+                              {/* Subtask Tag Pills */}
+                              {subtask.tags?.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {subtask.tags.map(tag => {
+                                    const colorMap = {
+                                      blue: 'bg-blue-100 text-blue-700',
+                                      green: 'bg-green-100 text-green-700',
+                                      red: 'bg-red-100 text-red-700',
+                                      amber: 'bg-amber-100 text-amber-700',
+                                      purple: 'bg-purple-100 text-purple-700',
+                                      pink: 'bg-pink-100 text-pink-700',
+                                      indigo: 'bg-indigo-100 text-indigo-700',
+                                      gray: 'bg-gray-100 text-gray-700'
+                                    }
+                                    const colorClasses = colorMap[tag.color] || colorMap.blue
+                                    return (
+                                      <span key={tag.id} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colorClasses}`}>
+                                        {tag.name}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
                             {/* Subtask Tag Button */}
                             <div className="relative">
                               <button
@@ -5086,13 +5155,13 @@ function TaskDetail() {
                             <button onClick={() => setEditingSubtaskId(null)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
                             <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
                               {s.title}
                             </span>
                             {/* Subtask Tag Pills */}
                             {s.tags?.length > 0 && (
-                              <div className="flex flex-wrap gap-1 ml-2">
+                              <div className="flex flex-wrap gap-1">
                                 {s.tags.map(tag => {
                                   const colorMap = {
                                     blue: 'bg-blue-100 text-blue-700',
@@ -6009,16 +6078,25 @@ function AllTasksView() {
                               </span>
                               {/* Subtask Tags Pills */}
                               {subtask.tags?.length > 0 && (
-                                <div className="flex gap-0.5">
-                                  {subtask.tags.map(tag => (
-                                    <span key={tag.id} className={`w-2 h-2 rounded-full ${tag.color === 'blue' ? 'bg-blue-400' :
-                                      tag.color === 'red' ? 'bg-red-400' :
-                                        tag.color === 'green' ? 'bg-green-400' :
-                                          tag.color === 'amber' ? 'bg-amber-400' :
-                                            tag.color === 'purple' ? 'bg-purple-400' :
-                                              'bg-gray-400'
-                                      }`} title={tag.name} />
-                                  ))}
+                                <div className="flex flex-wrap gap-1">
+                                  {subtask.tags.map(tag => {
+                                    const colorMap = {
+                                      blue: 'bg-blue-100 text-blue-700',
+                                      green: 'bg-green-100 text-green-700',
+                                      red: 'bg-red-100 text-red-700',
+                                      amber: 'bg-amber-100 text-amber-700',
+                                      purple: 'bg-purple-100 text-purple-700',
+                                      pink: 'bg-pink-100 text-pink-700',
+                                      indigo: 'bg-indigo-100 text-indigo-700',
+                                      gray: 'bg-gray-100 text-gray-700'
+                                    }
+                                    const colorClasses = colorMap[tag.color] || colorMap.blue
+                                    return (
+                                      <span key={tag.id} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colorClasses}`}>
+                                        {tag.name}
+                                      </span>
+                                    )
+                                  })}
                                 </div>
                               )}
 
@@ -6507,6 +6585,7 @@ function AppContent() {
       projectId: opts.projectId || null,
       isLocal: true,
       sourceTaskId: task.id,
+      tags: task.tags || [],
       created_at: new Date().toISOString()
     }
     // New tasks go above completed tasks
@@ -6545,6 +6624,7 @@ function AppContent() {
       isLocal: true,
       sourceTaskId: parentTask.id,
       sourceSubtaskId: subtask.id,
+      tags: subtask.tags || [],
       created_at: new Date().toISOString()
     }
     // New tasks go above completed tasks

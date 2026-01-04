@@ -82,16 +82,18 @@ export default function TagPicker({
     const pickerStyles = position ? {
         position: 'fixed',
         top: `${position.top}px`,
-        left: position.left !== undefined ? `${position.left}px` : 'auto',
-        right: position.right !== undefined ? `${position.right}px` : 'auto',
+        left: position.left !== undefined ? `${Math.max(8, Math.min(position.left, window.innerWidth - 300))}px` : 'auto',
+        right: position.right !== undefined ? `${Math.max(8, Math.min(position.right, window.innerWidth - 300))}px` : 'auto',
         zIndex: 10000,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        maxHeight: 'calc(100vh - 40px)',
+        overflowY: 'auto'
     } : { backgroundColor: '#ffffff', position: 'absolute', right: 0, top: '2rem', zIndex: 10000 }
 
     const content = (
         <div
             ref={containerRef}
-            className="w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in"
+            className="w-72 max-w-[calc(100vw-16px)] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in"
             style={pickerStyles}
             onClick={e => e.stopPropagation()}
         >
