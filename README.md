@@ -64,4 +64,4 @@ MIT License
 
 ---
 
-© 2025 [Kenneth Kusima](http://tinyurl.com/kennethkusima). All rights reserved.
+© 2026 [Kenneth Kusima](http://tinyurl.com/kennethkusima). All rights reserved.

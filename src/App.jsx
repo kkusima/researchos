@@ -232,7 +232,7 @@ function LoginPage() {
           </button>
         </div>
         <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
-          © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+          © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </p>
       </div>
     )
@@ -261,7 +261,7 @@ function LoginPage() {
           </button>
         </div>
         <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
-          © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+          © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </p>
       </div>
     )
@@ -436,7 +436,7 @@ function LoginPage() {
       </div>
 
       <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-gray-400">
-        © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+        © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
       </p>
     </div>
   )
@@ -3136,13 +3136,14 @@ function CreateProjectModal({ onClose }) {
 // PROJECT DETAIL VIEW
 // ============================================
 function ProjectDetail() {
-  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday } = useApp()
+  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday, tags, createTag, assignTag, unassignTag } = useApp()
   const { demoMode, user } = useAuth()
   const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
   const [previewIndex, setPreviewIndex] = useState(null)
   const [newTask, setNewTask] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [activeTagPicker, setActiveTagPicker] = useState(null) // { taskId, subtaskId? }
 
   if (!selectedProject) return null
 
@@ -3752,6 +3753,31 @@ function ProjectDetail() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Tag Button */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveTagPicker(activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? null : { taskId: task.id })
+                            }}
+                            className={`p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
+                            title="Add Tag"
+                          >
+                            <Tag className="w-4 h-4" />
+                          </button>
+                          {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
+                            <div className="absolute right-0 top-full mt-1 z-50" onClick={e => e.stopPropagation()}>
+                              <TagPicker
+                                tags={tags}
+                                assignedTagIds={new Set((task.tags || []).map(t => t.id))}
+                                onAssign={(tagId) => assignTag(task.id, tagId)}
+                                onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                                onCreate={createTag}
+                                onClose={() => setActiveTagPicker(null)}
+                              />
+                            </div>
+                          )}
+                        </div>
                         <ReminderPicker
                           value={task.reminder_date}
                           onChange={(date, scope) => updateTaskReminder(task.id, date, scope)}
@@ -3795,6 +3821,31 @@ function ProjectDetail() {
                             <span className={`flex-1 text-sm min-w-0 truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
                               {subtask.title}
                             </span>
+                            {/* Subtask Tag Button */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
+                                }}
+                                className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
+                                title="Add Tag"
+                              >
+                                <Tag className="w-3 h-3" />
+                              </button>
+                              {activeTagPicker?.subtaskId === subtask.id && (
+                                <div className="absolute right-0 top-full mt-1 z-50" onClick={e => e.stopPropagation()}>
+                                  <TagPicker
+                                    tags={tags}
+                                    assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
+                                    onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
+                                    onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
+                                    onCreate={createTag}
+                                    onClose={() => setActiveTagPicker(null)}
+                                  />
+                                </div>
+                              )}
+                            </div>
                             <ReminderPicker
                               value={subtask.reminder_date}
                               onChange={(date, scope) => updateSubtaskReminder(task.id, subtask.id, date, scope)}
@@ -5554,39 +5605,40 @@ function AllTasksView() {
                 Filter {selectedFilterTags.size > 0 ? `(${selectedFilterTags.size})` : ''}
               </button>
               {tagFilterOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-20 p-2 animate-fade-in">
-                  <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
-                    {tags.map(tag => (
-                      <label key={tag.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedFilterTags.has(tag.id)}
-                          onChange={() => {
-                            const newSet = new Set(selectedFilterTags)
-                            if (newSet.has(tag.id)) newSet.delete(tag.id)
-                            else newSet.add(tag.id)
-                            setSelectedFilterTags(newSet)
-                          }}
-                          className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
-                        />
-                        <span className="text-sm truncate">{tag.name}</span>
-                      </label>
-                    ))}
+                <>
+                  {/* Click outside backdrop */}
+                  <div className="fixed inset-0 z-10" onClick={() => setTagFilterOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-20 p-2 animate-fade-in">
+                    <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
+                      {tags.map(tag => (
+                        <label key={tag.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedFilterTags.has(tag.id)}
+                            onChange={() => {
+                              const newSet = new Set(selectedFilterTags)
+                              if (newSet.has(tag.id)) newSet.delete(tag.id)
+                              else newSet.add(tag.id)
+                              setSelectedFilterTags(newSet)
+                            }}
+                            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
+                          />
+                          <span className="text-sm truncate">{tag.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {selectedFilterTags.size > 0 && (
+                      <button
+                        onClick={() => setSelectedFilterTags(new Set())}
+                        className="w-full mt-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
-                  {selectedFilterTags.size > 0 && (
-                    <button
-                      onClick={() => setSelectedFilterTags(new Set())}
-                      className="w-full mt-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                  {/* Click outside to close handled by parent generic click handler if implemented, 
-                      for now simplistic: */}
-                  <div className="fixed inset-0 z-[-1]" onClick={() => setTagFilterOpen(false)} />
-                </div>
+                </>
               )}
             </div>
           )}
@@ -6959,7 +7011,7 @@ function AppContent() {
         )}
 
         <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-[10px] text-gray-400 bg-white/80 backdrop-blur-sm border-t border-gray-100">
-          © 2025 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
+          © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </footer>
       </div>
     </AppContext.Provider>
