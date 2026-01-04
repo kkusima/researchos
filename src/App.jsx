@@ -4429,7 +4429,10 @@ function ShareModal({ project, onClose, onUpdate }) {
 // TASK DETAIL VIEW
 // ============================================
 function TaskDetail() {
-  const { projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday } = useApp()
+  const {
+    projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday,
+    tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag
+  } = useApp()
   const { demoMode, user } = useAuth()
   const [newSubtask, setNewSubtask] = useState('')
   const [newComment, setNewComment] = useState('')
@@ -4801,22 +4804,50 @@ function TaskDetail() {
               onChange={e => updateTask({ title: e.target.value })}
               className={`w-full text-xl sm:text-2xl font-bold bg-transparent outline-none ${taskOverdue ? 'text-red-700' : ''}`}
             />
-            {/* Timestamps and Reminder */}
-            <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+            {/* Tags Display and Picker Button */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {/* Existing Tags Pills */}
+              {(currentTask.tags || []).map(tag => {
+                // Find tag definition to get color (or use tag.color directly if embedded)
+                const tagDef = tags.find(t => t.id === tag.id) || tag
+                // Map color name to classes (simplified map, should ideally share with TagPicker)
+                const colorMap = {
+                  blue: { bg: 'bg-blue-100', text: 'text-blue-700' },
+                  green: { bg: 'bg-green-100', text: 'text-green-700' },
+                  red: { bg: 'bg-red-100', text: 'text-red-700' },
+                  amber: { bg: 'bg-amber-100', text: 'text-amber-700' },
+                  purple: { bg: 'bg-purple-100', text: 'text-purple-700' },
+                  pink: { bg: 'bg-pink-100', text: 'text-pink-700' },
+                  indigo: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+                  gray: { bg: 'bg-gray-100', text: 'text-gray-700' }
+                }
+                const colors = colorMap[tagDef.color] || colorMap.blue
+
+                return (
+                  <span key={tag.id} className={`px-2 py-0.5 rounded-md text-xs font-medium ${colors.bg} ${colors.text} flex items-center gap-1`}>
+                    {tag.name}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); unassignTag(task.id, tag.id); }}
+                      className="hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )
+              })}
+
               <div className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     setActiveTagPicker(activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? null : { taskId: task.id })
                   }}
-                  className={`p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
+                  className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 text-xs ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
                   title="Manage Tags"
                 >
-                  <Tag className="w-4 h-4" />
+                  <Tag className="w-3.5 h-3.5" />
+                  {(currentTask.tags?.length || 0) === 0 && <span className="hidden sm:inline">Add Tag</span>}
                 </button>
-                {/* Task Tags Pills - displayed next to button in header if room, or just handled via picker. 
-                    User didn't explicitly ask for pills in header, but it's good practice. 
-                    For now, I'll just add the button as requested. */}
                 {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
                   <div className="absolute left-0 top-full mt-1 z-[100]" onClick={e => e.stopPropagation()}>
                     <TagPicker
@@ -4832,6 +4863,10 @@ function TaskDetail() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Timestamps and Reminder */}
+            <div className="flex items-center gap-3 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
               <ReminderPicker
                 value={currentTask.reminder_date}
                 onChange={updateTaskReminder}
@@ -7136,11 +7171,13 @@ function AppContent() {
     showToast,
     user,
     demoMode,
-    tags, createTag, editTag, deleteTag, assignTag, unassignTag
+    tags, createTag, editTag, deleteTag, assignTag, unassignTag,
+    activeTagPicker, setActiveTagPicker // <-- Fix for ReferenceError
   }
 
+
   return (
-    <AppContext.Provider value={ctx}>
+    <AppContext.Provider value={ctx} >
       <div className="min-h-screen pb-8">
         <Header
           projects={projects}
@@ -7186,7 +7223,7 @@ function AppContent() {
           © 2026 <a href="http://tinyurl.com/kennethkusima" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 underline">Kenneth Kusima</a>. All rights reserved.
         </footer>
       </div>
-    </AppContext.Provider>
+    </AppContext.Provider >
   )
 }
 
