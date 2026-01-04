@@ -1362,6 +1362,24 @@ export const db = {
     }
   },
 
+  async updateTag(id, updates) {
+    if (!supabase) return { data: null, error: null }
+    try {
+      const { data, error } = await supabase
+        .from('tags')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) logError('updateTag', error)
+      return { data, error }
+    } catch (error) {
+      logError('updateTag:catch', error)
+      return { data: null, error }
+    }
+  },
+
   async addTagToTask(taskId, tagId) {
     if (!supabase) return { error: null }
     try {

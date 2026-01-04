@@ -200,6 +200,47 @@ ALTER TABLE public.subtasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.today_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.task_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subtask_tags ENABLE ROW LEVEL SECURITY;
+
+-- 
+-- RLS POLICIES FOR TAGS
+--
+-- Tags: Users can manage their own tags
+DROP POLICY IF EXISTS "Users can manage own tags" ON public.tags;
+CREATE POLICY "Users can manage own tags" ON public.tags
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Task Tags: Users can manage tags on tasks they have access to
+DROP POLICY IF EXISTS "Users can manage task tags" ON public.task_tags;
+CREATE POLICY "Users can manage task tags" ON public.task_tags
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.tasks t
+      JOIN public.stages s ON t.stage_id = s.id
+      JOIN public.projects p ON s.project_id = p.id
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE t.id = task_tags.task_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
+
+-- Subtask Tags: Users can manage tags on subtasks they have access to
+DROP POLICY IF EXISTS "Users can manage subtask tags" ON public.subtask_tags;
+CREATE POLICY "Users can manage subtask tags" ON public.subtask_tags
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.subtasks st
+      JOIN public.tasks t ON st.task_id = t.id
+      JOIN public.stages s ON t.stage_id = s.id
+      JOIN public.projects p ON s.project_id = p.id
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE st.id = subtask_tags.subtask_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
 
 -- 
 -- TRIGGERS & FUNCTIONS FOR AUTOMATIC TIMESTAMP UPDATES
@@ -208,7 +249,10 @@ ALTER TABLE public.today_items ENABLE ROW LEVEL SECURITY;
 -- Function to handle project timestamp updates
 -- Function: When a Subtask or Comment changes, update the parent Task
 CREATE OR REPLACE FUNCTION public.handle_task_child_change()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   target_task_id UUID;
   modifier_id UUID;
@@ -240,11 +284,14 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- Function to handle project timestamp updates (Only triggered by Tasks now)
 CREATE OR REPLACE FUNCTION public.handle_project_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   project_id_val UUID;
   user_id_val UUID := null; -- Start as null
@@ -275,7 +322,7 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- Drop existing triggers if any to avoid errors
 DROP TRIGGER IF EXISTS on_task_change ON public.tasks;
@@ -305,6 +352,3 @@ CREATE TRIGGER on_comment_update_task
   AFTER INSERT OR UPDATE OR DELETE ON public.comments
   FOR EACH ROW EXECUTE PROCEDURE public.handle_task_child_change();
 
--- Policies (examples, ensure specific policies match your auth requirements)
--- Users can see their own data and shared projects data
--- ... (Existing policies assumed to be managed via Supabase UI or earlier scripts)

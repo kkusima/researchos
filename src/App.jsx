@@ -1783,7 +1783,7 @@ function TodayView() {
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { addLocalTodayTask(newTitle); setNewTitle('') } }}
             placeholder="+ New task for today"
-            className="input-sleek min-w-0"
+            className="input-sleek flex-1 min-w-[12rem] sm:min-w-[20rem] lg:min-w-[24rem]"
           />
           <button
             id="today-add-existing"
@@ -1795,42 +1795,55 @@ function TodayView() {
           </button>
 
           {showExistingPicker && (
-            <div ref={pickerRef} className="absolute right-0 mt-12 w-[34rem] bg-white border border-gray-100 rounded shadow-lg z-40 p-2">
+            <div ref={pickerRef} className="absolute right-0 mt-12 w-[90vw] sm:w-[48rem] lg:w-[51rem] max-w-[51rem] bg-white border border-gray-100 rounded-xl shadow-xl z-40 p-3">
               <input
-                className="w-full px-3 py-2 border border-gray-200 rounded mb-2"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-2 text-sm"
                 placeholder="Search tasks..."
                 value={existingQuery}
                 onChange={e => setExistingQuery(e.target.value)}
                 autoFocus
               />
-              <div className="max-h-48 overflow-auto">
+              <div className="max-h-96 overflow-auto">
                 {allEntries.filter(entry => {
                   const title = entry.type === 'task' ? entry.task.title : `${entry.task.title} — ${entry.subtask.title}`
                   const projectTitle = entry.project?.title || ''
                   if (!existingQuery) return true
                   return title.toLowerCase().includes(existingQuery.toLowerCase()) || projectTitle.toLowerCase().includes(existingQuery.toLowerCase())
-                }).slice(0, 200).map(entry => (
-                  <div key={entry.type === 'subtask' ? `s-${entry.subtask.id}` : `t-${entry.task.id}`} className="flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded cursor-pointer" onClick={() => {
-                    if (entry.type === 'subtask') {
-                      addSubtaskToToday(entry.subtask, entry.task, { projectId: entry.project?.id })
-                    } else {
-                      addToToday(entry.task, { projectId: entry.project?.id })
-                    }
-                    setShowExistingPicker(false)
-                  }}>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        {entry.project?.title && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{entry.project.title}</span>}
-                        {entry.stage?.title && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{entry.stage.title}</span>}
-                        {entry.type === 'subtask' && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">subtask</span>}
+                }).slice(0, 200).map(entry => {
+                  const entryTags = entry.type === 'subtask' ? (entry.subtask.tags || []) : (entry.task.tags || [])
+                  return (
+                    <div key={entry.type === 'subtask' ? `s-${entry.subtask.id}` : `t-${entry.task.id}`} className="flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={() => {
+                      if (entry.type === 'subtask') {
+                        addSubtaskToToday(entry.subtask, entry.task, { projectId: entry.project?.id })
+                      } else {
+                        addToToday(entry.task, { projectId: entry.project?.id })
+                      }
+                      setShowExistingPicker(false)
+                    }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {entry.project?.title && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{entry.project.title}</span>}
+                          {entry.stage?.name && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{entry.stage.name}</span>}
+                          {entry.type === 'subtask' && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">subtask</span>}
+                          {/* Tags Display */}
+                          {entryTags.map(tag => (
+                            <span key={tag.id} className={`text-xs px-1.5 py-0.5 rounded ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                              tag.color === 'red' ? 'bg-red-100 text-red-700' :
+                                tag.color === 'green' ? 'bg-green-100 text-green-700' :
+                                  tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                    tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
+                                      'bg-gray-100 text-gray-700'
+                              }`}>{tag.name}</span>
+                          ))}
+                        </div>
                       </div>
+                      <div className="text-xs text-gray-400 ml-2 flex-shrink-0">Add</div>
                     </div>
-                    <div className="text-xs text-gray-400">Add</div>
-                  </div>
-                ))}
+                  )
+                })}
                 {allEntries.length === 0 && (
-                  <div className="text-sm text-gray-400 p-2">No tasks available</div>
+                  <div className="text-sm text-gray-400 p-4 text-center">No tasks available</div>
                 )}
               </div>
             </div>
@@ -3136,7 +3149,7 @@ function CreateProjectModal({ onClose }) {
 // PROJECT DETAIL VIEW
 // ============================================
 function ProjectDetail() {
-  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday, tags, createTag, assignTag, unassignTag } = useApp()
+  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday, tags, createTag, editTag, deleteTag, assignTag, unassignTag } = useApp()
   const { demoMode, user } = useAuth()
   const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
   const [previewIndex, setPreviewIndex] = useState(null)
@@ -3773,6 +3786,8 @@ function ProjectDetail() {
                                 onAssign={(tagId) => assignTag(task.id, tagId)}
                                 onUnassign={(tagId) => unassignTag(task.id, tagId)}
                                 onCreate={createTag}
+                                onEdit={editTag}
+                                onDelete={deleteTag}
                                 onClose={() => setActiveTagPicker(null)}
                               />
                             </div>
@@ -3841,6 +3856,8 @@ function ProjectDetail() {
                                     onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
                                     onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
                                     onCreate={createTag}
+                                    onEdit={editTag}
+                                    onDelete={deleteTag}
                                     onClose={() => setActiveTagPicker(null)}
                                   />
                                 </div>
@@ -5145,7 +5162,7 @@ function TaskDetail() {
 // ALL TASKS VIEW
 // ============================================
 function AllTasksView() {
-  const { projects, setProjects, setSelectedProject, setSelectedTask, setView, tags, assignTag, unassignTag, createTag } = useApp()
+  const { projects, setProjects, setSelectedProject, setSelectedTask, setView, tags, assignTag, unassignTag, createTag, editTag, deleteTag } = useApp()
   const { demoMode, user } = useAuth()
   const [activeSubTab, setActiveSubTab] = useState('active') // 'active', 'scheduled', 'complete', 'all'
   const [sortOption, setSortOption] = useState('priority')
@@ -5786,6 +5803,8 @@ function AllTasksView() {
                             onAssign={(tagId) => assignTag(task.id, tagId)}
                             onUnassign={(tagId) => unassignTag(task.id, tagId)}
                             onCreate={createTag}
+                            onEdit={editTag}
+                            onDelete={deleteTag}
                             onClose={() => setActiveTagPicker(null)}
                           />
                         </div>
@@ -5865,6 +5884,8 @@ function AllTasksView() {
                                       onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
                                       onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
                                       onCreate={createTag}
+                                      onEdit={editTag}
+                                      onDelete={deleteTag}
                                       onClose={() => setActiveTagPicker(null)}
                                     />
                                   </div>
@@ -6006,10 +6027,75 @@ function AppContent() {
     }
   }
 
+  const editTag = async (tagId, newName, newColor) => {
+    const updatedTag = { id: tagId, name: newName, color: newColor }
+
+    // Update in tags list
+    const newTags = tags.map(t => t.id === tagId ? { ...t, name: newName, color: newColor } : t)
+    setTags(newTags)
+
+    // Update in all projects (tasks and subtasks that have this tag)
+    const newProjects = projects.map(p => ({
+      ...p,
+      stages: p.stages.map(s => ({
+        ...s,
+        tasks: s.tasks.map(t => ({
+          ...t,
+          tags: t.tags?.map(tag => tag.id === tagId ? { ...tag, name: newName, color: newColor } : tag) || [],
+          subtasks: t.subtasks?.map(st => ({
+            ...st,
+            tags: st.tags?.map(tag => tag.id === tagId ? { ...tag, name: newName, color: newColor } : tag) || []
+          })) || []
+        }))
+      }))
+    }))
+    setProjects(newProjects)
+
+    if (demoMode) {
+      saveTagsLocal(newTags)
+      saveLocal(newProjects)
+    } else {
+      await db.updateTag(tagId, { name: newName, color: newColor })
+    }
+  }
+
+  const deleteTag = async (tagId) => {
+    // Remove from tags list
+    const newTags = tags.filter(t => t.id !== tagId)
+    setTags(newTags)
+
+    // Remove from all projects (tasks and subtasks)
+    const newProjects = projects.map(p => ({
+      ...p,
+      stages: p.stages.map(s => ({
+        ...s,
+        tasks: s.tasks.map(t => ({
+          ...t,
+          tags: t.tags?.filter(tag => tag.id !== tagId) || [],
+          subtasks: t.subtasks?.map(st => ({
+            ...st,
+            tags: st.tags?.filter(tag => tag.id !== tagId) || []
+          })) || []
+        }))
+      }))
+    }))
+    setProjects(newProjects)
+
+    if (demoMode) {
+      saveTagsLocal(newTags)
+      saveLocal(newProjects)
+    } else {
+      await db.deleteTag(tagId)
+    }
+  }
+
   const assignTag = async (taskId, tagId, subtaskId = null) => {
     // Optimistic update in UI 
     const tag = tags.find(t => t.id === tagId)
     if (!tag) return
+
+    const now = new Date().toISOString()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
 
     const updateProjectWithTag = (p) => {
       return {
@@ -6022,11 +6108,14 @@ function AppContent() {
                 // Update subtask
                 return {
                   ...t,
+                  updated_at: now,
+                  modified_by: user?.id,
+                  modified_by_name: userName,
                   subtasks: t.subtasks?.map(st => {
                     if (st.id === subtaskId) {
                       const existing = st.tags || []
                       if (existing.some(et => et.id === tagId)) return st
-                      return { ...st, tags: [...existing, tag] }
+                      return { ...st, tags: [...existing, tag], updated_at: now, modified_by: user?.id, modified_by_name: userName }
                     }
                     return st
                   }) || []
@@ -6035,7 +6124,7 @@ function AppContent() {
                 // Update task
                 const existingTags = t.tags || []
                 if (existingTags.some(et => et.id === tagId)) return t
-                return { ...t, tags: [...existingTags, tag] }
+                return { ...t, tags: [...existingTags, tag], updated_at: now, modified_by: user?.id, modified_by_name: userName }
               }
             }
             return t
@@ -6049,12 +6138,20 @@ function AppContent() {
     if (demoMode) saveLocal(newProjects)
 
     if (!demoMode) {
-      if (subtaskId) await db.addTagToSubtask(subtaskId, tagId)
-      else await db.addTagToTask(taskId, tagId)
+      if (subtaskId) {
+        await db.addTagToSubtask(subtaskId, tagId)
+        await db.updateSubtask(subtaskId, { modified_by: user?.id })
+      } else {
+        await db.addTagToTask(taskId, tagId)
+        await db.updateTask(taskId, { modified_by: user?.id })
+      }
     }
   }
 
   const unassignTag = async (taskId, tagId, subtaskId = null) => {
+    const now = new Date().toISOString()
+    const userName = user?.user_metadata?.name || user?.email || 'Unknown'
+
     const updateProjectRemoveTag = (p) => {
       return {
         ...p,
@@ -6065,17 +6162,20 @@ function AppContent() {
               if (subtaskId) {
                 return {
                   ...t,
+                  updated_at: now,
+                  modified_by: user?.id,
+                  modified_by_name: userName,
                   subtasks: t.subtasks?.map(st => {
                     if (st.id === subtaskId) {
                       const existing = st.tags || []
-                      return { ...st, tags: existing.filter(et => et.id !== tagId) }
+                      return { ...st, tags: existing.filter(et => et.id !== tagId), updated_at: now, modified_by: user?.id, modified_by_name: userName }
                     }
                     return st
                   }) || []
                 }
               } else {
                 const existingTags = t.tags || []
-                return { ...t, tags: existingTags.filter(et => et.id !== tagId) }
+                return { ...t, tags: existingTags.filter(et => et.id !== tagId), updated_at: now, modified_by: user?.id, modified_by_name: userName }
               }
             }
             return t
@@ -6089,8 +6189,13 @@ function AppContent() {
     if (demoMode) saveLocal(newProjects)
 
     if (!demoMode) {
-      if (subtaskId) await db.removeTagFromSubtask(subtaskId, tagId)
-      else await db.removeTagFromTask(taskId, tagId)
+      if (subtaskId) {
+        await db.removeTagFromSubtask(subtaskId, tagId)
+        await db.updateSubtask(subtaskId, { modified_by: user?.id })
+      } else {
+        await db.removeTagFromTask(taskId, tagId)
+        await db.updateTask(taskId, { modified_by: user?.id })
+      }
     }
   }
 
@@ -6964,7 +7069,7 @@ function AppContent() {
     showToast,
     user,
     demoMode,
-    tags, createTag, assignTag, unassignTag
+    tags, createTag, editTag, deleteTag, assignTag, unassignTag
   }
 
   return (
