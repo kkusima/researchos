@@ -3802,7 +3802,7 @@ function ProjectDetail() {
                             <Tag className="w-4 h-4" />
                           </button>
                           {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                            <div className="absolute right-0 top-full mt-1 z-50" onClick={e => e.stopPropagation()}>
+                            <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
                               <TagPicker
                                 tags={tags}
                                 assignedTagIds={new Set((task.tags || []).map(t => t.id))}
@@ -3872,7 +3872,7 @@ function ProjectDetail() {
                                 <Tag className="w-3 h-3" />
                               </button>
                               {activeTagPicker?.subtaskId === subtask.id && (
-                                <div className="absolute right-0 top-full mt-1 z-50" onClick={e => e.stopPropagation()}>
+                                <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
                                   <TagPicker
                                     tags={tags}
                                     assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
@@ -4872,7 +4872,7 @@ function TaskDetail() {
                   {(currentTask.tags?.length || 0) === 0 && <span className="hidden sm:inline">Add Tag</span>}
                 </button>
                 {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                  <div className="absolute left-0 top-full mt-1 z-[100]" onClick={e => e.stopPropagation()}>
+                  <div className="absolute left-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
                     <TagPicker
                       tags={tags}
                       assignedTagIds={new Set((currentTask.tags || []).map(t => t.id))}
@@ -5068,21 +5068,10 @@ function TaskDetail() {
                             <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
                               {s.title}
                             </span>
-                            {/* Edit/Delete Actions (Hidden by default, shown on group hover) */}
-                            {!isSubtaskSelectionMode && !s.is_completed && (
-                              <div className="hidden group-hover:flex items-center gap-1 opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setEditingSubtaskId(s.id)
-                                    setEditingSubtaskTitle(s.title)
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50"
-                                  title="Edit"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                {/* Tag Button for Subtask */}
+                            {/* Action buttons for subtasks */}
+                            {!isSubtaskSelectionMode && (
+                              <div className="flex items-center gap-1">
+                                {/* Tag Button - Always visible */}
                                 <div className="relative">
                                   <button
                                     onClick={(e) => {
@@ -5092,10 +5081,13 @@ function TaskDetail() {
                                     className={`p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 ${activeTagPicker?.subtaskId === s.id ? 'bg-gray-100 text-gray-900' : ''}`}
                                     title="Tags"
                                   >
-                                    <Tag className="w-3 h-3" />
+                                    <Tag className="w-3.5 h-3.5" />
                                   </button>
                                   {activeTagPicker?.subtaskId === s.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-[100]" onClick={e => e.stopPropagation()}>
+                                    <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setActiveTagPicker(null); }} />
+                                  )}
+                                  {activeTagPicker?.subtaskId === s.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
                                       <TagPicker
                                         tags={tags}
                                         assignedTagIds={new Set((s.tags || []).map(t => t.id))}
@@ -5109,22 +5101,39 @@ function TaskDetail() {
                                     </div>
                                   )}
                                 </div>
+                                {/* Reminder - Always visible */}
                                 <ReminderPicker
                                   value={s.reminder_date}
                                   onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
                                   compact
                                   isShared={isShared}
                                 />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    deleteSubtask(s.id)
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                {/* Edit/Delete - Hidden on completed, shown on hover for active */}
+                                {!s.is_completed && (
+                                  <div className="hidden group-hover:flex items-center gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingSubtaskId(s.id)
+                                        setEditingSubtaskTitle(s.title)
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50"
+                                      title="Edit"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        deleteSubtask(s.id)
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
