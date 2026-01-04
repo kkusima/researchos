@@ -3741,6 +3741,29 @@ function ProjectDetail() {
                         <div className={`font-medium ${task.is_completed ? 'line-through text-gray-400' : taskOverdue ? 'text-red-700' : 'text-gray-900'}`}>
                           {task.title}
                         </div>
+                        {/* Tag Pills */}
+                        {task.tags?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {task.tags.map(tag => {
+                              const colorMap = {
+                                blue: 'bg-blue-100 text-blue-700',
+                                green: 'bg-green-100 text-green-700',
+                                red: 'bg-red-100 text-red-700',
+                                amber: 'bg-amber-100 text-amber-700',
+                                purple: 'bg-purple-100 text-purple-700',
+                                pink: 'bg-pink-100 text-pink-700',
+                                indigo: 'bg-indigo-100 text-indigo-700',
+                                gray: 'bg-gray-100 text-gray-700'
+                              }
+                              const colorClasses = colorMap[tag.color] || colorMap.blue
+                              return (
+                                <span key={tag.id} className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colorClasses}`}>
+                                  {tag.name}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs text-gray-400 flex-wrap">
                           {hasSubtasks && (
                             <span className="flex items-center gap-1">
