@@ -3794,7 +3794,15 @@ function ProjectDetail() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              setActiveTagPicker(activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? null : { taskId: task.id })
+                              if (activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId) {
+                                setActiveTagPicker(null)
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setActiveTagPicker({
+                                  taskId: task.id,
+                                  position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                                })
+                              }
                             }}
                             className={`p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
                             title="Add Tag"
@@ -3802,18 +3810,17 @@ function ProjectDetail() {
                             <Tag className="w-4 h-4" />
                           </button>
                           {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                            <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
-                              <TagPicker
-                                tags={tags}
-                                assignedTagIds={new Set((task.tags || []).map(t => t.id))}
-                                onAssign={(tagId) => assignTag(task.id, tagId)}
-                                onUnassign={(tagId) => unassignTag(task.id, tagId)}
-                                onCreate={createTag}
-                                onEdit={editTag}
-                                onDelete={deleteTag}
-                                onClose={() => setActiveTagPicker(null)}
-                              />
-                            </div>
+                            <TagPicker
+                              tags={tags}
+                              assignedTagIds={new Set((task.tags || []).map(t => t.id))}
+                              onAssign={(tagId) => assignTag(task.id, tagId)}
+                              onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                              onCreate={createTag}
+                              onEdit={editTag}
+                              onDelete={deleteTag}
+                              onClose={() => setActiveTagPicker(null)}
+                              position={activeTagPicker.position}
+                            />
                           )}
                         </div>
                         <ReminderPicker
@@ -3864,7 +3871,16 @@ function ProjectDetail() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
+                                  if (activeTagPicker?.subtaskId === subtask.id) {
+                                    setActiveTagPicker(null)
+                                  } else {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    setActiveTagPicker({
+                                      taskId: task.id,
+                                      subtaskId: subtask.id,
+                                      position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                                    })
+                                  }
                                 }}
                                 className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
                                 title="Add Tag"
@@ -3872,18 +3888,17 @@ function ProjectDetail() {
                                 <Tag className="w-3 h-3" />
                               </button>
                               {activeTagPicker?.subtaskId === subtask.id && (
-                                <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
-                                  <TagPicker
-                                    tags={tags}
-                                    assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
-                                    onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
-                                    onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
-                                    onCreate={createTag}
-                                    onEdit={editTag}
-                                    onDelete={deleteTag}
-                                    onClose={() => setActiveTagPicker(null)}
-                                  />
-                                </div>
+                                <TagPicker
+                                  tags={tags}
+                                  assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
+                                  onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
+                                  onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
+                                  onCreate={createTag}
+                                  onEdit={editTag}
+                                  onDelete={deleteTag}
+                                  onClose={() => setActiveTagPicker(null)}
+                                  position={activeTagPicker.position}
+                                />
                               )}
                             </div>
                             <ReminderPicker
@@ -4863,7 +4878,15 @@ function TaskDetail() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    setActiveTagPicker(activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? null : { taskId: task.id })
+                    if (activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId) {
+                      setActiveTagPicker(null)
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      setActiveTagPicker({
+                        taskId: task.id,
+                        position: { top: rect.bottom + 8, left: rect.left }
+                      })
+                    }
                   }}
                   className={`p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 text-xs ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
                   title="Manage Tags"
@@ -4872,18 +4895,17 @@ function TaskDetail() {
                   {(currentTask.tags?.length || 0) === 0 && <span className="hidden sm:inline">Add Tag</span>}
                 </button>
                 {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                  <div className="absolute left-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
-                    <TagPicker
-                      tags={tags}
-                      assignedTagIds={new Set((currentTask.tags || []).map(t => t.id))}
-                      onAssign={(tagId) => assignTag(task.id, tagId)}
-                      onUnassign={(tagId) => unassignTag(task.id, tagId)}
-                      onCreate={createTag}
-                      onEdit={editTag}
-                      onDelete={deleteTag}
-                      onClose={() => setActiveTagPicker(null)}
-                    />
-                  </div>
+                  <TagPicker
+                    tags={tags}
+                    assignedTagIds={new Set((currentTask.tags || []).map(t => t.id))}
+                    onAssign={(tagId) => assignTag(task.id, tagId)}
+                    onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                    onCreate={createTag}
+                    onEdit={editTag}
+                    onDelete={deleteTag}
+                    onClose={() => setActiveTagPicker(null)}
+                    position={activeTagPicker.position}
+                  />
                 )}
               </div>
             </div>
@@ -5068,6 +5090,29 @@ function TaskDetail() {
                             <span className={`text-sm ${s.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
                               {s.title}
                             </span>
+                            {/* Subtask Tag Pills */}
+                            {s.tags?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 ml-2">
+                                {s.tags.map(tag => {
+                                  const colorMap = {
+                                    blue: 'bg-blue-100 text-blue-700',
+                                    green: 'bg-green-100 text-green-700',
+                                    red: 'bg-red-100 text-red-700',
+                                    amber: 'bg-amber-100 text-amber-700',
+                                    purple: 'bg-purple-100 text-purple-700',
+                                    pink: 'bg-pink-100 text-pink-700',
+                                    indigo: 'bg-indigo-100 text-indigo-700',
+                                    gray: 'bg-gray-100 text-gray-700'
+                                  }
+                                  const colorClasses = colorMap[tag.color] || colorMap.blue
+                                  return (
+                                    <span key={tag.id} className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${colorClasses}`}>
+                                      {tag.name}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
                             {/* Action buttons for subtasks */}
                             {!isSubtaskSelectionMode && (
                               <div className="flex items-center gap-1">
@@ -5076,7 +5121,16 @@ function TaskDetail() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      setActiveTagPicker(activeTagPicker?.subtaskId === s.id ? null : { taskId: task.id, subtaskId: s.id })
+                                      if (activeTagPicker?.subtaskId === s.id) {
+                                        setActiveTagPicker(null)
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        setActiveTagPicker({
+                                          taskId: task.id,
+                                          subtaskId: s.id,
+                                          position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                                        })
+                                      }
                                     }}
                                     className={`p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 ${activeTagPicker?.subtaskId === s.id ? 'bg-gray-100 text-gray-900' : ''}`}
                                     title="Tags"
@@ -5084,21 +5138,17 @@ function TaskDetail() {
                                     <Tag className="w-3.5 h-3.5" />
                                   </button>
                                   {activeTagPicker?.subtaskId === s.id && (
-                                    <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setActiveTagPicker(null); }} />
-                                  )}
-                                  {activeTagPicker?.subtaskId === s.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-[9999]" onClick={e => e.stopPropagation()}>
-                                      <TagPicker
-                                        tags={tags}
-                                        assignedTagIds={new Set((s.tags || []).map(t => t.id))}
-                                        onAssign={(tagId) => assignTag(task.id, tagId, s.id)}
-                                        onUnassign={(tagId) => unassignTag(task.id, tagId, s.id)}
-                                        onCreate={createTag}
-                                        onEdit={editTag}
-                                        onDelete={deleteTag}
-                                        onClose={() => setActiveTagPicker(null)}
-                                      />
-                                    </div>
+                                    <TagPicker
+                                      tags={tags}
+                                      assignedTagIds={new Set((s.tags || []).map(t => t.id))}
+                                      onAssign={(tagId) => assignTag(task.id, tagId, s.id)}
+                                      onUnassign={(tagId) => unassignTag(task.id, tagId, s.id)}
+                                      onCreate={createTag}
+                                      onEdit={editTag}
+                                      onDelete={deleteTag}
+                                      onClose={() => setActiveTagPicker(null)}
+                                      position={activeTagPicker.position}
+                                    />
                                   )}
                                 </div>
                                 {/* Reminder - Always visible */}
@@ -5156,28 +5206,6 @@ function TaskDetail() {
                       )}
                     </div>
                   </div>
-                  {
-                    !isSubtaskSelectionMode && (
-                      <>
-                        <ReminderPicker
-                          value={s.reminder_date}
-                          onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
-                          compact
-                          isShared={isShared}
-                        />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); addSubtaskToToday(s, currentTask, { projectId: project.id }) }}
-                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Add subtask to Tod(o)ay"
-                        >
-                          <Sun className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => deleteSubtask(s.id)} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </>
-                    )
-                  }
                 </div>
               )
             })}
@@ -5922,26 +5950,33 @@ function AllTasksView() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setActiveTagPicker(activeTagPicker?.taskId === task.id ? null : { taskId: task.id })
+                          if (activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId) {
+                            setActiveTagPicker(null)
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setActiveTagPicker({
+                              taskId: task.id,
+                              position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                            })
+                          }
                         }}
-                        className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id ? 'bg-gray-100 text-gray-900' : ''}`}
+                        className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId ? 'bg-gray-100 text-gray-900' : ''}`}
                         title="Add Tag"
                       >
                         <Tag className="w-4 h-4" />
                       </button>
                       {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                        <div onClick={e => e.stopPropagation()}>
-                          <TagPicker
-                            tags={tags}
-                            assignedTagIds={new Set((task.tags || []).map(t => t.id))}
-                            onAssign={(tagId) => assignTag(task.id, tagId)}
-                            onUnassign={(tagId) => unassignTag(task.id, tagId)}
-                            onCreate={createTag}
-                            onEdit={editTag}
-                            onDelete={deleteTag}
-                            onClose={() => setActiveTagPicker(null)}
-                          />
-                        </div>
+                        <TagPicker
+                          tags={tags}
+                          assignedTagIds={new Set((task.tags || []).map(t => t.id))}
+                          onAssign={(tagId) => assignTag(task.id, tagId)}
+                          onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                          onCreate={createTag}
+                          onEdit={editTag}
+                          onDelete={deleteTag}
+                          onClose={() => setActiveTagPicker(null)}
+                          position={activeTagPicker.position}
+                        />
                       )}
                     </div>
                     {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
@@ -6003,7 +6038,16 @@ function AllTasksView() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
+                                    if (activeTagPicker?.subtaskId === subtask.id) {
+                                      setActiveTagPicker(null)
+                                    } else {
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      setActiveTagPicker({
+                                        taskId: task.id,
+                                        subtaskId: subtask.id,
+                                        position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                                      })
+                                    }
                                   }}
                                   className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
                                   title="Add Tag"
@@ -6011,18 +6055,17 @@ function AllTasksView() {
                                   <Tag className="w-3 h-3" />
                                 </button>
                                 {activeTagPicker?.subtaskId === subtask.id && (
-                                  <div className="absolute right-0 top-6 z-50 origin-top-right transform">
-                                    <TagPicker
-                                      tags={tags}
-                                      assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
-                                      onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
-                                      onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
-                                      onCreate={createTag}
-                                      onEdit={editTag}
-                                      onDelete={deleteTag}
-                                      onClose={() => setActiveTagPicker(null)}
-                                    />
-                                  </div>
+                                  <TagPicker
+                                    tags={tags}
+                                    assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
+                                    onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
+                                    onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
+                                    onCreate={createTag}
+                                    onEdit={editTag}
+                                    onDelete={deleteTag}
+                                    onClose={() => setActiveTagPicker(null)}
+                                    position={activeTagPicker.position}
+                                  />
                                 )}
                               </div>
                             )}

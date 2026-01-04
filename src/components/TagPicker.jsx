@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Plus, Check, X, Tag, Pencil, Trash2 } from 'lucide-react'
 
 export default function TagPicker({
@@ -9,7 +10,8 @@ export default function TagPicker({
     onCreate,
     onEdit,
     onDelete,
-    onClose
+    onClose,
+    position = null // { top, left, right }
 }) {
     const [search, setSearch] = useState('')
     const [selectedColor, setSelectedColor] = useState('blue')
@@ -77,11 +79,21 @@ export default function TagPicker({
         }
     }
 
-    return (
+    const pickerStyles = position ? {
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: position.left !== undefined ? `${position.left}px` : 'auto',
+        right: position.right !== undefined ? `${position.right}px` : 'auto',
+        zIndex: 10000,
+        backgroundColor: '#ffffff'
+    } : { backgroundColor: '#ffffff', position: 'absolute', right: 0, top: '2rem', zIndex: 10000 }
+
+    const content = (
         <div
             ref={containerRef}
-            className="absolute right-0 top-8 z-[200] w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in"
-            style={{ backgroundColor: '#ffffff' }}
+            className="w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in"
+            style={pickerStyles}
+            onClick={e => e.stopPropagation()}
         >
             {/* Edit Mode */}
             {editingTag ? (
@@ -150,7 +162,7 @@ export default function TagPicker({
                         </div>
                     </div>
 
-                    <div className="max-h-60 overflow-y-auto p-1">
+                    <div className="max-h-60 overflow-y-auto p-1 text-black">
                         {filteredTags.length > 0 && (
                             <div className="space-y-0.5">
                                 {filteredTags.map(tag => {
@@ -198,7 +210,7 @@ export default function TagPicker({
                         )}
 
                         {!exactMatch && search.trim() && (
-                            <div className="mt-2 pt-2 border-t border-gray-100 px-2 pb-2">
+                            <div className="mt-2 pt-2 border-t border-gray-100 px-2 pb-2 text-black">
                                 <div className="text-xs text-gray-500 mb-2">Create "{search}"</div>
                                 <div className="flex flex-wrap gap-1 mb-2">
                                     {COLORS.map(c => (
@@ -229,4 +241,6 @@ export default function TagPicker({
             )}
         </div>
     )
+
+    return createPortal(content, document.body)
 }
