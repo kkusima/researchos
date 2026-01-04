@@ -21,9 +21,11 @@ Get the native experience for your workstation:
 
 HypotheSys™ is a lightweight project management tool built specifically for research workflows. Created to address the pain point of needing a simple, practical tool for everyday research work, it allows users to create projects, collaborate in shared workspaces, and keep project information synchronized in real time, without unnecessary complexity. The tool is free to use and focuses on a straightforward, intuitive UI that centralizes tasks and project data to support core research workflows in a single interface.
 
-![v1GIF.gif](v1GIF.gif)
+### 📸 App Screenshots
 
-![v2GIF.gif](v2GIF.gif)
+| Dashboard Overview | Project Workspace | Task Management |
+| :---: | :---: | :---: |
+| ![Dashboard](docs/screenshots/1.png) | ![Project](docs/screenshots/2.png) | ![Tasks](docs/screenshots/4.png) |
 
 ## Key Features
 

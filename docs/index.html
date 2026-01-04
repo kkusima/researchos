@@ -61,24 +61,10 @@
         </div>
     </section>
 
-    <!-- Demo Section -->
-    <section class="demo">
-        <div class="container">
-            <h2 class="demo__title">See it in action</h2>
-            <div class="demo__grid">
-                <div class="demo__item">
-                    <img src="images/v1GIF.gif" alt="HypotheSys project organization demo" loading="lazy">
-                </div>
-                <div class="demo__item">
-                    <img src="images/v2GIF.gif" alt="HypotheSys task management demo" loading="lazy">
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- App Screenshots Carousel -->
     <section class="screenshots">
         <div class="container">
+            <h2 class="screenshots__title">See HypotheSys in action</h2>
             <div class="carousel">
                 <div class="carousel__track" id="carouselTrack">
                     <div class="carousel__item">
@@ -217,6 +203,12 @@
             </p>
         </div>
     </footer>
+
+    <!-- Lightbox Overlay -->
+    <div id="lightbox" class="lightbox">
+        <button class="lightbox__close" id="lightboxClose" aria-label="Close">&times;</button>
+        <img class="lightbox__content" id="lightboxImg">
+    </div>
     <script>
         const track = document.getElementById('carouselTrack');
         const prevBtn = document.getElementById('prevBtn');
@@ -247,6 +239,29 @@
             const isAtStart = track.scrollLeft <= 5;
             prevBtn.style.opacity = isAtStart ? '0.3' : '1';
             prevBtn.style.pointerEvents = isAtStart ? 'none' : 'auto';
+
+            // Lightbox functionality
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightboxImg');
+            const lightboxClose = document.getElementById('lightboxClose');
+            const carouselItems = document.querySelectorAll('.carousel__item img');
+
+            carouselItems.forEach(img => {
+                img.addEventListener('click', () => {
+                    lightbox.classList.add('active');
+                    lightboxImg.src = img.src;
+                });
+            });
+
+            lightboxClose.addEventListener('click', () => {
+                lightbox.classList.remove('active');
+            });
+
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) {
+                    lightbox.classList.remove('active');
+                }
+            });
         }
     </script>
 </body>
