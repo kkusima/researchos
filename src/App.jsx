@@ -1744,7 +1744,7 @@ function TodayView() {
       document.removeEventListener('mousedown', onDocDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [showExistingPicker])
+  }, [existingPicker])
   // Drag handlers
   const dragIndex = useRef(null)
 
@@ -5182,98 +5182,114 @@ function TaskDetail() {
                                 })}
                               </div>
                             )}
-                            {/* Action buttons for subtasks */}
-                            {!isSubtaskSelectionMode && (
-                              <div className="flex items-center gap-1">
-                                {/* Tag Button - Always visible */}
-                                <div className="relative">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (activeTagPicker?.subtaskId === s.id) {
-                                        setActiveTagPicker(null)
-                                      } else {
-                                        const rect = e.currentTarget.getBoundingClientRect()
-                                        setActiveTagPicker({
-                                          taskId: task.id,
-                                          subtaskId: s.id,
-                                          position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
-                                        })
-                                      }
-                                    }}
-                                    className={`p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 ${activeTagPicker?.subtaskId === s.id ? 'bg-gray-100 text-gray-900' : ''}`}
-                                    title="Tags"
-                                  >
-                                    <Tag className="w-3.5 h-3.5" />
-                                  </button>
-                                  {activeTagPicker?.subtaskId === s.id && (
-                                    <TagPicker
-                                      tags={tags}
-                                      assignedTagIds={new Set((s.tags || []).map(t => t.id))}
-                                      onAssign={(tagId) => assignTag(task.id, tagId, s.id)}
-                                      onUnassign={(tagId) => unassignTag(task.id, tagId, s.id)}
-                                      onCreate={createTag}
-                                      onEdit={editTag}
-                                      onDelete={deleteTag}
-                                      onClose={() => setActiveTagPicker(null)}
-                                      position={activeTagPicker.position}
-                                    />
-                                  )}
-                                </div>
-                                {/* Reminder - Always visible */}
-                                <ReminderPicker
-                                  value={s.reminder_date}
-                                  onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
-                                  compact
-                                  isShared={isShared}
-                                />
-                                {/* Edit/Delete - Hidden on completed, shown on hover for active */}
-                                {!s.is_completed && (
-                                  <div className="hidden group-hover:flex items-center gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setEditingSubtaskId(s.id)
-                                        setEditingSubtaskTitle(s.title)
-                                      }}
-                                      className="p-1 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50"
-                                      title="Edit"
-                                    >
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        deleteSubtask(s.id)
-                                      }}
-                                      className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
-                    </div>
-                    {/* Timestamp & Attribution Row (Styled like comments) */}
-                    <div className="text-xs text-gray-400 mt-1 flex flex-wrap items-center gap-2">
-                      {s.created_at && (
-                        <span title={new Date(s.created_at).toLocaleString()}>
-                          {formatRelativeDate(s.created_at)}
-                          {isShared && s.created_by_name && ` by ${s.created_by === user?.id ? 'you' : s.created_by_name}`}
-                        </span>
+
+                      {/* Action buttons for subtasks - Moved to right side of row */}
+                      {!isSubtaskSelectionMode && editingSubtaskId !== s.id && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {/* Add to Today Sun Icon */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const proj = projects?.find(p => p.id === task.project_id)
+                              addSubtaskToToday(s, task, { projectId: proj?.id })
+                            }}
+                            className="p-1 text-gray-400 hover:text-amber-500 rounded hover:bg-amber-50"
+                            title="Add to Tod(o)ay"
+                          >
+                            <Sun className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Tag Button */}
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (activeTagPicker?.subtaskId === s.id) {
+                                  setActiveTagPicker(null)
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  setActiveTagPicker({
+                                    taskId: task.id,
+                                    subtaskId: s.id,
+                                    position: { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+                                  })
+                                }
+                              }}
+                              className={`p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 ${activeTagPicker?.subtaskId === s.id ? 'bg-gray-100 text-gray-900' : ''}`}
+                              title="Tags"
+                            >
+                              <Tag className="w-3.5 h-3.5" />
+                            </button>
+                            {activeTagPicker?.subtaskId === s.id && (
+                              <TagPicker
+                                tags={tags}
+                                assignedTagIds={new Set((s.tags || []).map(t => t.id))}
+                                onAssign={(tagId) => assignTag(task.id, tagId, s.id)}
+                                onUnassign={(tagId) => unassignTag(task.id, tagId, s.id)}
+                                onCreate={createTag}
+                                onEdit={editTag}
+                                onDelete={deleteTag}
+                                onClose={() => setActiveTagPicker(null)}
+                                position={activeTagPicker.position}
+                              />
+                            )}
+                          </div>
+
+                          {/* Reminder */}
+                          <ReminderPicker
+                            value={s.reminder_date}
+                            onChange={(date, scope) => updateSubtaskReminder(s.id, date, scope)}
+                            compact
+                            isShared={isShared}
+                          />
+
+                          {/* Edit/Delete - Hidden on completed, shown on hover for active */}
+                          {!s.is_completed && (
+                            <div className="hidden group-hover:flex items-center gap-1 border-l border-gray-200 ml-1 pl-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingSubtaskId(s.id)
+                                  setEditingSubtaskTitle(s.title)
+                                }}
+                                className="p-1 text-gray-400 hover:text-blue-500 rounded hover:bg-blue-50"
+                                title="Edit"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteSubtask(s.id)
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
-                      {s.updated_at && (new Date(s.updated_at).getTime() > new Date(s.created_at).getTime() + 1000) && (
-                        <span className="italic text-gray-300">
-                          • Edited {formatRelativeDate(s.updated_at)}
-                          {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
-                        </span>
-                      )}
                     </div>
+                  </div>
+                  {/* Timestamp & Attribution Row (Styled like comments) */}
+                  <div className="text-xs text-gray-400 mt-1 flex flex-wrap items-center gap-2">
+                    {s.created_at && (
+                      <span title={new Date(s.created_at).toLocaleString()}>
+                        {formatRelativeDate(s.created_at)}
+                        {isShared && s.created_by_name && ` by ${s.created_by === user?.id ? 'you' : s.created_by_name}`}
+                      </span>
+                    )}
+                    {s.updated_at && (new Date(s.updated_at).getTime() > new Date(s.created_at).getTime() + 1000) && (
+                      <span className="italic text-gray-300">
+                        • Edited {formatRelativeDate(s.updated_at)}
+                        {isShared && s.modified_by_name && ` by ${s.modified_by === user?.id ? 'you' : s.modified_by_name}`}
+                      </span>
+                    )}
                   </div>
                 </div>
               )
