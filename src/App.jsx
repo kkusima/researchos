@@ -5441,6 +5441,10 @@ function AllTasksView() {
                 ? 'border-brand-600 text-brand-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              Complete ({completeCount})
+            </button>
 
             <button
               onClick={() => { setActiveSubTab('tagged'); setSelectedTaskIds(new Set()) }}
@@ -5690,150 +5694,152 @@ function AllTasksView() {
                               : task.created_by_name && `Created by ${task.created_by === user?.id ? 'you' : task.created_by_name}`
                             }
                           </span>
-                            }
-                      </span>
+
+
                         )}
-                      {/* Tags Display */}
-                      {task.tags?.map(tag => (
-                        <span key={tag.id} className={`tag text-[9px] px-1.5 py-0.5 border border-transparent ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
-                          tag.color === 'red' ? 'bg-red-100 text-red-700' :
-                            tag.color === 'green' ? 'bg-green-100 text-green-700' :
-                              tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
-                                tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
-                                  'bg-gray-100 text-gray-700'
-                          }`}>
-                          {tag.name}
-                        </span>
-                      ))}
+                        {/* Tags Display */}
+                        {task.tags?.map(tag => (
+                          <span key={tag.id} className={`tag text-[9px] px-1.5 py-0.5 border border-transparent ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                            tag.color === 'red' ? 'bg-red-100 text-red-700' :
+                              tag.color === 'green' ? 'bg-green-100 text-green-700' :
+                                tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                  tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-gray-100 text-gray-700'
+                            }`}>
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  {/* Tag Button - Persistent next to right chevron if we want it there, 
+                    {/* Tag Button - Persistent next to right chevron if we want it there, 
                          User said "right side next to the reminder button".
                          In this view, there is no reminder button for tasks.
                          So placing it before the chevron. */}
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActiveTagPicker(activeTagPicker?.taskId === task.id ? null : { taskId: task.id })
-                      }}
-                      className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id ? 'bg-gray-100 text-gray-900' : ''}`}
-                      title="Add Tag"
-                    >
-                      <Tag className="w-4 h-4" />
-                    </button>
-                    {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
-                      <div onClick={e => e.stopPropagation()}>
-                        <TagPicker
-                          tags={tags}
-                          assignedTagIds={new Set((task.tags || []).map(t => t.id))}
-                          onAssign={(tagId) => assignTag(task.id, tagId)}
-                          onUnassign={(tagId) => unassignTag(task.id, tagId)}
-                          onCreate={createTag}
-                          onClose={() => setActiveTagPicker(null)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
-                </div>
-              </div>
-
-                {/* Collapsible Subtasks */ }
-            {
-              hasSubtasks && isExpanded && (
-                <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
-                  {task.subtasks.map(subtask => {
-                    const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
-                    const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
-                    return (
-                      <div
-                        key={subtask.id}
-                        className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveTagPicker(activeTagPicker?.taskId === task.id ? null : { taskId: task.id })
+                        }}
+                        className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.taskId === task.id ? 'bg-gray-100 text-gray-900' : ''}`}
+                        title="Add Tag"
                       >
-                        <button
-                          onClick={() => !isCompleted && toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
-                          className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''} ${isCompleted ? 'cursor-not-allowed' : ''}`}
-                          style={{ width: 16, height: 16 }}
-                          disabled={isCompleted}
-                        >
-                          {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
-                        </button>
-                        <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
-                            {subtask.title}
-                          </span>
-                          {/* Subtask Tags Pills */}
-                          {subtask.tags?.length > 0 && (
-                            <div className="flex gap-0.5">
-                              {subtask.tags.map(tag => (
-                                <span key={tag.id} className={`w-2 h-2 rounded-full ${tag.color === 'blue' ? 'bg-blue-400' :
-                                  tag.color === 'red' ? 'bg-red-400' :
-                                    tag.color === 'green' ? 'bg-green-400' :
-                                      tag.color === 'amber' ? 'bg-amber-400' :
-                                        tag.color === 'purple' ? 'bg-purple-400' :
-                                          'bg-gray-400'
-                                  }`} title={tag.name} />
-                              ))}
-                            </div>
-                          )}
-
-                          {isSharedProject && (subtask.created_by_name || subtask.modified_by_name) && (
-                            <span className="text-[10px] text-gray-400 ml-2">
-                              {subtask.modified_by_name && subtask.updated_at !== subtask.created_at
-                                ? `by ${subtask.modified_by === user?.id ? 'you' : subtask.modified_by_name}`
-                                : subtask.created_by_name && `by ${subtask.created_by === user?.id ? 'you' : subtask.created_by_name}`
-                              }
-                            </span>
-                          )}
+                        <Tag className="w-4 h-4" />
+                      </button>
+                      {activeTagPicker?.taskId === task.id && !activeTagPicker?.subtaskId && (
+                        <div onClick={e => e.stopPropagation()}>
+                          <TagPicker
+                            tags={tags}
+                            assignedTagIds={new Set((task.tags || []).map(t => t.id))}
+                            onAssign={(tagId) => assignTag(task.id, tagId)}
+                            onUnassign={(tagId) => unassignTag(task.id, tagId)}
+                            onCreate={createTag}
+                            onClose={() => setActiveTagPicker(null)}
+                          />
                         </div>
+                      )}
+                    </div>
+                    {!isSelectionMode && <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />}
+                  </div>
+                </div>
 
-                        {/* Subtask Tag Button */}
-                        {!isCompleted && (
-                          <div className="relative">
+                {/* Collapsible Subtasks */}
+                {
+                  hasSubtasks && isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
+                      {task.subtasks.map(subtask => {
+                        const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                        const isSharedProject = project.owner_id !== user?.id || project.project_members?.length > 0
+                        return (
+                          <div
+                            key={subtask.id}
+                            className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue && !isCompleted ? 'bg-red-50' : ''}`}
+                          >
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
-                              }}
-                              className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
-                              title="Add Tag"
+                              onClick={() => !isCompleted && toggleSubtask(project.id, stageIndex, task.id, subtask.id)}
+                              className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''} ${isCompleted ? 'cursor-not-allowed' : ''}`}
+                              style={{ width: 16, height: 16 }}
+                              disabled={isCompleted}
                             >
-                              <Tag className="w-3 h-3" />
+                              {subtask.is_completed && <Check className="w-2.5 h-2.5" />}
                             </button>
-                            {activeTagPicker?.subtaskId === subtask.id && (
-                              <div className="absolute right-0 top-6 z-50 origin-top-right transform">
-                                <TagPicker
-                                  tags={tags}
-                                  assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
-                                  onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
-                                  onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
-                                  onCreate={createTag}
-                                  onClose={() => setActiveTagPicker(null)}
-                                />
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className={`text-sm truncate ${subtask.is_completed ? 'line-through text-gray-400' : subtaskOverdue ? 'text-red-700' : 'text-gray-700'}`}>
+                                {subtask.title}
+                              </span>
+                              {/* Subtask Tags Pills */}
+                              {subtask.tags?.length > 0 && (
+                                <div className="flex gap-0.5">
+                                  {subtask.tags.map(tag => (
+                                    <span key={tag.id} className={`w-2 h-2 rounded-full ${tag.color === 'blue' ? 'bg-blue-400' :
+                                      tag.color === 'red' ? 'bg-red-400' :
+                                        tag.color === 'green' ? 'bg-green-400' :
+                                          tag.color === 'amber' ? 'bg-amber-400' :
+                                            tag.color === 'purple' ? 'bg-purple-400' :
+                                              'bg-gray-400'
+                                      }`} title={tag.name} />
+                                  ))}
+                                </div>
+                              )}
+
+                              {isSharedProject && (subtask.created_by_name || subtask.modified_by_name) && (
+                                <span className="text-[10px] text-gray-400 ml-2">
+                                  {subtask.modified_by_name && subtask.updated_at !== subtask.created_at
+                                    ? `by ${subtask.modified_by === user?.id ? 'you' : subtask.modified_by_name}`
+                                    : subtask.created_by_name && `by ${subtask.created_by === user?.id ? 'you' : subtask.created_by_name}`
+                                  }
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Subtask Tag Button */}
+                            {!isCompleted && (
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setActiveTagPicker(activeTagPicker?.subtaskId === subtask.id ? null : { taskId: task.id, subtaskId: subtask.id })
+                                  }}
+                                  className={`p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors ${activeTagPicker?.subtaskId === subtask.id ? 'bg-gray-200 text-gray-900' : ''}`}
+                                  title="Add Tag"
+                                >
+                                  <Tag className="w-3 h-3" />
+                                </button>
+                                {activeTagPicker?.subtaskId === subtask.id && (
+                                  <div className="absolute right-0 top-6 z-50 origin-top-right transform">
+                                    <TagPicker
+                                      tags={tags}
+                                      assignedTagIds={new Set((subtask.tags || []).map(t => t.id))}
+                                      onAssign={(tagId) => assignTag(task.id, tagId, subtask.id)}
+                                      onUnassign={(tagId) => unassignTag(task.id, tagId, subtask.id)}
+                                      onCreate={createTag}
+                                      onClose={() => setActiveTagPicker(null)}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
+
+                            {!isCompleted && (
+                              <ReminderPicker
+                                value={subtask.reminder_date}
+                                onChange={(date, scope) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date, scope)}
+                                compact
+                                isShared={isSharedProject}
+                              />
+                            )}
                           </div>
-                        )}
+                        )
+                      })}
+                    </div>
+                  )
+                }
+              </div>
+            )
+          })}
 
-                        {!isCompleted && (
-                          <ReminderPicker
-                            value={subtask.reminder_date}
-                            onChange={(date, scope) => updateSubtaskReminder(project.id, stageIndex, task.id, subtask.id, date, scope)}
-                            compact
-                            isShared={isSharedProject}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            }
-            </div>
-      )
-      })}
-
+        </div>
+      )}
     </div>
   )
 }
@@ -5890,7 +5896,7 @@ function AppContent() {
   const [walkVisible, setWalkVisible] = useState(false)
   // Today / daily focus state (per-date persisted)
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
-  const [todayItems, setTodayItems] = useState([]) // { id, title, projectId?, taskId?, isLocal, created_at }
+  const [todayItems, setTodayItems] = useState([]) // {id, title, projectId ?, taskId ?, isLocal, created_at}
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
 
