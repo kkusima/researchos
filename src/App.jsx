@@ -3375,6 +3375,14 @@ function ProjectDetail() {
     const now = new Date().toISOString()
     const localId = uuid()
     const userName = user?.user_metadata?.name || user?.email || 'Unknown'
+    
+    // Set order_index to 0 (top) and shift all other tasks down by 1
+    const newTaskOrderIndex = 0
+    const shiftedTasks = (stage?.tasks || []).map(t => ({
+      ...t,
+      order_index: (t.order_index || 0) + 1
+    }))
+    
     const task = {
       id: localId,
       title: newTask.trim(),
@@ -3389,7 +3397,8 @@ function ProjectDetail() {
       created_by: user?.id,
       created_by_name: userName,
       modified_by: user?.id,
-      modified_by_name: userName
+      modified_by_name: userName,
+      order_index: newTaskOrderIndex
     }
 
     const updated = {
@@ -3398,7 +3407,7 @@ function ProjectDetail() {
       modified_by: user?.id,
       modified_by_name: userName,
       stages: project.stages.map((s, i) =>
-        i === stageIndex ? { ...s, tasks: [...(s.tasks || []), task] } : s
+        i === stageIndex ? { ...s, tasks: [task, ...shiftedTasks] } : s
       )
     }
     updateProject(updated)
@@ -3411,7 +3420,7 @@ function ProjectDetail() {
         stage_id: stage.id,
         title: task.title,
         description: task.description || '',
-        order_index: 1000000000,
+        order_index: newTaskOrderIndex,
         is_completed: false,
         reminder_date: task.reminder_date || null,
         created_by: user?.id,
@@ -4911,6 +4920,14 @@ function TaskDetail() {
     if (!newSubtask.trim()) return
     const localId = uuid()
     const now = new Date().toISOString()
+    
+    // Set order_index to 0 (top) and shift all other subtasks down by 1
+    const newSubtaskOrderIndex = 0
+    const shiftedSubtasks = (currentTask.subtasks || []).map(st => ({
+      ...st,
+      order_index: (st.order_index || 0) + 1
+    }))
+    
     const subtask = {
       id: localId,
       title: newSubtask.trim(),
@@ -4921,9 +4938,10 @@ function TaskDetail() {
       modified_by: user?.id,
       modified_by_name: userName,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      order_index: newSubtaskOrderIndex
     }
-    updateTask({ subtasks: [...(currentTask.subtasks || []), subtask] })
+    updateTask({ subtasks: [subtask, ...shiftedSubtasks] })
     setNewSubtask('')
 
     if (!demoMode) {
@@ -4934,7 +4952,7 @@ function TaskDetail() {
         title: subtask.title,
         is_completed: false,
         reminder_date: subtask.reminder_date || null,
-        order_index: 1000000000,
+        order_index: newSubtaskOrderIndex,
         created_by: user?.id,
         modified_by: user?.id
       }
@@ -6929,8 +6947,13 @@ function AppContent() {
 
     // 1. Optimistically update Today items
     let next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
-    // Sort completed items to bottom
-    next = next.sort((a, b) => (!!a.is_done === !!b.is_done) ? 0 : a.is_done ? 1 : -1)
+    // When unchecking (moving back to active), put at top; when checking, move to bottom
+    next = next.sort((a, b) => {
+      const aIsDone = !!a.is_done
+      const bIsDone = !!b.is_done
+      if (aIsDone === bIsDone) return 0 // Same status, keep relative order
+      return aIsDone ? 1 : -1 // Active items first, completed last
+    })
 
     setTodayItems(next)
     saveTodayItems(next)
