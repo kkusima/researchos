@@ -1044,6 +1044,7 @@ function ProfileSettingsModal({ onClose }) {
 
   // Profile state
   const [name, setName] = useState(user?.user_metadata?.full_name || user?.user_metadata?.name || '')
+  const [emailNotifications, setEmailNotifications] = useState(user?.user_metadata?.email_notifications ?? true)
 
   // Email state
   const [newEmail, setNewEmail] = useState('')
@@ -1059,7 +1060,11 @@ function ProfileSettingsModal({ onClose }) {
     setLoading(true)
     setMessage({ type: '', text: '' })
 
-    const { error } = await updateProfile({ full_name: name, name })
+    const { error } = await updateProfile({
+      full_name: name,
+      name,
+      email_notifications: emailNotifications
+    })
 
     if (error) {
       setMessage({ type: 'error', text: error.message })
@@ -1212,6 +1217,29 @@ function ProfileSettingsModal({ onClose }) {
                 <p className="text-xs text-gray-400 mt-1">
                   {showEmailAuth ? 'Change email in the Email tab' : 'Managed by Google'}
                 </p>
+              </div>
+
+              <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                      <Bell className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Email Notifications</p>
+                      <p className="text-xs text-gray-500">Receive alerts via email</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={emailNotifications}
+                      onChange={(e) => setEmailNotifications(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
               </div>
               <button
                 type="submit"
@@ -3377,41 +3405,41 @@ function ProjectDetail() {
     setNewTask('')
 
     if (!demoMode) {
-      const { data: createdTask } = await db.createTask({
+      db.createTask({
         stage_id: stage.id,
         title: task.title,
         order_index: stage.tasks?.length || 0,
         created_by: user?.id,
         modified_by: user?.id
+      }).then(async ({ data: createdTask }) => {
+        // Update local state with server-generated ID in background
+        if (createdTask) {
+          const syncedProject = {
+            ...project,
+            stages: project.stages.map((s, i) =>
+              i === stageIndex
+                ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, ...createdTask, id: createdTask.id, is_local: false } : t) }
+                : s
+            ),
+            updated_at: now,
+            modified_by: user?.id,
+            modified_by_name: userName
+          }
+          const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
+          setProjects(newProjects)
+          setSelectedProject(syncedProject)
+
+          // Notify collaborators about the new task
+          if (isShared) {
+            await db.notifyCollaborators(project.id, user?.id, {
+              type: 'task_created',
+              title: 'New task added',
+              message: task.title,
+              task_id: createdTask.id
+            })
+          }
+        }
       })
-
-      // Update local state with server-generated ID
-      if (createdTask) {
-        const syncedProject = {
-          ...project,
-          stages: project.stages.map((s, i) =>
-            i === stageIndex
-              ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, ...createdTask, id: createdTask.id, is_local: false } : t) }
-              : s
-          ),
-          updated_at: now,
-          modified_by: user?.id,
-          modified_by_name: userName
-        }
-        const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
-        setProjects(newProjects)
-        setSelectedProject(syncedProject)
-
-        // Notify collaborators about the new task
-        if (isShared) {
-          await db.notifyCollaborators(project.id, user?.id, {
-            type: 'task_created',
-            title: 'New task added',
-            message: task.title,
-            task_id: createdTask.id
-          })
-        }
-      }
     }
   }
 
@@ -3854,15 +3882,15 @@ function ProjectDetail() {
                   onDrop={(e) => onTaskDrop(e, i)}
                   className={`glass-card glass-card-hover rounded-xl animate-fade-in transition-all ${taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
                     } relative group`}
-                  style={{ animationDelay: `${i * 30}ms` }}
                 >
-                  {/* Drag Handle for Task */}
-                  <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 transition-opacity p-1 cursor-grab active:cursor-grabbing text-gray-400">
-                    <GripVertical className="w-3.5 h-3.5" />
-                  </div>
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-2 sm:gap-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 mt-0.5">
+                        {/* Drag Handle for Task */}
+                        <div className="opacity-0 group-hover:opacity-40 transition-opacity p-0.5 -ml-1 cursor-grab active:cursor-grabbing text-gray-400 flex-shrink-0">
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </div>
+
                         {isSelectionMode && (
                           <button
                             onMouseDown={() => { /* prevent text drag */ }}
@@ -3878,7 +3906,7 @@ function ProjectDetail() {
 
                         <button
                           onClick={() => toggleTask(task.id)}
-                          className={`checkbox-custom mt-0.5 flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
+                          className={`checkbox-custom flex-shrink-0 ${task.is_completed ? 'checked' : ''}`}
                         >
                           {task.is_completed && <Check className="w-3 h-3" />}
                         </button>
@@ -3998,18 +4026,19 @@ function ProjectDetail() {
                   {/* Always visible Subtasks */}
                   {hasSubtasks && (
                     <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
-                      {task.subtasks.map((subtask, idx) => {
+                      {[...(task.subtasks || [])].sort((a, b) => (a.is_completed ? 1 : 0) - (b.is_completed ? 1 : 0)).map((subtask, sIdx) => {
                         const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
+                        const originalIdx = task.subtasks.findIndex(s => s.id === subtask.id)
                         return (
                           <div
                             key={subtask.id}
                             draggable="true"
-                            onDragStart={(e) => onSubtaskDragStart(e, task.id, idx)}
-                            onDragOver={(e) => onSubtaskDragOver(e, idx)}
-                            onDrop={(e) => onSubtaskDrop(e, task.id, idx)}
+                            onDragStart={(e) => onSubtaskDragStart(e, task.id, originalIdx)}
+                            onDragOver={(e) => onSubtaskDragOver(e, sIdx)}
+                            onDrop={(e) => onSubtaskDrop(e, task.id, sIdx)}
                             className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''} hover:bg-gray-100 group/subtask transition-colors relative`}
                           >
-                            <div className="absolute left-0 opacity-0 group-hover/subtask:opacity-40 p-0.5 text-gray-400 cursor-grab active:cursor-grabbing">
+                            <div className="opacity-0 group-hover/subtask:opacity-40 p-0.5 -ml-1 text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0">
                               <GripVertical className="w-2.5 h-2.5" />
                             </div>
                             <button
@@ -4099,7 +4128,8 @@ function ProjectDetail() {
                         )
                       })}
                     </div>
-                  )}
+                  )
+                  }
                 </div>
               )
             })
@@ -4107,34 +4137,38 @@ function ProjectDetail() {
         </div>
       </div>
 
-      {showSettings && (
-        <ProjectSettingsModal
-          project={project}
-          onClose={() => setShowSettings(false)}
-          onUpdate={updateProject}
-          onDelete={async () => {
-            if (!window.confirm('Delete this project and all its data?')) return
-            if (demoMode) {
-              const newProjects = projects.filter(p => p.id !== project.id)
-              setProjects(newProjects)
-              saveLocal(newProjects)
-            } else {
-              await db.deleteProject(project.id)
-              setProjects(projects.filter(p => p.id !== project.id))
-            }
-            setSelectedProject(null)
-            setView('main')
-          }}
-        />
-      )}
+      {
+        showSettings && (
+          <ProjectSettingsModal
+            project={project}
+            onClose={() => setShowSettings(false)}
+            onUpdate={updateProject}
+            onDelete={async () => {
+              if (!window.confirm('Delete this project and all its data?')) return
+              if (demoMode) {
+                const newProjects = projects.filter(p => p.id !== project.id)
+                setProjects(newProjects)
+                saveLocal(newProjects)
+              } else {
+                await db.deleteProject(project.id)
+                setProjects(projects.filter(p => p.id !== project.id))
+              }
+              setSelectedProject(null)
+              setView('main')
+            }}
+          />
+        )
+      }
 
-      {showShare && (
-        <ShareModal
-          project={project}
-          onClose={() => setShowShare(false)}
-        />
-      )}
-    </div>
+      {
+        showShare && (
+          <ShareModal
+            project={project}
+            onClose={() => setShowShare(false)}
+          />
+        )
+      }
+    </div >
   )
 }
 
@@ -6726,12 +6760,9 @@ function AppContent() {
     persistTodayToServer(next)
   }
 
-  // Helper to place new items correctly (above completed)
+  // Helper to place new items correctly (now prepends to top)
   const appendTodayItem = (current, item) => {
-    const firstCompletedIndex = current.findIndex(i => i.is_done)
-    return firstCompletedIndex === -1
-      ? [...current, item]
-      : [...current.slice(0, firstCompletedIndex), item, ...current.slice(firstCompletedIndex)]
+    return [item, ...current]
   }
 
   const persistTodayToServer = async (next) => {
@@ -6962,11 +6993,17 @@ function AppContent() {
     const project = projects.find(p => p.id === projectId)
     if (!project || !project.stages[stageIndex]) return
 
+    const sortFn = (a, b) => {
+      if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1
+      if ((a.order_index || 0) !== (b.order_index || 0)) return (a.order_index || 0) - (b.order_index || 0)
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    }
+
     const newProjects = projects.map(p => {
       if (p.id !== projectId) return p
       const stages = p.stages.map((s, si) => {
         if (si !== stageIndex) return s
-        const tasks = [...s.tasks]
+        const tasks = [...s.tasks].sort(sortFn)
         const [moved] = tasks.splice(fromIndex, 1)
         tasks.splice(toIndex, 0, moved)
         return { ...s, tasks: tasks.map((t, idx) => ({ ...t, order_index: idx })) }
@@ -6979,13 +7016,12 @@ function AppContent() {
 
     if (!demoMode) {
       const stage = project.stages[stageIndex]
-      const tasks = [...stage.tasks]
+      const tasks = [...stage.tasks].sort(sortFn)
       const [moved] = tasks.splice(fromIndex, 1)
       tasks.splice(toIndex, 0, moved)
-      // Bulk update order_index in background
-      for (let i = 0; i < tasks.length; i++) {
-        db.updateTask(tasks[i].id, { order_index: i }).catch(e => dwarn('reorderTasks sync failed', e))
-      }
+      // Bulk update order_index in background for performance
+      const updates = tasks.map((t, idx) => ({ id: t.id, order_index: idx }))
+      db.bulkUpdateTasks(updates).catch(e => dwarn('reorderTasks sync failed', e))
     }
   }
 
@@ -6993,13 +7029,19 @@ function AppContent() {
     const project = projects.find(p => p.id === projectId)
     if (!project) return
 
+    const sortFn = (a, b) => {
+      if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1
+      if ((a.order_index || 0) !== (b.order_index || 0)) return (a.order_index || 0) - (b.order_index || 0)
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+    }
+
     const newProjects = projects.map(p => {
       if (p.id !== projectId) return p
       const stages = p.stages.map((s, si) => {
         if (si !== stageIndex) return s
         const tasks = s.tasks.map(t => {
           if (t.id !== taskId) return t
-          const subtasks = [...(t.subtasks || [])]
+          const subtasks = [...(t.subtasks || [])].sort(sortFn)
           const [moved] = subtasks.splice(fromIndex, 1)
           subtasks.splice(toIndex, 0, moved)
           return { ...t, subtasks: subtasks.map((st, idx) => ({ ...st, order_index: idx })) }
@@ -7015,13 +7057,13 @@ function AppContent() {
     if (!demoMode) {
       const stage = project.stages[stageIndex]
       const task = stage.tasks.find(t => t.id === taskId)
-      if (task) {
-        const subtasks = [...(task.subtasks || [])]
+      if (task) { // Keep the check for task existence
+        const subtasks = [...(task.subtasks || [])].sort(sortFn)
         const [moved] = subtasks.splice(fromIndex, 1)
         subtasks.splice(toIndex, 0, moved)
-        for (let i = 0; i < subtasks.length; i++) {
-          db.updateSubtask(subtasks[i].id, { order_index: i }).catch(e => dwarn('reorderSubtasks sync failed', e))
-        }
+        // Bulk update order_index in background for performance
+        const updates = subtasks.map((st, idx) => ({ id: st.id, order_index: idx }))
+        db.bulkUpdateSubtasks(updates).catch(e => dwarn('reorderSubtasks sync failed', e))
       }
     }
   }
@@ -7450,6 +7492,8 @@ function AppContent() {
       if (!relevant) return
 
       // Debounce to avoid multiple rapid reloads
+      // Use longer debounce for local changes to allow optimistic UI to finish
+      const delay = payload.new?.modified_by === user.id ? 2000 : 500
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(async () => {
         dlog('🔄 Reloading projects due to realtime change...')

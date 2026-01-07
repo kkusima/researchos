@@ -83,7 +83,8 @@ export function AuthProvider({ children }) {
             authUser.user_metadata?.name ||
             authUser.email?.split('@')[0] || 'User',
           avatar_url: authUser.user_metadata?.avatar_url ||
-            authUser.user_metadata?.picture || null
+            authUser.user_metadata?.picture || null,
+          email_notifications: authUser.user_metadata?.email_notifications ?? true
         }, { onConflict: 'id' }),
         5000,
         'Profile sync timed out'
@@ -387,10 +388,14 @@ export function AuthProvider({ children }) {
 
     // Also update the public users table
     if (user?.id) {
-      await supabase.from('users').update({
-        name: updates.full_name || updates.name,
-        avatar_url: updates.avatar_url
-      }).eq('id', user.id)
+      const dbUpdates = {}
+      if (updates.full_name || updates.name) dbUpdates.name = updates.full_name || updates.name
+      if (updates.avatar_url !== undefined) dbUpdates.avatar_url = updates.avatar_url
+      if (updates.email_notifications !== undefined) dbUpdates.email_notifications = updates.email_notifications
+
+      if (Object.keys(dbUpdates).length > 0) {
+        await supabase.from('users').update(dbUpdates).eq('id', user.id)
+      }
     }
 
     return { data, error: null }

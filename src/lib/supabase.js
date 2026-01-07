@@ -395,7 +395,16 @@ export const db = {
         .from('tasks')
         .update(updates)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          stage:stages (
+            project_id,
+            project:projects (
+              title,
+              emoji
+            )
+          )
+        `)
         .single()
 
       if (error) {
@@ -406,38 +415,26 @@ export const db = {
       // If modified_by provided and project is shared, notify collaborators
       try {
         if (data && updates.modified_by) {
-          // Determine project id via task -> stage -> project
-          const { data: task } = await supabase
-            .from('tasks')
-            .select('stage_id, title')
-            .eq('id', id)
-            .single()
-          if (task && task.stage_id) {
-            const { data: stage } = await supabase
-              .from('stages')
-              .select('project_id')
-              .eq('id', task.stage_id)
-              .single()
-            if (stage && stage.project_id) {
-              const modifierId = updates.modified_by
-              // If completion changed, use task_completed type
-              if (Object.prototype.hasOwnProperty.call(updates, 'is_completed')) {
-                const type = updates.is_completed ? 'task_completed' : 'task_uncompleted'
-                await db.notifyCollaborators(stage.project_id, modifierId, {
-                  type,
-                  title: updates.is_completed ? 'Task completed' : 'Task updated',
-                  message: `${task.title} (${updates.is_completed ? 'completed' : 'updated'})`,
-                  task_id: id
-                })
-              } else {
-                // Generic task modified
-                await db.notifyCollaborators(stage.project_id, modifierId, {
-                  type: 'task_modified',
-                  title: 'Task modified',
-                  message: `${task.title} → changes made`,
-                  task_id: id
-                })
-              }
+          const project = data.stage?.project
+          if (project && data.stage?.project_id) {
+            const modifierId = updates.modified_by
+            // If completion changed, use task_completed type
+            if (Object.prototype.hasOwnProperty.call(updates, 'is_completed')) {
+              const type = updates.is_completed ? 'task_completed' : 'task_uncompleted'
+              await db.notifyCollaborators(data.stage.project_id, modifierId, {
+                type,
+                title: updates.is_completed ? 'Task completed' : 'Task updated',
+                message: `${data.title} (${updates.is_completed ? 'completed' : 'updated'})`,
+                task_id: id
+              })
+            } else {
+              // Generic task modified
+              await db.notifyCollaborators(data.stage.project_id, modifierId, {
+                type: 'task_modified',
+                title: 'Task modified',
+                message: `${data.title} → changes made`,
+                task_id: id
+              })
             }
           }
         }
@@ -451,6 +448,22 @@ export const db = {
     } catch (error) {
       logError('updateTask:catch', error)
       return { data: null, error }
+    }
+  },
+
+  // Bulk update tasks (optimized for reordering)
+  async bulkUpdateTasks(updates) {
+    if (!supabase || !updates.length) return { error: null }
+    try {
+      devLog('📝 Bulk updating tasks:', updates.length)
+      const { error } = await supabase
+        .from('tasks')
+        .upsert(updates)
+      if (error) logError('bulkUpdateTasks', error)
+      return { error }
+    } catch (error) {
+      logError('bulkUpdateTasks:catch', error)
+      return { error }
     }
   },
   async deleteTask(id) {
@@ -525,65 +538,71 @@ export const db = {
         .from('subtasks')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          task:tasks (
+            id,
+            title,
+            stage_id,
+            stage:stages (
+              project_id,
+              project:projects (
+                title,
+                emoji,
+                owner_id
+              )
+            )
+          )
+        `)
         .single()
+
       if (error) {
         logError('updateSubtask', error)
       } else {
         devLog('✅ Subtask updated:', data?.id)
         // Notify collaborators if not self
         if (data && updates.modified_by) {
-          // Get project_id for this subtask
-          const { data: task } = await supabase
-            .from('tasks')
-            .select('stage_id, title')
-            .eq('id', data.task_id)
-            .single()
-          if (task && task.stage_id) {
-            const { data: stage } = await supabase
-              .from('stages')
-              .select('project_id')
-              .eq('id', task.stage_id)
-              .single()
-            if (stage && stage.project_id) {
-              // Get all project members except the modifier
-              const { data: members } = await supabase
-                .from('project_members')
-                .select('user_id')
-                .eq('project_id', stage.project_id)
-              const notifyIds = (members || []).map(m => m.user_id).filter(uid => uid !== updates.modified_by)
-              // Also notify owner if not the modifier
-              const { data: project } = await supabase
-                .from('projects')
-                .select('owner_id, title, emoji')
-                .eq('id', stage.project_id)
+          const task = data.task
+          const stage = task?.stage
+          const project = stage?.project
+
+          if (project && stage?.project_id) {
+            // Get all project members except the modifier
+            const { data: members } = await supabase
+              .from('project_members')
+              .select('user_id')
+              .eq('project_id', stage.project_id)
+
+            const notifyIds = (members || []).map(m => m.user_id).filter(uid => uid !== updates.modified_by)
+
+            // Also notify owner if not the modifier
+            if (project.owner_id && project.owner_id !== updates.modified_by && !notifyIds.includes(project.owner_id)) {
+              notifyIds.push(project.owner_id)
+            }
+
+            // Get modifier's name
+            let modifierName = ''
+            if (updates.modified_by) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('name, email')
+                .eq('id', updates.modified_by)
                 .single()
-              if (project && project.owner_id && project.owner_id !== updates.modified_by && !notifyIds.includes(project.owner_id)) {
-                notifyIds.push(project.owner_id)
-              }
-              // Get modifier's name
-              let modifierName = ''
-              if (updates.modified_by) {
-                const { data: userData } = await supabase
-                  .from('users')
-                  .select('name, email')
-                  .eq('id', updates.modified_by)
-                  .single()
-                modifierName = userData?.name || userData?.email || 'Someone'
-              }
-              // Create notifications
-              for (const uid of notifyIds) {
-                await supabase.from('notifications').insert({
-                  user_id: uid,
-                  type: 'subtask_modified',
-                  title: 'Subtask modified',
-                  message: `${project?.emoji || ''} ${project?.title || ''}: ${task.title} → ${data.title} (by ${modifierName})`,
-                  project_id: stage.project_id,
-                  task_id: data.task_id,
-                  subtask_id: data.id,
-                  is_read: false
-                })
-              }
+              modifierName = userData?.name || userData?.email || 'Someone'
+            }
+
+            // Create notifications
+            for (const uid of notifyIds) {
+              await supabase.from('notifications').insert({
+                user_id: uid,
+                type: 'subtask_modified',
+                title: 'Subtask modified',
+                message: `${project?.emoji || ''} ${project?.title || ''}: ${task.title} → ${data.title} (by ${modifierName})`,
+                project_id: stage.project_id,
+                task_id: data.task_id,
+                subtask_id: data.id,
+                is_read: false
+              })
             }
           }
         }
@@ -592,6 +611,22 @@ export const db = {
     } catch (error) {
       logError('updateSubtask:catch', error)
       return { data: null, error }
+    }
+  },
+
+  // Bulk update subtasks (optimized for reordering)
+  async bulkUpdateSubtasks(updates) {
+    if (!supabase || !updates.length) return { error: null }
+    try {
+      devLog('📝 Bulk updating subtasks:', updates.length)
+      const { error } = await supabase
+        .from('subtasks')
+        .upsert(updates)
+      if (error) logError('bulkUpdateSubtasks', error)
+      return { error }
+    } catch (error) {
+      logError('bulkUpdateSubtasks:catch', error)
+      return { error }
     }
   },
 
