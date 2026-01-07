@@ -7110,7 +7110,8 @@ function AppContent() {
       tasks.splice(toIndex, 0, moved)
       // Bulk update order_index in background for performance
       const updates = tasks.map((t, idx) => ({ id: t.id, order_index: idx }))
-      db.bulkUpdateTasks(updates).catch(e => dwarn('reorderTasks sync failed', e))
+      const { error } = await db.bulkUpdateTasks(updates)
+      if (error) dwarn('reorderTasks sync failed', error)
     }
   }
 
