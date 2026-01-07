@@ -456,9 +456,16 @@ export const db = {
     if (!supabase || !updates.length) return { error: null }
     try {
       devLog('📝 Bulk updating tasks:', updates.length)
-      const { error } = await supabase
-        .from('tasks')
-        .upsert(updates)
+      // Use individual updates instead of upsert for partial field updates
+      const results = await Promise.all(
+        updates.map(({ id, order_index }) =>
+          supabase
+            .from('tasks')
+            .update({ order_index, updated_at: new Date().toISOString() })
+            .eq('id', id)
+        )
+      )
+      const error = results.find(r => r.error)?.error
       if (error) logError('bulkUpdateTasks', error)
       return { error }
     } catch (error) {
