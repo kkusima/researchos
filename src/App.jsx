@@ -1665,6 +1665,13 @@ function TodayView() {
   const [editText, setEditText] = useState('')
   const lastTapRef = useRef(0)
   const [openMenuId, setOpenMenuId] = useState(null)
+  const [todaySubtab, setTodaySubtab] = useState('active') // 'active', 'completed', 'all'
+
+  const itemsToShow = useMemo(() => {
+    if (todaySubtab === 'active') return todayItems.filter(i => !i.is_done)
+    if (todaySubtab === 'completed') return todayItems.filter(i => i.is_done)
+    return todayItems
+  }, [todayItems, todaySubtab])
 
   const onRenameItem = async (it, trimmed) => {
     if (!trimmed) return
@@ -1779,12 +1786,15 @@ function TodayView() {
           ) : (
             <div className="flex items-center gap-2">
               <button onClick={() => {
-                if (selectedIds.size === todayItems.length) {
+                const visibleIds = itemsToShow.map(i => i.id)
+                if (selectedIds.size === visibleIds.length && visibleIds.every(id => selectedIds.has(id))) {
                   setSelectedIds(new Set())
                 } else {
-                  setSelectedIds(new Set(todayItems.map(i => i.id)))
+                  setSelectedIds(new Set(visibleIds))
                 }
-              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">{selectedIds.size === todayItems.length ? 'Deselect All' : 'Select All'}</button>
+              }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">
+                {selectedIds.size === itemsToShow.length && itemsToShow.length > 0 ? 'Deselect All' : 'Select All'}
+              </button>
               <button onClick={() => {
                 const toRemove = Array.from(selectedIds)
                 if (toRemove.length === 0) return
@@ -1896,11 +1906,32 @@ function TodayView() {
         </div>
       </div>
 
+      {/* Today Subtabs */}
+      <div className="flex border-b border-gray-200 mb-6 gap-6">
+        {[
+          { id: 'active', label: 'Active', count: todayItems.filter(i => !i.is_done).length },
+          { id: 'completed', label: 'Completed', count: todayItems.filter(i => i.is_done).length },
+          { id: 'all', label: 'All', count: todayItems.length }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setTodaySubtab(tab.id); setSelectedIds(new Set()); setIsSelectionMode(false) }}
+            className={`pb-3 text-sm font-medium transition-colors relative ${todaySubtab === tab.id ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            {tab.label}
+            <span className="ml-2 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px]">{tab.count}</span>
+            {todaySubtab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-2">
-        {todayItems.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No items yet - Start your day's to do list Today.</div>
+        {itemsToShow.length === 0 ? (
+          <div className="p-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl">
+            {todaySubtab === 'active' ? 'No active tasks for today.' : todaySubtab === 'completed' ? 'No completed tasks yet.' : 'Your list is empty.'}
+          </div>
         ) : (
-          todayItems.map((it, i) => {
+          itemsToShow.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
             return (
               <TodayItem
@@ -1933,7 +1964,60 @@ function TodayView() {
           })
         )}
       </div>
+
+      {/* Duplicate Check Popup */}
+      <DuplicatePopup />
     </div>
+  )
+}
+
+function DuplicatePopup() {
+  const { duplicateCheck, handleDuplicateAction } = useApp()
+  if (!duplicateCheck) return null
+
+  const { item, existingItem, type } = duplicateCheck
+  const status = existingItem.is_done ? 'completed' : 'active'
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4">
+        <div className="flex items-center gap-3 text-amber-600">
+          <div className="p-2 bg-amber-50 rounded-full">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold">Already in Tod(o)ay</h3>
+        </div>
+
+        <p className="text-gray-600 text-sm">
+          "<span className="font-semibold text-gray-900">{existingItem.title}</span>"
+          is already in your list and is currently <span className={`font-medium ${status === 'completed' ? 'text-green-600' : 'text-blue-600'}`}>{status}</span>.
+        </p>
+
+        <div className="grid grid-cols-1 gap-2 pt-2">
+          {existingItem.is_done && (
+            <button
+              onClick={() => handleDuplicateAction('reactivate', duplicateCheck)}
+              className="w-full py-2.5 px-4 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              Reactivate existing
+            </button>
+          )}
+          <button
+            onClick={() => handleDuplicateAction('duplicate', duplicateCheck)}
+            className="w-full py-2.5 px-4 bg-gray-100 text-gray-900 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Add as duplicate
+          </button>
+          <button
+            onClick={() => handleDuplicateAction('cancel', duplicateCheck)}
+            className="w-full py-2.5 px-4 text-gray-500 font-medium hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -6242,6 +6326,7 @@ function AppContent() {
   // Today / daily focus state (per-date persisted)
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // {id, title, projectId ?, taskId ?, isLocal, created_at}
+  const [duplicateCheck, setDuplicateCheck] = useState(null) // { item, existingItem, type: 'task'|'subtask'|'local' }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
 
@@ -6488,25 +6573,22 @@ function AppContent() {
           } catch (e) { }
 
           if (serverData) {
-            // Merge with local if exists
-            try {
-              const rawLocal = localStorage.getItem(key)
-              const localItems = rawLocal ? JSON.parse(rawLocal) : []
-              if (Array.isArray(localItems) && localItems.length > 0) {
-                // Simple merge: ID based
-                const merged = [...serverData]
-                const exists = new Set(merged.map(i => i.id))
-                localItems.forEach(i => {
-                  if (!exists.has(i.id)) merged.push(i)
-                })
-
-                // Save back merged
-                try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
-                setTodayItems(merged)
-                localStorage.setItem(key, JSON.stringify(merged))
-                return
-              }
-            } catch (e) { }
+            // Trust the server as the source of truth for synced data.
+            // This prevents "resurrection" of deleted items that might still be in local storage.
+            // We only merge local items if the server data is empty, which might happen if 
+            // the user just added items while offline and they haven't synced yet.
+            if (serverData.length === 0) {
+              try {
+                const rawLocal = localStorage.getItem(key)
+                const localItems = rawLocal ? JSON.parse(rawLocal) : []
+                if (Array.isArray(localItems) && localItems.length > 0) {
+                  setTodayItems(localItems)
+                  // Try to sync these local-only items to server
+                  db.saveTodayItems(user.id, today, localItems).catch(() => { })
+                  return
+                }
+              } catch (e) { }
+            }
 
             setTodayItems(serverData)
             localStorage.setItem(key, JSON.stringify(serverData))
@@ -6594,7 +6676,15 @@ function AppContent() {
     if (!task) return
     // Prevent duplicates: consider legacy linked items (taskId) and copied items (sourceTaskId)
     const exists = todayItems.find(i => i.taskId === task.id || i.sourceTaskId === task.id)
-    if (exists) { showToast('Task already in Tod(o)ay'); return }
+    if (exists) {
+      setDuplicateCheck({
+        item: task,
+        existingItem: exists,
+        type: 'task',
+        opts
+      })
+      return
+    }
     // Create a local copy of the task so edits don't affect the original
     const item = {
       id: uuid(),
@@ -6605,34 +6695,78 @@ function AppContent() {
       tags: task.tags || [],
       created_at: new Date().toISOString()
     }
-    // New tasks go above completed tasks
-    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
-    const next = firstCompletedIndex === -1
-      ? [...todayItems, item]
-      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
+    const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
     saveTodayItems(next)
-      // Try to persist immediately to server and surface errors
-      (async () => {
-        try {
-          if (!demoMode && user && db && db.saveTodayItems) {
-            const today = new Date()
-            const { data, error } = await db.saveTodayItems(user.id, today, next)
-            if (error) {
-              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
-            }
-          }
-        } catch (e) {
-          dwarn('addToToday: save to server failed', e)
+    persistTodayToServer(next)
+  }
+
+  // Helper to place new items correctly (above completed)
+  const appendTodayItem = (current, item) => {
+    const firstCompletedIndex = current.findIndex(i => i.is_done)
+    return firstCompletedIndex === -1
+      ? [...current, item]
+      : [...current.slice(0, firstCompletedIndex), item, ...current.slice(firstCompletedIndex)]
+  }
+
+  const persistTodayToServer = async (next) => {
+    try {
+      if (!demoMode && user && db && db.saveTodayItems) {
+        const today = new Date()
+        const { error } = await db.saveTodayItems(user.id, today, next)
+        if (error) {
+          showToast('Failed to sync to server: ' + (error.message || error))
         }
-      })()
+      }
+    } catch (e) {
+      dwarn('persistTodayToServer failed', e)
+    }
+  }
+
+  const handleDuplicateAction = (action, check) => {
+    const { item, existingItem, type, opts } = check
+    setDuplicateCheck(null)
+
+    if (action === 'cancel') return
+
+    if (action === 'reactivate') {
+      toggleTodayDone(existingItem.id) // This handles both local and server sync
+      showToast('Task reactivated')
+      return
+    }
+
+    if (action === 'duplicate') {
+      const newItem = {
+        id: uuid(),
+        title: type === 'local' ? item.title : (type === 'subtask' ? `${opts.parentTitle} — ${item.title}` : item.title),
+        projectId: opts?.projectId || null,
+        isLocal: true,
+        sourceTaskId: type === 'task' ? item.id : (type === 'subtask' ? opts.parentTaskId : null),
+        sourceSubtaskId: type === 'subtask' ? item.id : null,
+        tags: item.tags || [],
+        created_at: new Date().toISOString()
+      }
+      const next = appendTodayItem(todayItems, newItem)
+      setTodayItems(next)
+      saveTodayItems(next)
+      persistTodayToServer(next)
+      showToast('Duplicate added')
+    }
   }
 
   const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
     if (!subtask || !parentTask) return
     // Prevent duplicates: consider legacy linked items and copied items
     const exists = todayItems.find(i => i.subtaskId === subtask.id || i.sourceSubtaskId === subtask.id || (i.taskId === parentTask.id || i.sourceTaskId === parentTask.id) && i.title === `${parentTask.title} — ${subtask.title}`)
-    if (exists) { showToast('Subtask already in Tod(o)ay'); return }
+    if (exists) {
+      setDuplicateCheck({
+        item: subtask,
+        existingItem: exists,
+        type: 'subtask',
+        opts: { ...opts, parentTaskId: parentTask.id, parentTitle: parentTask.title }
+      })
+      return
+    }
     // Create a local copy of the subtask so edits don't affect the original
     const item = {
       id: uuid(),
@@ -6644,54 +6778,29 @@ function AppContent() {
       tags: subtask.tags || [],
       created_at: new Date().toISOString()
     }
-    // New tasks go above completed tasks
-    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
-    const next = firstCompletedIndex === -1
-      ? [...todayItems, item]
-      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
+    const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
     saveTodayItems(next)
-      ; (async () => {
-        try {
-          if (!demoMode && user && db && db.saveTodayItems) {
-            const today = new Date()
-            const { data, error } = await db.saveTodayItems(user.id, today, next)
-            if (error) {
-              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
-            }
-          }
-        } catch (e) {
-          dwarn('addSubtaskToToday: save to server failed', e)
-        }
-      })()
+    persistTodayToServer(next)
   }
 
   const addLocalTodayTask = (title) => {
     if (!title || !title.trim()) return
     const trimmed = title.trim()
     const exists = todayItems.find(i => i.isLocal && i.title === trimmed)
-    if (exists) { showToast('Item already in Tod(o)ay'); return }
+    if (exists) {
+      setDuplicateCheck({
+        item: { title: trimmed },
+        existingItem: exists,
+        type: 'local'
+      })
+      return
+    }
     const item = { id: uuid(), title: trimmed, isLocal: true, is_done: false, created_at: new Date().toISOString() }
-    // New tasks go above completed tasks
-    const firstCompletedIndex = todayItems.findIndex(i => i.is_done)
-    const next = firstCompletedIndex === -1
-      ? [...todayItems, item]
-      : [...todayItems.slice(0, firstCompletedIndex), item, ...todayItems.slice(firstCompletedIndex)]
+    const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
     saveTodayItems(next)
-      ; (async () => {
-        try {
-          if (!demoMode && user && db && db.saveTodayItems) {
-            const today = new Date()
-            const { data, error } = await db.saveTodayItems(user.id, today, next)
-            if (error) {
-              showToast('Failed to save Tod(o)ay to server: ' + (error.message || error))
-            }
-          }
-        } catch (e) {
-          dwarn('addLocalTodayTask: save to server failed', e)
-        }
-      })()
+    persistTodayToServer(next)
   }
 
   const toggleTodayDone = async (id) => {
@@ -7351,7 +7460,8 @@ function AppContent() {
     user,
     demoMode,
     tags, createTag, editTag, deleteTag, assignTag, unassignTag,
-    activeTagPicker, setActiveTagPicker // <-- Fix for ReferenceError
+    activeTagPicker, setActiveTagPicker,
+    duplicateCheck, setDuplicateCheck, handleDuplicateAction
   }
 
 
