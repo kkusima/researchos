@@ -3405,14 +3405,20 @@ function ProjectDetail() {
     setNewTask('')
 
     if (!demoMode) {
-      db.createTask({
+      // Filter for valid DB columns only
+      const cleanTask = {
         id: localId,
         stage_id: stage.id,
         title: task.title,
+        description: task.description || '',
         order_index: 1000000000,
+        is_completed: false,
+        reminder_date: task.reminder_date || null,
         created_by: user?.id,
         modified_by: user?.id
-      }).then(async ({ data: createdTask, error }) => {
+      }
+
+      db.createTask(cleanTask).then(async ({ data: createdTask, error }) => {
         console.log('Task creation response:', { createdTask, error })
         if (error) {
           console.error('Failed to create task:', error)
@@ -4920,14 +4926,19 @@ function TaskDetail() {
     setNewSubtask('')
 
     if (!demoMode) {
-      db.createSubtask({
+      // Filter for valid DB columns only
+      const cleanSubtask = {
         id: localId,
         task_id: task.id,
         title: subtask.title,
+        is_completed: false,
+        reminder_date: subtask.reminder_date || null,
         order_index: 1000000000,
         created_by: user?.id,
         modified_by: user?.id
-      }).then(async ({ data: createdSubtask, error }) => {
+      }
+
+      db.createSubtask(cleanSubtask).then(async ({ data: createdSubtask, error }) => {
         if (error) {
           console.error('Failed to create subtask:', error)
           showToast('Failed to save subtask. Please try again.')
