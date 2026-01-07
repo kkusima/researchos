@@ -5732,12 +5732,12 @@ function AllTasksView() {
       // Priority is always sorted the same way: lower rank/index = higher priority (top)
       // Direction toggle doesn't apply to priority
       if (a.project.priority_rank !== b.project.priority_rank) {
-        return a.project.priority_rank - b.project.priority_rank
+        return b.project.priority_rank - a.project.priority_rank
       }
       if (a.stageIndex !== b.stageIndex) {
-        return a.stageIndex - b.stageIndex
+        return b.stageIndex - a.stageIndex
       }
-      return (a.task.order_index || 0) - (b.task.order_index || 0)
+      return (b.task.order_index || 0) - (a.task.order_index || 0)
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
