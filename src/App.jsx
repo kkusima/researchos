@@ -5739,8 +5739,8 @@ function AllTasksView() {
       if (a.stageIndex !== b.stageIndex) {
         return (a.stageIndex - b.stageIndex) * dir
       }
-      // Finally by task order_index (higher = top)
-      return ((b.task.order_index || 0) - (a.task.order_index || 0)) * dir
+      // Finally by task order_index (lower = top = higher priority)
+      return ((a.task.order_index || 0) - (b.task.order_index || 0)) * dir
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
