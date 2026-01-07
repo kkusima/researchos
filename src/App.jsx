@@ -3278,7 +3278,7 @@ function CreateProjectModal({ onClose }) {
 // PROJECT DETAIL VIEW
 // ============================================
 function ProjectDetail() {
-  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday, tags, createTag, editTag, deleteTag, assignTag, unassignTag } = useApp()
+  const { projects, setProjects, selectedProject, setSelectedProject, setView, setSelectedTask, addToToday, addSubtaskToToday, tags, createTag, editTag, deleteTag, assignTag, unassignTag, reorderTasks, reorderSubtasks } = useApp()
   const { demoMode, user } = useAuth()
   const currentUserName = user?.user_metadata?.name || user?.email || 'Unknown'
   const [previewIndex, setPreviewIndex] = useState(null)
@@ -3286,6 +3286,34 @@ function ProjectDetail() {
   const [showSettings, setShowSettings] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [activeTagPicker, setActiveTagPicker] = useState(null) // { taskId, subtaskId? }
+  const dragTaskIndex = useRef(null)
+  const dragSubtaskIndex = useRef(null)
+  const dragSubtaskTaskId = useRef(null)
+
+  const onTaskDragStart = (e, i) => { dragTaskIndex.current = i; e.dataTransfer?.setData('text/task', String(i)) }
+  const onTaskDragOver = (e, i) => { e.preventDefault() }
+  const onTaskDrop = (e, i) => {
+    e.preventDefault()
+    const from = dragTaskIndex.current ?? parseInt(e.dataTransfer?.getData('text/task') || '0', 10)
+    if (from !== i) reorderTasks(project.id, stageIndex, from, i)
+    dragTaskIndex.current = null
+  }
+
+  const onSubtaskDragStart = (e, taskId, i) => {
+    dragSubtaskIndex.current = i;
+    dragSubtaskTaskId.current = taskId;
+    e.dataTransfer?.setData('text/subtask', String(i))
+    e.stopPropagation()
+  }
+  const onSubtaskDragOver = (e, i) => { e.preventDefault(); e.stopPropagation() }
+  const onSubtaskDrop = (e, taskId, i) => {
+    e.preventDefault(); e.stopPropagation()
+    if (dragSubtaskTaskId.current !== taskId) return
+    const from = dragSubtaskIndex.current ?? parseInt(e.dataTransfer?.getData('text/subtask') || '0', 10)
+    if (from !== i) reorderSubtasks(project.id, stageIndex, taskId, from, i)
+    dragSubtaskIndex.current = null
+    dragSubtaskTaskId.current = null
+  }
 
   if (!selectedProject) return null
 
@@ -3544,25 +3572,9 @@ function ProjectDetail() {
   // Sort tasks: overdue first, then by reminder date, then others
   // Sort tasks: Completed at bottom, Newest active at top
   const sortedTasks = [...(stage?.tasks || [])].sort((a, b) => {
-    // 1. Completion status: Incomplete first
-    if (a.is_completed !== b.is_completed) {
-      return a.is_completed ? 1 : -1 // Completed goes to bottom
-    }
-
-    // 2. Overdue priority (only for incomplete tasks)
-    if (!a.is_completed) {
-      const aOverdue = isOverdue(a.reminder_date)
-      const bOverdue = isOverdue(b.reminder_date)
-      if (aOverdue !== bOverdue) {
-        return aOverdue ? -1 : 1 // Overdue goes to top
-      }
-    }
-
-    // 3. Sort by Created Date Descending (Newest first) for both active and completed
-    // This satisfies "New task should appear at the top"
-    const dateA = new Date(a.created_at || 0).getTime()
-    const dateB = new Date(b.created_at || 0).getTime()
-    return dateB - dateA
+    if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1
+    if ((a.order_index || 0) !== (b.order_index || 0)) return (a.order_index || 0) - (b.order_index || 0)
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0)
   })
 
   // Multi-select state for tasks
@@ -3836,10 +3848,18 @@ function ProjectDetail() {
               return (
                 <div
                   key={task.id}
+                  draggable="true"
+                  onDragStart={(e) => onTaskDragStart(e, i)}
+                  onDragOver={(e) => onTaskDragOver(e, i)}
+                  onDrop={(e) => onTaskDrop(e, i)}
                   className={`glass-card glass-card-hover rounded-xl animate-fade-in transition-all ${taskOverdue ? 'bg-red-50/80 border-l-4 border-l-red-400' : ''
-                    }`}
+                    } relative group`}
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
+                  {/* Drag Handle for Task */}
+                  <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 transition-opacity p-1 cursor-grab active:cursor-grabbing text-gray-400">
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </div>
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-2 sm:gap-3">
                       <div className="flex items-center gap-2">
@@ -3978,13 +3998,20 @@ function ProjectDetail() {
                   {/* Always visible Subtasks */}
                   {hasSubtasks && (
                     <div className="border-t border-gray-100 bg-gray-50/50 rounded-b-xl px-3 sm:px-4 py-2 space-y-1.5">
-                      {task.subtasks.map(subtask => {
+                      {task.subtasks.map((subtask, idx) => {
                         const subtaskOverdue = isOverdue(subtask.reminder_date) && !subtask.is_completed
                         return (
                           <div
                             key={subtask.id}
-                            className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''}`}
+                            draggable="true"
+                            onDragStart={(e) => onSubtaskDragStart(e, task.id, idx)}
+                            onDragOver={(e) => onSubtaskDragOver(e, idx)}
+                            onDrop={(e) => onSubtaskDrop(e, task.id, idx)}
+                            className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${subtaskOverdue ? 'bg-red-50' : ''} hover:bg-gray-100 group/subtask transition-colors relative`}
                           >
+                            <div className="absolute left-0 opacity-0 group-hover/subtask:opacity-40 p-0.5 text-gray-400 cursor-grab active:cursor-grabbing">
+                              <GripVertical className="w-2.5 h-2.5" />
+                            </div>
                             <button
                               onClick={() => toggleSubtask(task.id, subtask.id)}
                               className={`checkbox-custom flex-shrink-0 ${subtask.is_completed ? 'checked' : ''}`}
@@ -4623,7 +4650,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 function TaskDetail() {
   const {
     projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday,
-    tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag
+    tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag, reorderSubtasks
   } = useApp()
   const { demoMode, user } = useAuth()
   const [newSubtask, setNewSubtask] = useState('')
@@ -4632,6 +4659,21 @@ function TaskDetail() {
   const [selectedSubtaskIds, setSelectedSubtaskIds] = useState(new Set())
   const [editingSubtaskId, setEditingSubtaskId] = useState(null)
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('')
+  const dragSubtaskIndex = useRef(null)
+
+  const onSubtaskDragStart = (e, i) => {
+    dragSubtaskIndex.current = i
+    e.dataTransfer?.setData('text/subtask', String(i))
+  }
+  const onSubtaskDragOver = (e) => { e.preventDefault() }
+  const onSubtaskDrop = (e, i) => {
+    e.preventDefault()
+    const from = dragSubtaskIndex.current ?? parseInt(e.dataTransfer?.getData('text/subtask') || '0', 10)
+    if (from !== i) {
+      reorderSubtasks(project.id, stageIndex, currentTask.id, from, i)
+    }
+    dragSubtaskIndex.current = null
+  }
 
   if (!selectedTask || !selectedProject) return null
 
@@ -4957,12 +4999,9 @@ function TaskDetail() {
 
   // Sort subtasks: overdue first
   const sortedSubtasks = [...(currentTask.subtasks || [])].sort((a, b) => {
-    const aOverdue = isOverdue(a.reminder_date) && !a.is_completed
-    const bOverdue = isOverdue(b.reminder_date) && !b.is_completed
-
-    if (aOverdue && !bOverdue) return -1
-    if (!aOverdue && bOverdue) return 1
-    return 0
+    if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1
+    if ((a.order_index || 0) !== (b.order_index || 0)) return (a.order_index || 0) - (b.order_index || 0)
+    return new Date(a.created_at || 0) - new Date(b.created_at || 0)
   })
 
   return (
@@ -5191,15 +5230,22 @@ function TaskDetail() {
             )}
           </div>
           <div className="space-y-2 mb-4">
-            {sortedSubtasks.map(s => {
+            {sortedSubtasks.map((s, idx) => {
               const subtaskOverdue = isOverdue(s.reminder_date) && !s.is_completed
               const isSelected = selectedSubtaskIds.has(s.id)
               return (
                 <div
                   key={s.id}
-                  className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors ${subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
+                  draggable="true"
+                  onDragStart={(e) => onSubtaskDragStart(e, idx)}
+                  onDragOver={onSubtaskDragOver}
+                  onDrop={(e) => onSubtaskDrop(e, idx)}
+                  className={`flex items-center gap-2 sm:gap-3 p-3 rounded-lg transition-colors relative group ${subtaskOverdue ? 'bg-red-50 border-l-2 border-l-red-400' : 'bg-gray-50'
                     } ${isSelected ? 'ring-2 ring-brand-500 bg-brand-50' : ''}`}
                 >
+                  <div className="absolute left-0 opacity-0 group-hover:opacity-40 p-1 text-gray-400 cursor-grab active:cursor-grabbing">
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </div>
                   {isSubtaskSelectionMode ? (
                     <button
                       onClick={(e) => toggleSubtaskSelection(s.id, e)}
@@ -5571,7 +5617,13 @@ function AllTasksView() {
     if (!aOverdue && bOverdue) return 1
 
     if (sortOption === 'priority') {
-      return (a.project.priority_rank - b.project.priority_rank) * dir
+      if (a.project.priority_rank !== b.project.priority_rank) {
+        return (a.project.priority_rank - b.project.priority_rank) * dir
+      }
+      if (a.stageIndex !== b.stageIndex) {
+        return (a.stageIndex - b.stageIndex) * dir
+      }
+      return ((a.task.order_index || 0) - (b.task.order_index || 0)) * dir
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
@@ -6573,54 +6625,22 @@ function AppContent() {
           } catch (e) { }
 
           if (serverData) {
-            // Trust the server as the source of truth for synced data.
-            // This prevents "resurrection" of deleted items that might still be in local storage.
-            // We only merge local items if the server data is empty, which might happen if 
-            // the user just added items while offline and they haven't synced yet.
-            if (serverData.length === 0) {
-              try {
-                const rawLocal = localStorage.getItem(key)
-                const localItems = rawLocal ? JSON.parse(rawLocal) : []
-                if (Array.isArray(localItems) && localItems.length > 0) {
-                  setTodayItems(localItems)
-                  // Try to sync these local-only items to server
-                  db.saveTodayItems(user.id, today, localItems).catch(() => { })
-                  return
-                }
-              } catch (e) { }
-            }
-
+            // Trust the server as the source of truth.
+            // DO NOT auto-restore from local storage if serverData is empty, 
+            // as an empty array is a valid state (user deleted everything).
             setTodayItems(serverData)
             localStorage.setItem(key, JSON.stringify(serverData))
             return
           }
         }
 
-        // Fallback or No Server: Local Storage
+        // Fallback for Demo Mode or Offline: Local Storage
         const rawLocal = localStorage.getItem(key)
         if (rawLocal) {
           try {
             const parsed = JSON.parse(rawLocal)
             if (Array.isArray(parsed)) {
               setTodayItems(parsed)
-              return
-            }
-          } catch (e) { }
-        }
-
-        // Valid Migration Check
-        const legacyKey = `researchos_today_${today.toISOString().slice(0, 10)}`
-        const legacyStored = localStorage.getItem(legacyKey)
-        if (legacyStored) {
-          try {
-            const parsedLegacy = JSON.parse(legacyStored)
-            if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
-              const merged = parsedLegacy.map(i => ({ ...i, id: i.id || uuid(), created_at: i.created_at || new Date().toISOString() }))
-              localStorage.setItem(key, JSON.stringify(merged))
-              if (!demoMode && user && db && db.saveTodayItems) {
-                try { await db.saveTodayItems(user.id, today, merged) } catch (e) { }
-              }
-              setTodayItems(merged)
               return
             }
           } catch (e) { }
@@ -6638,6 +6658,11 @@ function AppContent() {
         setTodayItems([])
       }
     })()
+
+    return () => {
+      // Small cleanup to ensure state doesn't leak if hook unmounts or user logs out
+      if (!user) setTodayItems([])
+    }
   }, [user])
 
   const saveTodayItems = (items) => {
@@ -6931,6 +6956,74 @@ function AppContent() {
     items.splice(toIndex, 0, moved)
     setTodayItems(items)
     saveTodayItems(items)
+  }
+
+  const reorderTasks = async (projectId, stageIndex, fromIndex, toIndex) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project || !project.stages[stageIndex]) return
+
+    const newProjects = projects.map(p => {
+      if (p.id !== projectId) return p
+      const stages = p.stages.map((s, si) => {
+        if (si !== stageIndex) return s
+        const tasks = [...s.tasks]
+        const [moved] = tasks.splice(fromIndex, 1)
+        tasks.splice(toIndex, 0, moved)
+        return { ...s, tasks: tasks.map((t, idx) => ({ ...t, order_index: idx })) }
+      })
+      return { ...p, stages }
+    })
+
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      const stage = project.stages[stageIndex]
+      const tasks = [...stage.tasks]
+      const [moved] = tasks.splice(fromIndex, 1)
+      tasks.splice(toIndex, 0, moved)
+      // Bulk update order_index in background
+      for (let i = 0; i < tasks.length; i++) {
+        db.updateTask(tasks[i].id, { order_index: i }).catch(e => dwarn('reorderTasks sync failed', e))
+      }
+    }
+  }
+
+  const reorderSubtasks = async (projectId, stageIndex, taskId, fromIndex, toIndex) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+
+    const newProjects = projects.map(p => {
+      if (p.id !== projectId) return p
+      const stages = p.stages.map((s, si) => {
+        if (si !== stageIndex) return s
+        const tasks = s.tasks.map(t => {
+          if (t.id !== taskId) return t
+          const subtasks = [...(t.subtasks || [])]
+          const [moved] = subtasks.splice(fromIndex, 1)
+          subtasks.splice(toIndex, 0, moved)
+          return { ...t, subtasks: subtasks.map((st, idx) => ({ ...st, order_index: idx })) }
+        })
+        return { ...s, tasks }
+      })
+      return { ...p, stages }
+    })
+
+    setProjects(newProjects)
+    if (demoMode) saveLocal(newProjects)
+
+    if (!demoMode) {
+      const stage = project.stages[stageIndex]
+      const task = stage.tasks.find(t => t.id === taskId)
+      if (task) {
+        const subtasks = [...(task.subtasks || [])]
+        const [moved] = subtasks.splice(fromIndex, 1)
+        subtasks.splice(toIndex, 0, moved)
+        for (let i = 0; i < subtasks.length; i++) {
+          db.updateSubtask(subtasks[i].id, { order_index: i }).catch(e => dwarn('reorderSubtasks sync failed', e))
+        }
+      }
+    }
   }
 
   // Keep ref in sync
@@ -7347,6 +7440,8 @@ function AppContent() {
             if ((p.stages || []).some(s => (s.tasks || []).some(t => t.id === taskId))) { relevant = true; break }
           }
         }
+      } else if (table === 'today_items') {
+        relevant = payload.new?.user_id === user.id || payload.old?.user_id === user.id
       } else {
         // conservatively treat other tables as relevant
         relevant = true
@@ -7362,8 +7457,17 @@ function AppContent() {
         if (!error && data) {
           setProjects(data)
         }
-        // Also reload notifications in case new ones were created
+        // Also reload notifications and today items
         loadNotifications()
+
+        // Reload today items
+        const today = new Date()
+        const { data: tData } = await db.getTodayItems(user.id, today)
+        if (tData) {
+          setTodayItems(tData)
+          const key = getTodayKey(today)
+          localStorage.setItem(key, JSON.stringify(tData))
+        }
       }, 500)
     }
 
@@ -7448,7 +7552,7 @@ function AppContent() {
     view, setView,
     loading,
     reorderProjects,
-    todayItems, addToToday, addLocalTodayTask, removeTodayItem, reorderToday,
+    todayItems, addToToday, addLocalTodayTask, removeTodayItem, reorderToday, reorderTasks, reorderSubtasks,
     toggleTodayDone,
     addSubtaskToToday,
     removeTodayItems, duplicateTodayItems,
