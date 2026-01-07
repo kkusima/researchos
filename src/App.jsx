@@ -5675,8 +5675,6 @@ function AllTasksView() {
     }
   }
 
-  // Collect all tasks
-  const allTasks = []
   // Collect all tasks, ensuring tasks within each stage are sorted by order_index
   const allTasks = []
   projects.forEach(p => {
