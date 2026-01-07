@@ -3436,12 +3436,13 @@ function ProjectDetail() {
         // Task is already in local state with the correct ID.
         // We just mark it as no longer local.
         if (createdTask) {
+          console.log('✅ Task saved to DB, syncing local state...');
           const syncProject = (p) => {
             if (p.id !== project.id) return p
             return {
               ...p,
-              stages: p.stages.map((s, i) =>
-                i === stageIndex
+              stages: p.stages.map(s =>
+                s.id === stage.id
                   ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, is_local: false } : t) }
                   : s
               ),
@@ -3463,7 +3464,7 @@ function ProjectDetail() {
 
           // Notify collaborators about the new task
           if (isShared) {
-            await db.notifyCollaborators(project.id, user?.id, {
+            db.notifyCollaborators(project.id, user?.id, {
               type: 'task_created',
               title: 'New task added',
               message: task.title,
@@ -4948,6 +4949,7 @@ function TaskDetail() {
         }
         // Update local state - subtask already has correct ID
         if (createdSubtask) {
+          console.log('✅ Subtask saved to DB, syncing local state...');
           const now = new Date().toISOString()
           const syncSubtaskProject = (p) => {
             if (p.id !== project.id) return p
@@ -4956,8 +4958,8 @@ function TaskDetail() {
               updated_at: now,
               modified_by: user?.id,
               modified_by_name: userName,
-              stages: p.stages.map((s, i) =>
-                i === stageIndex
+              stages: p.stages.map(s =>
+                s.id === stage.id
                   ? {
                     ...s, tasks: s.tasks.map(t => t.id === task.id
                       ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, is_local: false } : st) }
@@ -4976,7 +4978,7 @@ function TaskDetail() {
 
           // Notify collaborators about the new subtask
           if (isShared) {
-            await db.notifyCollaborators(project.id, user?.id, {
+            db.notifyCollaborators(project.id, user?.id, {
               type: 'subtask_created',
               title: 'New subtask added',
               message: `${currentTask.title} → ${subtask.title}`,
