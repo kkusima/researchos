@@ -236,34 +236,73 @@ CREATE POLICY "Users can manage own notifications" ON public.notifications
   FOR ALL USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Projects: Owners and members can view/manage
+-- Projects: Owners and members can view/manage (NO CIRCULAR DEPENDENCIES)
 DROP POLICY IF EXISTS "Users can view projects they are members of" ON public.projects;
-CREATE POLICY "Users can view projects they are members of" ON public.projects
-  FOR SELECT USING (
-    owner_id = auth.uid() OR 
-    EXISTS (SELECT 1 FROM public.project_members WHERE project_id = projects.id AND user_id = auth.uid())
-  );
-
 DROP POLICY IF EXISTS "Owners can manage their projects" ON public.projects;
-CREATE POLICY "Owners can manage their projects" ON public.projects
-  FOR ALL USING (owner_id = auth.uid())
-  WITH CHECK (owner_id = auth.uid());
+DROP POLICY IF EXISTS "Users can view owned projects" ON public.projects;
+DROP POLICY IF EXISTS "Users can view shared projects" ON public.projects;
+DROP POLICY IF EXISTS "Owners can insert projects" ON public.projects;
+DROP POLICY IF EXISTS "Owners can update projects" ON public.projects;
+DROP POLICY IF EXISTS "Owners can delete projects" ON public.projects;
 
--- Project Members: Owner can manage, members can view
-DROP POLICY IF EXISTS "Users can view project members" ON public.project_members;
-CREATE POLICY "Users can view project members" ON public.project_members
+-- Separate SELECT policies to avoid recursion
+CREATE POLICY "Users can view owned projects" ON public.projects
+  FOR SELECT USING (owner_id = auth.uid());
+
+CREATE POLICY "Users can view shared projects" ON public.projects
   FOR SELECT USING (
-    user_id = auth.uid() OR 
     EXISTS (
-      SELECT 1 FROM public.projects 
-      WHERE id = project_members.project_id
+      SELECT 1 FROM public.project_members pm 
+      WHERE pm.project_id = projects.id 
+      AND pm.user_id = auth.uid()
     )
   );
 
+-- Separate policies for INSERT, UPDATE, DELETE
+CREATE POLICY "Owners can insert projects" ON public.projects
+  FOR INSERT WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "Owners can update projects" ON public.projects
+  FOR UPDATE USING (owner_id = auth.uid())
+  WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "Owners can delete projects" ON public.projects
+  FOR DELETE USING (owner_id = auth.uid());
+
+-- Project Members: Owner can manage, members can view (NO CIRCULAR DEPENDENCIES)
+DROP POLICY IF EXISTS "Users can view project members" ON public.project_members;
 DROP POLICY IF EXISTS "Owners can manage project members" ON public.project_members;
+DROP POLICY IF EXISTS "Users can view own membership" ON public.project_members;
+DROP POLICY IF EXISTS "Owners can view all project members" ON public.project_members;
+
+-- Separate SELECT policies
+CREATE POLICY "Users can view own membership" ON public.project_members
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Owners can view all project members" ON public.project_members
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_members.project_id 
+      AND p.owner_id = auth.uid()
+    )
+  );
+
+-- Policy for managing project members (only owners)
 CREATE POLICY "Owners can manage project members" ON public.project_members
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.projects WHERE id = project_members.project_id AND owner_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_members.project_id 
+      AND p.owner_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_members.project_id 
+      AND p.owner_id = auth.uid()
+    )
   );
 
 -- Stages: Project access required
