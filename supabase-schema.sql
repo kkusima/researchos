@@ -274,13 +274,17 @@ DROP POLICY IF EXISTS "Users can view project members" ON public.project_members
 DROP POLICY IF EXISTS "Owners can manage project members" ON public.project_members;
 DROP POLICY IF EXISTS "Users can view own membership" ON public.project_members;
 DROP POLICY IF EXISTS "Owners can view all project members" ON public.project_members;
+DROP POLICY IF EXISTS "Owners can insert project members" ON public.project_members;
+DROP POLICY IF EXISTS "Owners can update project members" ON public.project_members;
+DROP POLICY IF EXISTS "Owners can delete project members" ON public.project_members;
 
--- Separate SELECT policies
+-- CRITICAL: project_members SELECT must NEVER check projects table to avoid recursion
 CREATE POLICY "Users can view own membership" ON public.project_members
   FOR SELECT USING (user_id = auth.uid());
 
-CREATE POLICY "Owners can view all project members" ON public.project_members
-  FOR SELECT USING (
+-- INSERT/UPDATE/DELETE can reference projects (no SELECT recursion)
+CREATE POLICY "Owners can insert project members" ON public.project_members
+  FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.projects p
       WHERE p.id = project_members.project_id 
@@ -288,9 +292,8 @@ CREATE POLICY "Owners can view all project members" ON public.project_members
     )
   );
 
--- Policy for managing project members (only owners)
-CREATE POLICY "Owners can manage project members" ON public.project_members
-  FOR ALL USING (
+CREATE POLICY "Owners can update project members" ON public.project_members
+  FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM public.projects p
       WHERE p.id = project_members.project_id 
@@ -305,32 +308,39 @@ CREATE POLICY "Owners can manage project members" ON public.project_members
     )
   );
 
--- Stages: Project access required
+CREATE POLICY "Owners can delete project members" ON public.project_members
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.id = project_members.project_id 
+      AND p.owner_id = auth.uid()
+    )
+  );
+
+-- Stages: Only owners can manage (avoids circular dependency with project_members)
 DROP POLICY IF EXISTS "Users can manage stages" ON public.stages;
 CREATE POLICY "Users can manage stages" ON public.stages
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM public.projects p
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE p.id = stages.project_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
--- Tasks: Project access required
+-- Tasks: Only owners can manage (avoids circular dependency with project_members)
 DROP POLICY IF EXISTS "Users can manage tasks" ON public.tasks;
 CREATE POLICY "Users can manage tasks" ON public.tasks
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM public.stages s
       JOIN public.projects p ON s.project_id = p.id
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE s.id = tasks.stage_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
--- Subtasks: Project access required
+-- Subtasks: Only owners can manage (avoids circular dependency with project_members)
 DROP POLICY IF EXISTS "Users can manage subtasks" ON public.subtasks;
 CREATE POLICY "Users can manage subtasks" ON public.subtasks
   FOR ALL USING (
@@ -338,13 +348,12 @@ CREATE POLICY "Users can manage subtasks" ON public.subtasks
       SELECT 1 FROM public.tasks t
       JOIN public.stages s ON t.stage_id = s.id
       JOIN public.projects p ON s.project_id = p.id
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE t.id = subtasks.task_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
--- Comments: Project access required
+-- Comments: Only owners can manage (avoids circular dependency with project_members)
 DROP POLICY IF EXISTS "Users can manage comments" ON public.comments;
 CREATE POLICY "Users can manage comments" ON public.comments
   FOR ALL USING (
@@ -352,9 +361,8 @@ CREATE POLICY "Users can manage comments" ON public.comments
       SELECT 1 FROM public.tasks t
       JOIN public.stages s ON t.stage_id = s.id
       JOIN public.projects p ON s.project_id = p.id
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE t.id = comments.task_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
@@ -367,7 +375,7 @@ CREATE POLICY "Users can manage own tags" ON public.tags
   FOR ALL USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Task Tags: Users can manage tags on tasks they have access to
+-- Task Tags: Only owners can manage (avoids circular dependency)
 DROP POLICY IF EXISTS "Users can manage task tags" ON public.task_tags;
 CREATE POLICY "Users can manage task tags" ON public.task_tags
   FOR ALL USING (
@@ -375,13 +383,12 @@ CREATE POLICY "Users can manage task tags" ON public.task_tags
       SELECT 1 FROM public.tasks t
       JOIN public.stages s ON t.stage_id = s.id
       JOIN public.projects p ON s.project_id = p.id
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE t.id = task_tags.task_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
--- Subtask Tags: Users can manage tags on subtasks they have access to
+-- Subtask Tags: Only owners can manage (avoids circular dependency)
 DROP POLICY IF EXISTS "Users can manage subtask tags" ON public.subtask_tags;
 CREATE POLICY "Users can manage subtask tags" ON public.subtask_tags
   FOR ALL USING (
@@ -390,9 +397,8 @@ CREATE POLICY "Users can manage subtask tags" ON public.subtask_tags
       JOIN public.tasks t ON st.task_id = t.id
       JOIN public.stages s ON t.stage_id = s.id
       JOIN public.projects p ON s.project_id = p.id
-      LEFT JOIN public.project_members pm ON pm.project_id = p.id
       WHERE st.id = subtask_tags.subtask_id
-      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+      AND p.owner_id = auth.uid()
     )
   );
 
