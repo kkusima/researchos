@@ -12,7 +12,7 @@ This Edge Function sends email notifications via Resend when new notifications a
 
 1. Set the Resend API key as a secret:
    ```bash
-   supabase secrets set RESEND_API_KEY=REDACTED_API_KEY
+   supabase secrets set RESEND_API_KEY=your_resend_api_key_here
    ```
 
 2. Deploy the function:
