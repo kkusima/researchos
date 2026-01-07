@@ -5677,9 +5677,13 @@ function AllTasksView() {
 
   // Collect all tasks
   const allTasks = []
+  // Collect all tasks, ensuring tasks within each stage are sorted by order_index
+  const allTasks = []
   projects.forEach(p => {
     p.stages?.forEach((s, si) => {
-      s.tasks?.forEach(t => {
+      // Sort tasks within each stage by order_index before collecting
+      const sortedStageTasks = [...(s.tasks || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+      sortedStageTasks.forEach(t => {
         allTasks.push({ project: p, stage: s, stageIndex: si, task: t })
       })
     })
