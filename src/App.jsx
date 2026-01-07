@@ -3406,6 +3406,7 @@ function ProjectDetail() {
 
     if (!demoMode) {
       db.createTask({
+        id: localId,
         stage_id: stage.id,
         title: task.title,
         order_index: Number.MAX_SAFE_INTEGER,
@@ -3425,13 +3426,14 @@ function ProjectDetail() {
           updateProject(rollbackProject)
           return
         }
-        // Update local state with server-generated ID in background
+        // Task is already in local state with the correct ID.
+        // We just mark it as no longer local.
         if (createdTask) {
           const syncedProject = {
             ...project,
             stages: project.stages.map((s, i) =>
               i === stageIndex
-                ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, ...createdTask, id: createdTask.id, is_local: false } : t) }
+                ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, is_local: false } : t) }
                 : s
             ),
             updated_at: now,
@@ -3448,7 +3450,7 @@ function ProjectDetail() {
               type: 'task_created',
               title: 'New task added',
               message: task.title,
-              task_id: createdTask.id
+              task_id: localId
             })
           }
         }
@@ -4908,6 +4910,7 @@ function TaskDetail() {
 
     if (!demoMode) {
       db.createSubtask({
+        id: localId,
         task_id: task.id,
         title: subtask.title,
         order_index: Number.MAX_SAFE_INTEGER,
@@ -4921,7 +4924,7 @@ function TaskDetail() {
           updateTask({ subtasks: currentTask.subtasks.filter(st => st.id !== localId) })
           return
         }
-        // Update local state with server-generated ID
+        // Update local state - subtask already has correct ID
         if (createdSubtask) {
           const now = new Date().toISOString()
           const updated = {
@@ -4933,7 +4936,7 @@ function TaskDetail() {
               i === stageIndex
                 ? {
                   ...s, tasks: s.tasks.map(t => t.id === task.id
-                    ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id } : st) }
+                    ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, is_local: false } : st) }
                     : t
                   )
                 }
@@ -4950,7 +4953,7 @@ function TaskDetail() {
               title: 'New subtask added',
               message: `${currentTask.title} → ${subtask.title}`,
               task_id: task.id,
-              subtask_id: createdSubtask.id
+              subtask_id: localId
             })
           }
         }
