@@ -3411,7 +3411,20 @@ function ProjectDetail() {
         order_index: Number.MAX_SAFE_INTEGER,
         created_by: user?.id,
         modified_by: user?.id
-      }).then(async ({ data: createdTask }) => {
+      }).then(async ({ data: createdTask, error }) => {
+        if (error) {
+          console.error('Failed to create task:', error)
+          showToast('Failed to save task. Please try again.')
+          // Remove the local task since it failed to save
+          const rollbackProject = {
+            ...project,
+            stages: project.stages.map((s, i) =>
+              i === stageIndex ? { ...s, tasks: s.tasks.filter(t => t.id !== localId) } : s
+            )
+          }
+          updateProject(rollbackProject)
+          return
+        }
         // Update local state with server-generated ID in background
         if (createdTask) {
           const syncedProject = {
@@ -3439,6 +3452,9 @@ function ProjectDetail() {
             })
           }
         }
+      }).catch(err => {
+        console.error('Task creation failed:', err)
+        showToast('Failed to save task. Please try again.')
       })
     }
   }
@@ -4897,7 +4913,14 @@ function TaskDetail() {
         order_index: Number.MAX_SAFE_INTEGER,
         created_by: user?.id,
         modified_by: user?.id
-      }).then(async ({ data: createdSubtask }) => {
+      }).then(async ({ data: createdSubtask, error }) => {
+        if (error) {
+          console.error('Failed to create subtask:', error)
+          showToast('Failed to save subtask. Please try again.')
+          // Remove the local subtask since it failed to save
+          updateTask({ subtasks: currentTask.subtasks.filter(st => st.id !== localId) })
+          return
+        }
         // Update local state with server-generated ID
         if (createdSubtask) {
           const now = new Date().toISOString()
@@ -4931,6 +4954,9 @@ function TaskDetail() {
             })
           }
         }
+      }).catch(err => {
+        console.error('Subtask creation failed:', err)
+        showToast('Failed to save subtask. Please try again.')
       })
     }
   }
@@ -7546,7 +7572,7 @@ function AppContent() {
           const key = getTodayKey(today)
           localStorage.setItem(key, JSON.stringify(tData))
         }
-      }, 500)
+      }, delay)
     }
 
     const channel = db.subscribeToUserProjects(user.id, projectIds, handleRealtimeChange)
