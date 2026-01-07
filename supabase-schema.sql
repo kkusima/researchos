@@ -217,6 +217,25 @@ ALTER TABLE public.subtask_tags ENABLE ROW LEVEL SECURITY;
 -- RLS POLICIES
 --
 
+-- Users: Users can view and manage their own profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
+CREATE POLICY "Users can view own profile" ON public.users
+  FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
+CREATE POLICY "Users can update own profile" ON public.users
+  FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
+CREATE POLICY "Users can insert own profile" ON public.users
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Notifications: Users can manage their own notifications
+DROP POLICY IF EXISTS "Users can manage own notifications" ON public.notifications;
+CREATE POLICY "Users can manage own notifications" ON public.notifications
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 -- Projects: Owners and members can view/manage
 DROP POLICY IF EXISTS "Users can view projects they are members of" ON public.projects;
 CREATE POLICY "Users can view projects they are members of" ON public.projects
