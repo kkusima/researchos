@@ -87,7 +87,7 @@ Deno.serve(async (req: Request) => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                from: "onboarding@resend.dev",
+                from: "HypotheSys <notifications@hypothesys.dev>",
                 to: [userData.email],
                 subject: emailSubject,
                 html: emailBody,
