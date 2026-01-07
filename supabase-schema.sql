@@ -96,6 +96,14 @@ BEGIN
   ) THEN
     ALTER TABLE public.comments ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
   END IF;
+  
+  -- Add email_notifications column if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'users' AND column_name = 'email_notifications'
+  ) THEN
+    ALTER TABLE public.users ADD COLUMN email_notifications BOOLEAN DEFAULT TRUE;
+  END IF;
 END;
 $$;
 

@@ -3408,7 +3408,7 @@ function ProjectDetail() {
       db.createTask({
         stage_id: stage.id,
         title: task.title,
-        order_index: stage.tasks?.length || 0,
+        order_index: Number.MAX_SAFE_INTEGER,
         created_by: user?.id,
         modified_by: user?.id
       }).then(async ({ data: createdTask }) => {
@@ -4891,46 +4891,47 @@ function TaskDetail() {
     setNewSubtask('')
 
     if (!demoMode) {
-      const { data: createdSubtask } = await db.createSubtask({
+      db.createSubtask({
         task_id: task.id,
         title: subtask.title,
+        order_index: Number.MAX_SAFE_INTEGER,
         created_by: user?.id,
         modified_by: user?.id
+      }).then(async ({ data: createdSubtask }) => {
+        // Update local state with server-generated ID
+        if (createdSubtask) {
+          const now = new Date().toISOString()
+          const updated = {
+            ...project,
+            updated_at: now,
+            modified_by: user?.id,
+            modified_by_name: userName,
+            stages: project.stages.map((s, i) =>
+              i === stageIndex
+                ? {
+                  ...s, tasks: s.tasks.map(t => t.id === task.id
+                    ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id } : st) }
+                    : t
+                  )
+                }
+                : s
+            )
+          }
+          const newProjects = projects.map(p => p.id === project.id ? updated : p)
+          setProjects(newProjects)
+
+          // Notify collaborators about the new subtask
+          if (isShared) {
+            await db.notifyCollaborators(project.id, user?.id, {
+              type: 'subtask_created',
+              title: 'New subtask added',
+              message: `${currentTask.title} → ${subtask.title}`,
+              task_id: task.id,
+              subtask_id: createdSubtask.id
+            })
+          }
+        }
       })
-
-      // Update local state with server-generated ID
-      if (createdSubtask) {
-        const now = new Date().toISOString()
-        const updated = {
-          ...project,
-          updated_at: now,
-          modified_by: user?.id,
-          modified_by_name: userName,
-          stages: project.stages.map((s, i) =>
-            i === stageIndex
-              ? {
-                ...s, tasks: s.tasks.map(t => t.id === task.id
-                  ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id } : st) }
-                  : t
-                )
-              }
-              : s
-          )
-        }
-        const newProjects = projects.map(p => p.id === project.id ? updated : p)
-        setProjects(newProjects)
-
-        // Notify collaborators about the new subtask
-        if (isShared) {
-          await db.notifyCollaborators(project.id, user?.id, {
-            type: 'subtask_created',
-            title: 'New subtask added',
-            message: `${currentTask.title} → ${subtask.title}`,
-            task_id: task.id,
-            subtask_id: createdSubtask.id
-          })
-        }
-      }
     }
   }
 
@@ -6408,6 +6409,7 @@ function AppContent() {
   const [notifications, setNotifications] = useState([])
   const notificationsRef = useRef(notifications)
   const notifiedOverdueRef = useRef(new Set())
+  const dismissedNotificationsRef = useRef(new Set()) // Tracks cleared/deleted notification keys to prevent regeneration
   const [walkVisible, setWalkVisible] = useState(false)
   // Today / daily focus state (per-date persisted)
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
@@ -7117,6 +7119,13 @@ function AppContent() {
         })
         notifiedOverdueRef.current = set
       } catch (e) { }
+      // Load dismissed keys from localStorage
+      try {
+        const dismissedStored = localStorage.getItem('hypothesys_dismissed_notifications')
+        if (dismissedStored) {
+          dismissedNotificationsRef.current = new Set(JSON.parse(dismissedStored))
+        }
+      } catch (e) { }
     }
   }
 
@@ -7186,7 +7195,7 @@ function AppContent() {
       const key = `task-${task.id}`
       const existingKey = `task_overdue-${task.id}-`
       // skip if already notified (in-memory set) or existing notifications include it
-      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey)) {
+      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey) && !dismissedNotificationsRef.current.has(existingKey)) {
         newNotifications.push({
           id: uuid(),
           type: 'task_overdue',
@@ -7206,7 +7215,7 @@ function AppContent() {
     overdueSubtasks.forEach(({ project, task, subtask }) => {
       const key = `subtask-${task.id}-${subtask.id}`
       const existingKey = `subtask_overdue-${task.id}-${subtask.id}`
-      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey)) {
+      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey) && !dismissedNotificationsRef.current.has(existingKey)) {
         newNotifications.push({
           id: uuid(),
           type: 'subtask_overdue',
@@ -7296,6 +7305,20 @@ function AppContent() {
   }
 
   const handleDeleteNotification = async (id) => {
+    // Track dismissed key to prevent regeneration
+    const notif = notifications.find(n => n.id === id)
+    if (notif) {
+      const key = notif.type === 'task_overdue' && notif.task_id
+        ? `task_overdue-${notif.task_id}`
+        : notif.type === 'subtask_overdue' && notif.task_id && notif.subtask_id
+          ? `subtask_overdue-${notif.task_id}-${notif.subtask_id}`
+          : null
+      if (key) {
+        dismissedNotificationsRef.current.add(key)
+        localStorage.setItem('hypothesys_dismissed_notifications', JSON.stringify([...dismissedNotificationsRef.current]))
+      }
+    }
+
     if (demoMode) {
       const updated = notifications.filter(n => n.id !== id)
       setNotifications(updated)
@@ -7323,6 +7346,17 @@ function AppContent() {
   }
 
   const handleClearAllNotifications = async () => {
+    // Track all current notification keys as dismissed
+    notifications.forEach(notif => {
+      const key = notif.type === 'task_overdue' && notif.task_id
+        ? `task_overdue-${notif.task_id}`
+        : notif.type === 'subtask_overdue' && notif.task_id && notif.subtask_id
+          ? `subtask_overdue-${notif.task_id}-${notif.subtask_id}`
+          : null
+      if (key) dismissedNotificationsRef.current.add(key)
+    })
+    localStorage.setItem('hypothesys_dismissed_notifications', JSON.stringify([...dismissedNotificationsRef.current]))
+
     if (demoMode) {
       setNotifications([])
       localStorage.setItem('hypothesys_notifications', JSON.stringify([]))
