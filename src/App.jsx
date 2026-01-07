@@ -3409,10 +3409,11 @@ function ProjectDetail() {
         id: localId,
         stage_id: stage.id,
         title: task.title,
-        order_index: Number.MAX_SAFE_INTEGER,
+        order_index: 1000000000,
         created_by: user?.id,
         modified_by: user?.id
       }).then(async ({ data: createdTask, error }) => {
+        console.log('Task creation response:', { createdTask, error })
         if (error) {
           console.error('Failed to create task:', error)
           showToast('Failed to save task. Please try again.')
@@ -3429,20 +3430,30 @@ function ProjectDetail() {
         // Task is already in local state with the correct ID.
         // We just mark it as no longer local.
         if (createdTask) {
-          const syncedProject = {
-            ...project,
-            stages: project.stages.map((s, i) =>
-              i === stageIndex
-                ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, is_local: false } : t) }
-                : s
-            ),
-            updated_at: now,
-            modified_by: user?.id,
-            modified_by_name: userName
+          const syncProject = (p) => {
+            if (p.id !== project.id) return p
+            return {
+              ...p,
+              stages: p.stages.map((s, i) =>
+                i === stageIndex
+                  ? { ...s, tasks: s.tasks.map(t => t.id === localId ? { ...t, is_local: false } : t) }
+                  : s
+              ),
+              updated_at: now,
+              modified_by: user?.id,
+              modified_by_name: userName
+            }
           }
-          const newProjects = projects.map(p => p.id === project.id ? syncedProject : p)
-          setProjects(newProjects)
-          setSelectedProject(syncedProject)
+
+          setProjects(prev => {
+            const next = prev.map(syncProject)
+            return next
+          })
+
+          setSelectedProject(prev => {
+            if (prev?.id === project.id) return syncProject(prev)
+            return prev
+          })
 
           // Notify collaborators about the new task
           if (isShared) {
@@ -3455,8 +3466,8 @@ function ProjectDetail() {
           }
         }
       }).catch(err => {
-        console.error('Task creation failed:', err)
-        showToast('Failed to save task. Please try again.')
+        console.error('CRITICAL: Task creation failed to reach server:', err)
+        showToast('Connection error. Task might not be saved.')
       })
     }
   }
@@ -4913,7 +4924,7 @@ function TaskDetail() {
         id: localId,
         task_id: task.id,
         title: subtask.title,
-        order_index: Number.MAX_SAFE_INTEGER,
+        order_index: 1000000000,
         created_by: user?.id,
         modified_by: user?.id
       }).then(async ({ data: createdSubtask, error }) => {
@@ -4927,24 +4938,30 @@ function TaskDetail() {
         // Update local state - subtask already has correct ID
         if (createdSubtask) {
           const now = new Date().toISOString()
-          const updated = {
-            ...project,
-            updated_at: now,
-            modified_by: user?.id,
-            modified_by_name: userName,
-            stages: project.stages.map((s, i) =>
-              i === stageIndex
-                ? {
-                  ...s, tasks: s.tasks.map(t => t.id === task.id
-                    ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, is_local: false } : st) }
-                    : t
-                  )
-                }
-                : s
-            )
+          const syncSubtaskProject = (p) => {
+            if (p.id !== project.id) return p
+            return {
+              ...p,
+              updated_at: now,
+              modified_by: user?.id,
+              modified_by_name: userName,
+              stages: p.stages.map((s, i) =>
+                i === stageIndex
+                  ? {
+                    ...s, tasks: s.tasks.map(t => t.id === task.id
+                      ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, is_local: false } : st) }
+                      : t
+                    )
+                  }
+                  : s
+              )
+            }
           }
-          const newProjects = projects.map(p => p.id === project.id ? updated : p)
-          setProjects(newProjects)
+
+          setProjects(prev => prev.map(syncSubtaskProject))
+          if (selectedProject?.id === project.id) {
+            setSelectedProject(prev => syncSubtaskProject(prev))
+          }
 
           // Notify collaborators about the new subtask
           if (isShared) {
@@ -4958,8 +4975,8 @@ function TaskDetail() {
           }
         }
       }).catch(err => {
-        console.error('Subtask creation failed:', err)
-        showToast('Failed to save subtask. Please try again.')
+        console.error('CRITICAL: Subtask creation failed to reach server:', err)
+        showToast('Connection error. Subtask might not be saved.')
       })
     }
   }

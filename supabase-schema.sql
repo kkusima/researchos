@@ -214,6 +214,93 @@ ALTER TABLE public.task_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subtask_tags ENABLE ROW LEVEL SECURITY;
 
 -- 
+-- RLS POLICIES
+--
+
+-- Projects: Owners and members can view/manage
+DROP POLICY IF EXISTS "Users can view projects they are members of" ON public.projects;
+CREATE POLICY "Users can view projects they are members of" ON public.projects
+  FOR SELECT USING (
+    owner_id = auth.uid() OR 
+    EXISTS (SELECT 1 FROM public.project_members WHERE project_id = projects.id AND user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Owners can manage their projects" ON public.projects;
+CREATE POLICY "Owners can manage their projects" ON public.projects
+  FOR ALL USING (owner_id = auth.uid())
+  WITH CHECK (owner_id = auth.uid());
+
+-- Project Members: Owner can manage, members can view
+DROP POLICY IF EXISTS "Users can view project members" ON public.project_members;
+CREATE POLICY "Users can view project members" ON public.project_members
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p 
+      WHERE p.id = project_members.project_id 
+      AND (p.owner_id = auth.uid() OR EXISTS (SELECT 1 FROM public.project_members pm WHERE pm.project_id = p.id AND pm.user_id = auth.uid()))
+    )
+  );
+
+DROP POLICY IF EXISTS "Owners can manage project members" ON public.project_members;
+CREATE POLICY "Owners can manage project members" ON public.project_members
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.projects WHERE id = project_members.project_id AND owner_id = auth.uid())
+  );
+
+-- Stages: Project access required
+DROP POLICY IF EXISTS "Users can manage stages" ON public.stages;
+CREATE POLICY "Users can manage stages" ON public.stages
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE p.id = stages.project_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
+
+-- Tasks: Project access required
+DROP POLICY IF EXISTS "Users can manage tasks" ON public.tasks;
+CREATE POLICY "Users can manage tasks" ON public.tasks
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.stages s
+      JOIN public.projects p ON s.project_id = p.id
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE s.id = tasks.stage_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
+
+-- Subtasks: Project access required
+DROP POLICY IF EXISTS "Users can manage subtasks" ON public.subtasks;
+CREATE POLICY "Users can manage subtasks" ON public.subtasks
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.tasks t
+      JOIN public.stages s ON t.stage_id = s.id
+      JOIN public.projects p ON s.project_id = p.id
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE t.id = subtasks.task_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
+
+-- Comments: Project access required
+DROP POLICY IF EXISTS "Users can manage comments" ON public.comments;
+CREATE POLICY "Users can manage comments" ON public.comments
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.tasks t
+      JOIN public.stages s ON t.stage_id = s.id
+      JOIN public.projects p ON s.project_id = p.id
+      LEFT JOIN public.project_members pm ON pm.project_id = p.id
+      WHERE t.id = comments.task_id
+      AND (p.owner_id = auth.uid() OR pm.user_id = auth.uid())
+    )
+  );
+
+-- 
 -- RLS POLICIES FOR TAGS
 --
 -- Tags: Users can manage their own tags
