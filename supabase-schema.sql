@@ -253,10 +253,10 @@ CREATE POLICY "Owners can manage their projects" ON public.projects
 DROP POLICY IF EXISTS "Users can view project members" ON public.project_members;
 CREATE POLICY "Users can view project members" ON public.project_members
   FOR SELECT USING (
+    user_id = auth.uid() OR 
     EXISTS (
-      SELECT 1 FROM public.projects p 
-      WHERE p.id = project_members.project_id 
-      AND (p.owner_id = auth.uid() OR EXISTS (SELECT 1 FROM public.project_members pm WHERE pm.project_id = p.id AND pm.user_id = auth.uid()))
+      SELECT 1 FROM public.projects 
+      WHERE id = project_members.project_id
     )
   );
 
