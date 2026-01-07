@@ -5729,15 +5729,16 @@ function AllTasksView() {
     if (!aOverdue && bOverdue) return 1
 
     if (sortOption === 'priority') {
-      // Priority is always sorted the same way: lower rank/index = higher priority (top)
-      // Direction toggle doesn't apply to priority
+      // Sort by project priority first (lower rank = higher priority)
       if (a.project.priority_rank !== b.project.priority_rank) {
-        return b.project.priority_rank - a.project.priority_rank
+        return (a.project.priority_rank - b.project.priority_rank) * dir
       }
+      // Then by stage order (lower index = earlier stage = higher priority)
       if (a.stageIndex !== b.stageIndex) {
-        return b.stageIndex - a.stageIndex
+        return (a.stageIndex - b.stageIndex) * dir
       }
-      return (b.task.order_index || 0) - (a.task.order_index || 0)
+      // Finally by task order_index (lower = top = higher priority)
+      return ((a.task.order_index || 0) - (b.task.order_index || 0)) * dir
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
