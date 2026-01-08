@@ -96,14 +96,14 @@ export const db = {
             *,
             tasks (
               *,
-              tags (
+              tags:tags (
                 *
               ),
               creator:users!created_by (name, email),
               modifier:users!modified_by (name, email),
               subtasks (
                 *,
-                tags (
+                tags:tags (
                   *
                 ),
                 creator:users!created_by (name, email),
@@ -256,6 +256,7 @@ export const db = {
         .from('projects')
         .delete()
         .eq('id', id)
+        .eq('owner_id', userId) // Security check
 
       if (error) {
         logError('deleteProject', error)
