@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, Notification } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -39,6 +39,35 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    // Enable dock/taskbar badges on macOS/Windows for notifications
+    app.setAppUserModelId('com.hypothesys.app');
+
+    ipcMain.on('notify', (_, payload = {}) => {
+        const { title = 'HypotheSys', body = '', badgeCount } = payload;
+        if (Notification.isSupported()) {
+            const notification = new Notification({ title, body });
+            notification.show();
+        }
+
+        if (badgeCount !== undefined) {
+            if (process.platform === 'darwin' && app.dock) {
+                app.dock.setBadge(badgeCount > 0 ? String(badgeCount) : '');
+            }
+            if (process.platform === 'win32') {
+                app.setBadgeCount(Number(badgeCount) || 0);
+            }
+        }
+    });
+
+    ipcMain.on('set-badge', (_, count = 0) => {
+        if (process.platform === 'darwin' && app.dock) {
+            app.dock.setBadge(count > 0 ? String(count) : '');
+        }
+        if (process.platform === 'win32') {
+            app.setBadgeCount(Number(count) || 0);
+        }
+    });
+
     createWindow();
 
     app.on('activate', () => {

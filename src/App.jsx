@@ -156,7 +156,9 @@ const saveLocal = (data) => {
 // ============================================
 function LoginPage() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset, demoMode } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [email, setEmail] = useState('')
@@ -167,15 +169,15 @@ function LoginPage() {
   const [resetEmailSent, setResetEmailSent] = useState(false)
 
   const handleGoogleLogin = async () => {
-    setLoading(true)
+    setGoogleLoading(true)
     setError('')
     await signInWithGoogle()
-    setLoading(false)
+    setGoogleLoading(false)
   }
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setFormLoading(true)
     setError('')
     setConfirmationSent(false)
 
@@ -192,12 +194,12 @@ function LoginPage() {
         setError(error.message)
       }
     }
-    setLoading(false)
+    setFormLoading(false)
   }
 
   const handleForgotPassword = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setResetLoading(true)
     setError('')
 
     const { error } = await sendPasswordReset(email)
@@ -206,7 +208,7 @@ function LoginPage() {
     } else {
       setResetEmailSent(true)
     }
-    setLoading(false)
+    setResetLoading(false)
   }
 
   // Show password reset email sent message
@@ -268,21 +270,40 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f3f4f6 0%, #6b7280 100%)' }}>
-      <div className="glass-card rounded-3xl p-8 w-full max-w-md text-center animate-fade-in">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center text-4xl" style={{ background: 'linear-gradient(135deg, #e5e7eb, #4b5563)' }}>
-          🔬
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(circle at 20% 20%, #eef2ff 0, #f9fafb 45%, #e5e7eb 100%)' }}>
+      <div className="glass-card rounded-3xl p-8 w-full max-w-md text-center animate-fade-in shadow-xl border border-gray-100/60">
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-left">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">Welcome to</p>
+            <h1 className="text-3xl font-black text-gray-900">HypotheSys™</h1>
+          </div>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: 'linear-gradient(135deg, #e0f2fe, #eef2ff)' }}>
+            🔬
+          </div>
         </div>
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">HypotheSys™</h1>
-        <p className="text-gray-500 mb-6">Systematizing your way from hypothesis to discovery</p>
+        <p className="text-gray-500 mb-4">Systematize your hypothesis-to-discovery workflow.</p>
 
-        {/* Google Sign In - First */}
+        <div className="bg-gray-100 rounded-2xl p-1 grid grid-cols-2 text-sm font-semibold mb-5">
+          <button
+            className={`py-2 rounded-xl transition-all ${!isSignUp ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            onClick={() => { setIsSignUp(false); setIsForgotPassword(false); setError('') }}
+          >
+            Sign In
+          </button>
+          <button
+            className={`py-2 rounded-xl transition-all ${isSignUp ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+            onClick={() => { setIsSignUp(true); setIsForgotPassword(false); setError('') }}
+          >
+            Create Account
+          </button>
+        </div>
+
         <button
           onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 mb-4"
+          disabled={googleLoading}
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white border-2 border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-60 mb-4"
         >
-          {loading ? (
+          {googleLoading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -292,16 +313,15 @@ function LoginPage() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
           )}
-          Sign in with Google
+          Continue with Google
         </button>
 
-        {/* OR Divider */}
         <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-400">OR</span>
+            <span className="px-3 bg-white text-gray-400">or email</span>
           </div>
         </div>
 
@@ -330,10 +350,10 @@ function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={resetLoading}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
                 Send Reset Link
               </button>
             </form>
@@ -405,19 +425,19 @@ function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={formLoading}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition-all disabled:opacity-50"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                {formLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
                 {isSignUp ? 'Create Account' : 'Sign In'}
               </button>
             </form>
 
             <button
               onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
-              className="text-sm text-gray-500 hover:text-gray-700 mt-4"
+              className="text-sm text-gray-700 font-semibold hover:text-gray-900 mt-4"
             >
-              {isSignUp ? 'Already have an account? Sign in' : "Need an account? Sign Up"}
+              {isSignUp ? 'Already have an account? Sign in' : 'New here? Create your account'}
             </button>
           </>
         )}
@@ -5701,20 +5721,16 @@ function AllTasksView() {
   const [tagFilterOpen, setTagFilterOpen] = useState(false)
 
   const handleSortChange = (newOption) => {
-    if (newOption === 'priority') {
-      setSortOption('priority')
-      setSortDirection('asc')
-      return
-    }
     if (newOption === sortOption) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+      return
+    }
+
+    setSortOption(newOption)
+    if (newOption === 'created' || newOption === 'modified') {
+      setSortDirection('desc')
     } else {
-      setSortOption(newOption)
-      if (newOption === 'created' || newOption === 'modified') {
-        setSortDirection('desc')
-      } else {
-        setSortDirection('asc')
-      }
+      setSortDirection('asc')
     }
   }
 
@@ -5788,20 +5804,18 @@ function AllTasksView() {
     if (!aOverdue && bOverdue) return 1
 
     if (sortOption === 'priority') {
-      // Force priority sort to keep higher-priority items at the top regardless of toggle direction
-      const priorityDir = 1
       if (a.project.priority_rank !== b.project.priority_rank) {
-        return (a.project.priority_rank - b.project.priority_rank) * priorityDir
+        return (a.project.priority_rank - b.project.priority_rank) * dir
       }
       const stageA = a.stageOrder ?? a.stageIndex
       const stageB = b.stageOrder ?? b.stageIndex
       if (stageA !== stageB) {
-        return (stageA - stageB) * priorityDir
+        return (stageA - stageB) * dir
       }
       const orderDiff = (a.task.order_index || 0) - (b.task.order_index || 0)
-      if (orderDiff !== 0) return orderDiff
+      if (orderDiff !== 0) return orderDiff * dir
       // Stable fallback: newer tasks lower priority when order_index ties
-      return new Date(a.task.created_at || 0) - new Date(b.task.created_at || 0)
+      return (new Date(a.task.created_at || 0) - new Date(b.task.created_at || 0)) * dir
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()

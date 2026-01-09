@@ -1,12 +1,6 @@
-// Preload script
-// Expose safe APIs to the renderer process here if needed.
-window.addEventListener('DOMContentLoaded', () => {
-    const replaceText = (selector, text) => {
-        const element = document.getElementById(selector);
-        if (element) element.innerText = text;
-    };
+const { contextBridge, ipcRenderer } = require('electron');
 
-    for (const type of ['chrome', 'node', 'electron']) {
-        replaceText(`${type}-version`, process.versions[type]);
-    }
+contextBridge.exposeInMainWorld('desktopBridge', {
+    notify: ({ title, body, badgeCount } = {}) => ipcRenderer.send('notify', { title, body, badgeCount }),
+    setBadge: (count = 0) => ipcRenderer.send('set-badge', count),
 });
