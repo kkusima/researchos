@@ -6595,6 +6595,7 @@ function AppContent() {
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // {id, title, projectId ?, taskId ?, isLocal, created_at}
   const todayUpdatedAtRef = useRef(null)
+  const todayLoadedRef = useRef(false) // Track if we've loaded this user's data this session
   const [duplicateCheck, setDuplicateCheck] = useState(null) // { item, existingItem, type: 'task'|'subtask'|'local' }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
@@ -6846,8 +6847,10 @@ function AppContent() {
         const localPayload = parseLocal()
         let serverPayload = null
 
-        // Try server if available and user is signed in
-        if (!demoMode && user && db && db.getTodayItems) {
+        // On initial load (user just logged in), fetch from server to sync
+        // On subsequent page reloads within same session, trust localStorage unless realtime tells us otherwise
+        const isInitialLoad = !todayLoadedRef.current
+        if (isInitialLoad && !demoMode && user && db && db.getTodayItems) {
           try {
             const { data, error } = await db.getTodayItems(user.id)
             if (!error && data && Array.isArray(data.items)) {
@@ -6859,11 +6862,13 @@ function AppContent() {
         const serverTime = serverPayload?.updated_at ? new Date(serverPayload.updated_at).getTime() : -Infinity
         const localTime = localPayload?.updated_at ? new Date(localPayload.updated_at).getTime() : -Infinity
 
-        const chosen = serverTime > localTime ? serverPayload : (localPayload || serverPayload)
+        // Prefer server on FIRST load (initial sync), then always prefer local until realtime updates
+        const chosen = isInitialLoad ? (serverTime >= localTime ? serverPayload : (localPayload || serverPayload)) : (localPayload || serverPayload)
 
         if (chosen && Array.isArray(chosen.items)) {
           const updatedAt = chosen.updated_at || new Date().toISOString()
           todayUpdatedAtRef.current = updatedAt
+          todayLoadedRef.current = true // Mark as loaded for this user
           setTodayItems(chosen.items)
           try { localStorage.setItem(key, JSON.stringify({ items: chosen.items, updated_at: updatedAt })) } catch (e) { }
           return
@@ -6876,15 +6881,20 @@ function AppContent() {
           localStorage.removeItem('researchos_notifications')
         }
 
+        todayLoadedRef.current = true
         setTodayItems([])
       } catch (e) {
+        todayLoadedRef.current = true
         setTodayItems([])
       }
     })()
 
     return () => {
-      // Small cleanup to ensure state doesn't leak if hook unmounts or user logs out
-      if (!user) setTodayItems([])
+      // Clear loaded flag when user changes (logout/login) so next user gets a fresh sync
+      if (!user) {
+        todayLoadedRef.current = false
+        setTodayItems([])
+      }
     }
   }, [user])
 
