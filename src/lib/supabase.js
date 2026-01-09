@@ -294,18 +294,22 @@ export const db = {
     }
   },
 
-  async saveTodayItems(userId, items) {
+  async saveTodayItems(userId, items, clientTimestamp = null) {
     if (!supabase) return { data: null, error: null }
     try {
+      // Use provided client timestamp (from saveTodayItems in App.jsx) or generate new one
+      // This ensures the client's timestamp is preserved on server and used for conflict resolution
+      const updated_at = clientTimestamp || new Date().toISOString()
       // Store a single persistent row per user (day is a fixed key for compatibility)
-      const payload = { user_id: userId, day: 'permanent', items, updated_at: new Date().toISOString() }
+      const payload = { user_id: userId, day: 'permanent', items, updated_at }
       const { data, error } = await supabase
         .from('today_items')
         .upsert(payload, { onConflict: 'user_id,day' })
         .select()
         .single()
       if (error) return { data: null, error }
-      return { data: { items: data.items, updated_at: data.updated_at }, error: null }
+      // Return with the timestamp we sent (not server-generated), so client can trust it
+      return { data: { items: data.items, updated_at: updated_at }, error: null }
     } catch (error) {
       return { data: null, error }
     }

@@ -6901,8 +6901,10 @@ function AppContent() {
     // persist to server if available and user signed in
     if (!demoMode && user && db && db.saveTodayItems) {
       try {
-        const { error, data } = await db.saveTodayItems(user.id, items)
+        // Pass the client timestamp to the server so it uses OUR timestamp for conflict resolution
+        const { error, data } = await db.saveTodayItems(user.id, items, updated_at)
         if (!error && data?.updated_at) {
+          // Server should echo back our timestamp, confirming the save
           todayUpdatedAtRef.current = data.updated_at
           const key = getTodayKey()
           try { localStorage.setItem(key, JSON.stringify({ items, updated_at: data.updated_at })) } catch (e) { }
