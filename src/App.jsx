@@ -6930,7 +6930,7 @@ function AppContent() {
     } catch (e) { }
   }
 
-  const addToToday = (task, opts = {}) => {
+  const addToToday = async (task, opts = {}) => {
     if (!task) return
     // Prevent duplicates: consider legacy linked items (taskId) and copied items (sourceTaskId)
     const exists = todayItems.find(i => i.taskId === task.id || i.sourceTaskId === task.id)
@@ -7008,7 +7008,7 @@ function AppContent() {
     }
   }
 
-  const addSubtaskToToday = (subtask, parentTask, opts = {}) => {
+  const addSubtaskToToday = async (subtask, parentTask, opts = {}) => {
     if (!subtask || !parentTask) return
     // Prevent duplicates: consider legacy linked items and copied items
     const exists = todayItems.find(i => i.subtaskId === subtask.id || i.sourceSubtaskId === subtask.id || (i.taskId === parentTask.id || i.sourceTaskId === parentTask.id) && i.title === `${parentTask.title} — ${subtask.title}`)
@@ -7038,7 +7038,7 @@ function AppContent() {
     persistTodayToServer(next)
   }
 
-  const addLocalTodayTask = (title) => {
+  const addLocalTodayTask = async (title) => {
     if (!title || !title.trim()) return
     const trimmed = title.trim()
     const exists = todayItems.find(i => i.isLocal && i.title === trimmed)
