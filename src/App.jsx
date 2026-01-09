@@ -1793,6 +1793,13 @@ function TodayView() {
     dragIndex.current = null
   }
 
+  const handleToggleDone = (id) => {
+    const item = todayItems.find(i => i.id === id)
+    const wasDone = !!item?.is_done
+    toggleTodayDone(id)
+    if (wasDone) setTodaySubtab('active')
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="flex items-center justify-between mb-4">
@@ -1977,7 +1984,7 @@ function TodayView() {
                   else s.add(id)
                   setSelectedIds(s)
                 }}
-                onToggleDone={toggleTodayDone}
+                onToggleDone={handleToggleDone}
                 onMenuToggle={(id) => setOpenMenuId(openMenuId === id ? null : id)}
                 onEditStart={setEditingId}
                 onEditCancel={() => setEditingId(null)}
@@ -4839,7 +4846,17 @@ function TaskDetail() {
 
   const saveDescription = async () => {
     if (localDescription !== currentTask.description) {
-      await updateTask({ description: localDescription })
+      updateTask({ description: localDescription })
+      if (!demoMode) {
+        try {
+          const { error } = await db.updateTask(task.id, { description: localDescription, modified_by: user?.id, updated_at: new Date().toISOString() })
+          if (error) {
+            console.warn('Failed to save description', error)
+          }
+        } catch (e) {
+          console.warn('Failed to save description', e)
+        }
+      }
     }
     setIsEditingDescription(false)
   }
@@ -5656,6 +5673,7 @@ function AllTasksView() {
   const [sortDirection, setSortDirection] = useState('asc')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
+  const [taskSearch, setTaskSearch] = useState('')
 
   const [expandedTasks, setExpandedTasks] = useState(new Set())
   const [activeTagPicker, setActiveTagPicker] = useState(null) // { taskId, subtaskId } | null
@@ -5663,6 +5681,11 @@ function AllTasksView() {
   const [tagFilterOpen, setTagFilterOpen] = useState(false)
 
   const handleSortChange = (newOption) => {
+    if (newOption === 'priority') {
+      setSortOption('priority')
+      setSortDirection('asc')
+      return
+    }
     if (newOption === sortOption) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
@@ -5709,7 +5732,7 @@ function AllTasksView() {
           : allTasks
 
   // Apply Tag Filters
-  const displayedTasks = (activeSubTab === 'tagged' && selectedFilterTags.size > 0)
+  const tagFilteredTasks = (activeSubTab === 'tagged' && selectedFilterTags.size > 0)
     ? filteredTasks.filter(({ task }) => {
       const taskTagIds = new Set((task.tags || []).map(t => t.id))
       const subtaskTagIds = new Set((task.subtasks || []).flatMap(s => (s.tags || []).map(t => t.id)))
@@ -5721,6 +5744,20 @@ function AllTasksView() {
     })
     : filteredTasks
 
+  const searchQuery = taskSearch.trim().toLowerCase()
+  const matchesSearch = ({ project, stage, task }) => {
+    if (!searchQuery) return true
+    const inTitle = task.title?.toLowerCase().includes(searchQuery)
+    const inProject = project.title?.toLowerCase().includes(searchQuery)
+    const inStage = stage.name?.toLowerCase().includes(searchQuery)
+    const inTags = (task.tags || []).some(tag => tag.name?.toLowerCase().includes(searchQuery))
+    const inSubtasks = (task.subtasks || []).some(st => st.title?.toLowerCase().includes(searchQuery))
+    return inTitle || inProject || inStage || inTags || inSubtasks
+  }
+
+  const searchedTasks = searchQuery ? tagFilteredTasks.filter(matchesSearch) : tagFilteredTasks
+  const displayedTasks = [...searchedTasks]
+
   // Sort tasks: overdue first, then by selected option
   const dir = sortDirection === 'asc' ? 1 : -1
   displayedTasks.sort((a, b) => {
@@ -5731,16 +5768,18 @@ function AllTasksView() {
     if (!aOverdue && bOverdue) return 1
 
     if (sortOption === 'priority') {
-      // Sort by project priority first (lower rank = higher priority)
+      // Force priority sort to keep higher-priority items at the top regardless of toggle direction
+      const priorityDir = 1
       if (a.project.priority_rank !== b.project.priority_rank) {
-        return (a.project.priority_rank - b.project.priority_rank) * dir
+        return (a.project.priority_rank - b.project.priority_rank) * priorityDir
       }
-      // Then by stage order (lower index = earlier stage = higher priority)
       if (a.stageIndex !== b.stageIndex) {
-        return (a.stageIndex - b.stageIndex) * dir
+        return (a.stageIndex - b.stageIndex) * priorityDir
       }
-      // Finally by task order_index (lower = top = higher priority) - ALWAYS ascending within stage
-      return (a.task.order_index || 0) - (b.task.order_index || 0)
+      const orderDiff = (a.task.order_index || 0) - (b.task.order_index || 0)
+      if (orderDiff !== 0) return orderDiff
+      // Stable fallback: newer tasks lower priority when order_index ties
+      return new Date(a.task.created_at || 0) - new Date(b.task.created_at || 0)
     } else if (sortOption === 'created') {
       const dateA = new Date(a.task.created_at || 0).getTime()
       const dateB = new Date(b.task.created_at || 0).getTime()
@@ -6088,78 +6127,91 @@ function AllTasksView() {
           </div>
         </div>
 
-        {/* Sort and Filter Bar */}
-        <div className="flex items-center gap-2 mb-2 relative z-40">
-          {/* Sort options (scrollable) */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 flex-1 no-scrollbar">
-            {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
-              <button
-                key={opt.key}
-                onClick={() => handleSortChange(opt.key)}
-                className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${sortOption === opt.key
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-              >
-                {opt.label}
-                {sortOption === opt.key && (
-                  sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                )}
-              </button>
-            ))}
+        {/* Sort, Filter, and Search Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 relative z-40">
+          <div className="relative w-full sm:w-64 flex-shrink-0">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={taskSearch}
+              onChange={(e) => setTaskSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition"
+            />
           </div>
 
-          {/* Tag Filter Dropdown (Fixed, not scrollable) */}
-          {activeSubTab === 'tagged' && (
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() => setTagFilterOpen(!tagFilterOpen)}
-                className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${selectedFilterTags.size > 0
-                  ? 'bg-brand-100 text-brand-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-              >
-                <Tag className="w-3 h-3" />
-                Filter {selectedFilterTags.size > 0 ? `(${selectedFilterTags.size})` : ''}
-              </button>
-              {tagFilterOpen && (
-                <>
-                  {/* Click outside backdrop - fixed to viewport */}
-                  <div className="fixed inset-0 z-[45]" onClick={() => setTagFilterOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-[50] p-2 animate-fade-in">
-                    <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
-                    <div className="max-h-48 overflow-y-auto space-y-1">
-                      {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
-                      {tags.map(tag => (
-                        <label key={tag.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFilterTags.has(tag.id)}
-                            onChange={() => {
-                              const newSet = new Set(selectedFilterTags)
-                              if (newSet.has(tag.id)) newSet.delete(tag.id)
-                              else newSet.add(tag.id)
-                              setSelectedFilterTags(newSet)
-                            }}
-                            className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
-                          />
-                          <span className="text-sm truncate">{tag.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {selectedFilterTags.size > 0 && (
-                      <button
-                        onClick={() => setSelectedFilterTags(new Set())}
-                        className="w-full mt-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
-                      >
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
+          <div className="flex items-center gap-2 flex-1">
+            {/* Sort options (scrollable) */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 flex-1 no-scrollbar">
+              {[{ key: 'priority', label: 'Priority' }, { key: 'created', label: 'Created' }, { key: 'modified', label: 'Modified' }].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => handleSortChange(opt.key)}
+                  className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${sortOption === opt.key
+                    ? 'bg-gray-200 text-gray-900 font-medium'
+                    : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  {opt.label}
+                  {sortOption === opt.key && (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+              ))}
             </div>
-          )}
+
+            {/* Tag Filter Dropdown (Fixed, not scrollable) */}
+            {activeSubTab === 'tagged' && (
+              <div className="relative flex-shrink-0">
+                <button
+                  onClick={() => setTagFilterOpen(!tagFilterOpen)}
+                  className={`px-2 sm:px-3 py-1 sm:py-2 text-[10px] sm:text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap ${selectedFilterTags.size > 0
+                    ? 'bg-brand-100 text-brand-700 font-medium'
+                    : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  <Tag className="w-3 h-3" />
+                  Filter {selectedFilterTags.size > 0 ? `(${selectedFilterTags.size})` : ''}
+                </button>
+                {tagFilterOpen && (
+                  <>
+                    {/* Click outside backdrop - fixed to viewport */}
+                    <div className="fixed inset-0 z-[45]" onClick={() => setTagFilterOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-gray-200 z-[50] p-2 animate-fade-in">
+                      <div className="text-xs font-semibold text-gray-500 mb-2 px-1">Filter by Tag</div>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {tags.length === 0 && <div className="text-xs text-gray-400 px-1">No tags available</div>}
+                        {tags.map(tag => (
+                          <label key={tag.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedFilterTags.has(tag.id)}
+                              onChange={() => {
+                                const newSet = new Set(selectedFilterTags)
+                                if (newSet.has(tag.id)) newSet.delete(tag.id)
+                                else newSet.add(tag.id)
+                                setSelectedFilterTags(newSet)
+                              }}
+                              className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-sm truncate">{tag.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {selectedFilterTags.size > 0 && (
+                        <button
+                          onClick={() => setSelectedFilterTags(new Set())}
+                          className="w-full mt-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -6493,7 +6545,7 @@ function AppContent() {
   const notifiedOverdueRef = useRef(new Set())
   const dismissedNotificationsRef = useRef(new Set()) // Tracks cleared/deleted notification keys to prevent regeneration
   const [walkVisible, setWalkVisible] = useState(false)
-  // Today / daily focus state (per-date persisted)
+  // Today / focus state (persisted per user, not per-day)
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // {id, title, projectId ?, taskId ?, isLocal, created_at}
   const [duplicateCheck, setDuplicateCheck] = useState(null) // { item, existingItem, type: 'task'|'subtask'|'local' }
@@ -6731,21 +6783,18 @@ function AppContent() {
   useEffect(() => {
     (async () => {
       try {
-        const today = new Date()
-        const key = getTodayKey(today)
+        const key = getTodayKey()
 
         // Try server if available and user is signed in
         if (!demoMode && user && db && db.getTodayItems) {
           let serverData = null
           try {
-            const { data, error } = await db.getTodayItems(user.id, today)
-            if (!error && data) serverData = data
+            const { data, error } = await db.getTodayItems(user.id)
+            if (!error && data !== null && data !== undefined) serverData = data
           } catch (e) { }
 
-          if (serverData) {
+          if (serverData !== null && serverData !== undefined) {
             // Trust the server as the source of truth.
-            // DO NOT auto-restore from local storage if serverData is empty, 
-            // as an empty array is a valid state (user deleted everything).
             setTodayItems(serverData)
             localStorage.setItem(key, JSON.stringify(serverData))
             return
@@ -6791,9 +6840,8 @@ function AppContent() {
 
     // persist to server if available and user signed in
     try {
-      const today = new Date()
       if (!demoMode && user && db && db.saveTodayItems) {
-        db.saveTodayItems(user.id, today, items).catch(e => {
+        db.saveTodayItems(user.id, items).catch(e => {
           // Log in dev only
           try { console.warn('Failed to save today items to server', e) } catch (_) { }
         })
@@ -6852,8 +6900,7 @@ function AppContent() {
   const persistTodayToServer = async (next) => {
     try {
       if (!demoMode && user && db && db.saveTodayItems) {
-        const today = new Date()
-        const { error } = await db.saveTodayItems(user.id, today, next)
+        const { error } = await db.saveTodayItems(user.id, next)
         if (error) {
           showToast('Failed to sync to server: ' + (error.message || error))
         }
@@ -6951,14 +6998,11 @@ function AppContent() {
     const newDone = !currentlyDone
 
     // 1. Optimistically update Today items
-    let next = todayItems.map(i => i.id === id ? { ...i, is_done: newDone } : i)
-    // When unchecking (moving back to active), put at top; when checking, move to bottom
-    next = next.sort((a, b) => {
-      const aIsDone = !!a.is_done
-      const bIsDone = !!b.is_done
-      if (aIsDone === bIsDone) return 0 // Same status, keep relative order
-      return aIsDone ? 1 : -1 // Active items first, completed last
-    })
+    const updatedItem = { ...item, is_done: newDone }
+    const remaining = todayItems.filter(i => i.id !== id)
+    const active = newDone ? remaining.filter(i => !i.is_done) : [updatedItem, ...remaining.filter(i => !i.is_done)]
+    const completed = newDone ? [...remaining.filter(i => i.is_done), updatedItem] : remaining.filter(i => i.is_done)
+    const next = [...active, ...completed]
 
     setTodayItems(next)
     saveTodayItems(next)
@@ -7627,11 +7671,10 @@ function AppContent() {
         loadNotifications()
 
         // Reload today items
-        const today = new Date()
-        const { data: tData } = await db.getTodayItems(user.id, today)
-        if (tData) {
+        const { data: tData } = await db.getTodayItems(user.id)
+        if (tData !== null && tData !== undefined) {
           setTodayItems(tData)
-          const key = getTodayKey(today)
+          const key = getTodayKey()
           localStorage.setItem(key, JSON.stringify(tData))
         }
       }, delay)

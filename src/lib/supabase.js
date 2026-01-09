@@ -271,32 +271,34 @@ export const db = {
     }
   },
 
-  // Today items: per-user per-day storage
-  async getTodayItems(userId, day) {
+  // Today items: per-user persistent storage (no daily reset)
+  async getTodayItems(userId) {
     if (!supabase) return { data: null, error: null }
     try {
-      const dayStr = (day instanceof Date) ? day.toISOString().slice(0, 10) : day
       const { data, error } = await supabase
         .from('today_items')
-        .select('items')
+        .select('items, day, updated_at')
         .eq('user_id', userId)
-        .eq('day', dayStr)
-        .single()
+        .order('updated_at', { ascending: false })
+        .limit(1)
+
       if (error && error.code !== 'PGRST116') {
         return { data: null, error }
       }
-      return { data: data ? data.items : [], error: null }
+
+      const row = Array.isArray(data) ? data[0] : data
+      if (!row) return { data: null, error: null }
+      return { data: row.items || [], error: null }
     } catch (error) {
       return { data: null, error }
     }
   },
 
-  async saveTodayItems(userId, day, items) {
+  async saveTodayItems(userId, items) {
     if (!supabase) return { data: null, error: null }
     try {
-      const dayStr = (day instanceof Date) ? day.toISOString().slice(0, 10) : day
-      // upsert row for (user_id, day)
-      const payload = { user_id: userId, day: dayStr, items: items, updated_at: new Date().toISOString() }
+      // Store a single persistent row per user (day is a fixed key for compatibility)
+      const payload = { user_id: userId, day: 'permanent', items, updated_at: new Date().toISOString() }
       const { data, error } = await supabase
         .from('today_items')
         .upsert(payload, { onConflict: 'user_id,day' })
