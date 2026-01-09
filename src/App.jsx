@@ -1578,7 +1578,7 @@ const TodayItem = React.memo(({
             </button>
           )}
           <button
-            onClick={() => onToggleDone(item.id)}
+            onClick={async () => await onToggleDone(item.id)}
             className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${item.is_done ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-300 bg-white'}`}
           >
             {item.is_done ? <Check className="w-3 h-3" /> : null}
@@ -1606,7 +1606,7 @@ const TodayItem = React.memo(({
               />
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); if (editText.trim()) onRename(item, editText.trim()) }}
+                onClick={async (e) => { e.stopPropagation(); if (editText.trim()) await onRename(item, editText.trim()) }}
                 className="px-2 py-1 bg-gray-800 text-white rounded text-xs h-8 hover:bg-gray-700"
               >
                 Save
@@ -1745,7 +1745,7 @@ function TodayView() {
     if (it.isLocal) {
       const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
       setTodayItems(next)
-      saveTodayItems(next)
+      await saveTodayItems(next)
       setEditingId(null)
       return
     }
@@ -1787,7 +1787,7 @@ function TodayView() {
       // Update today list to reflect new title
       const next = todayItems.map(x => x.id === it.id ? { ...x, title: trimmed } : x)
       setTodayItems(next)
-      saveTodayItems(next)
+      await saveTodayItems(next)
       setEditingId(null)
     } catch (e) {
       dwarn('Failed to save renamed item', e)
@@ -1830,10 +1830,10 @@ function TodayView() {
     dragIndex.current = null
   }
 
-  const handleToggleDone = (id) => {
+  const handleToggleDone = async (id) => {
     const item = todayItems.find(i => i.id === id)
     const wasDone = !!item?.is_done
-    toggleTodayDone(id)
+    await toggleTodayDone(id)
     if (wasDone) setTodaySubtab('active')
   }
 
@@ -1867,17 +1867,17 @@ function TodayView() {
               }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200">
                 {selectedIds.size === itemsToShow.length && itemsToShow.length > 0 ? 'Deselect All' : 'Select All'}
               </button>
-              <button onClick={() => {
+              <button onClick={async () => {
                 const toRemove = Array.from(selectedIds)
                 if (toRemove.length === 0) return
-                try { removeTodayItems(toRemove) } catch (e) { dwarn('removeTodayItems failed', e) }
+                try { await removeTodayItems(toRemove) } catch (e) { dwarn('removeTodayItems failed', e) }
                 setSelectedIds(new Set())
                 setIsSelectionMode(false)
               }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"><Trash2 className="w-4 h-4" /> <span>Delete</span> <span className="opacity-80">({selectedIds.size})</span></button>
-              <button onClick={() => {
+              <button onClick={async () => {
                 const toDup = Array.from(selectedIds)
                 if (toDup.length === 0) return
-                try { duplicateTodayItems(toDup) } catch (e) { dwarn('duplicateTodayItems failed', e) }
+                try { await duplicateTodayItems(toDup) } catch (e) { dwarn('duplicateTodayItems failed', e) }
                 setSelectedIds(new Set())
                 setIsSelectionMode(false)
               }} className="text-xs sm:text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-700 flex items-center gap-1"><Copy className="w-4 h-4" /> <span>Duplicate</span> <span className="opacity-80">({selectedIds.size})</span></button>
