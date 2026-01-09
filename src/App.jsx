@@ -6594,6 +6594,7 @@ function AppContent() {
   // Today / focus state (persisted per user, not per-day)
   const getTodayKey = (d = new Date()) => `hypothesys_today_${user?.id || 'anon'}_permanent`
   const [todayItems, setTodayItems] = useState([]) // {id, title, projectId ?, taskId ?, isLocal, created_at}
+  const todayUpdatedAtRef = useRef(null)
   const [duplicateCheck, setDuplicateCheck] = useState(null) // { item, existingItem, type: 'task'|'subtask'|'local' }
   const [toast, setToast] = useState(null)
   const [toastVisible, setToastVisible] = useState(false)
@@ -6861,8 +6862,10 @@ function AppContent() {
         const chosen = serverTime > localTime ? serverPayload : (localPayload || serverPayload)
 
         if (chosen && Array.isArray(chosen.items)) {
+          const updatedAt = chosen.updated_at || new Date().toISOString()
+          todayUpdatedAtRef.current = updatedAt
           setTodayItems(chosen.items)
-          try { localStorage.setItem(key, JSON.stringify({ items: chosen.items, updated_at: chosen.updated_at || new Date().toISOString() })) } catch (e) { }
+          try { localStorage.setItem(key, JSON.stringify({ items: chosen.items, updated_at: updatedAt })) } catch (e) { }
           return
         }
 
@@ -6885,8 +6888,10 @@ function AppContent() {
     }
   }, [user])
 
-  const saveTodayItems = (items) => {
-    const payload = { items, updated_at: new Date().toISOString() }
+  const saveTodayItems = async (items) => {
+    const updated_at = new Date().toISOString()
+    const payload = { items, updated_at }
+    todayUpdatedAtRef.current = updated_at
 
     try {
       const key = getTodayKey()
@@ -6894,14 +6899,21 @@ function AppContent() {
     } catch (e) { }
 
     // persist to server if available and user signed in
-    try {
-      if (!demoMode && user && db && db.saveTodayItems) {
-        db.saveTodayItems(user.id, items).catch(e => {
-          // Log in dev only
-          try { console.warn('Failed to save today items to server', e) } catch (_) { }
-        })
+    if (!demoMode && user && db && db.saveTodayItems) {
+      try {
+        const { error, data } = await db.saveTodayItems(user.id, items)
+        if (!error && data?.updated_at) {
+          todayUpdatedAtRef.current = data.updated_at
+          const key = getTodayKey()
+          try { localStorage.setItem(key, JSON.stringify({ items, updated_at: data.updated_at })) } catch (e) { }
+        }
+        if (error) {
+          try { console.warn('Failed to save today items to server', error) } catch (_) { }
+        }
+      } catch (e) {
+        try { console.warn('Failed to save today items to server', e) } catch (_) { }
       }
-    } catch (e) { }
+    }
   }
 
   const showToast = (message, ms = 2500) => {
@@ -6943,7 +6955,7 @@ function AppContent() {
     }
     const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
     persistTodayToServer(next)
   }
 
@@ -7022,7 +7034,7 @@ function AppContent() {
     }
     const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
     persistTodayToServer(next)
   }
 
@@ -7041,7 +7053,7 @@ function AppContent() {
     const item = { id: uuid(), title: trimmed, isLocal: true, is_done: false, created_at: new Date().toISOString() }
     const next = appendTodayItem(todayItems, item)
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
     persistTodayToServer(next)
   }
 
@@ -7062,7 +7074,7 @@ function AppContent() {
     const next = [...active, ...completedSorted]
 
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
 
     // 2. If it's a local-only item, we are done
     if (item.isLocal) return
@@ -7147,35 +7159,35 @@ function AppContent() {
     }
   }
 
-  const removeTodayItem = (id) => {
+  const removeTodayItem = async (id) => {
     const next = todayItems.filter(i => i.id !== id)
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
   }
 
-  const removeTodayItems = (ids = []) => {
+  const removeTodayItems = async (ids = []) => {
     if (!ids || ids.length === 0) return
     const idSet = new Set(ids)
     const next = todayItems.filter(i => !idSet.has(i.id))
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
   }
 
-  const duplicateTodayItems = (ids = []) => {
+  const duplicateTodayItems = async (ids = []) => {
     if (!ids || ids.length === 0) return
     const toDup = todayItems.filter(i => ids.includes(i.id))
     const copies = toDup.map(i => ({ ...i, id: uuid(), created_at: new Date().toISOString(), is_done: false }))
     const next = [...todayItems, ...copies]
     setTodayItems(next)
-    saveTodayItems(next)
+    await saveTodayItems(next)
   }
 
-  const reorderToday = (fromIndex, toIndex) => {
+  const reorderToday = async (fromIndex, toIndex) => {
     const items = [...todayItems]
     const [moved] = items.splice(fromIndex, 1)
     items.splice(toIndex, 0, moved)
     setTodayItems(items)
-    saveTodayItems(items)
+    await saveTodayItems(items)
   }
 
   const reorderTasks = async (projectId, stageIndex, fromIndex, toIndex) => {
@@ -7730,10 +7742,16 @@ function AppContent() {
         const { data: tData } = await db.getTodayItems(user.id)
         if (tData !== null && tData !== undefined) {
           const items = Array.isArray(tData.items) ? tData.items : []
-          const payload = { items, updated_at: tData.updated_at || new Date().toISOString() }
-          setTodayItems(items)
-          const key = getTodayKey()
-          localStorage.setItem(key, JSON.stringify(payload))
+          const updated_at = tData.updated_at || new Date().toISOString()
+          const incomingTime = new Date(updated_at).getTime()
+          const currentTime = todayUpdatedAtRef.current ? new Date(todayUpdatedAtRef.current).getTime() : -Infinity
+          // Only apply if newer than what we already hold
+          if (incomingTime >= currentTime) {
+            todayUpdatedAtRef.current = updated_at
+            setTodayItems(items)
+            const key = getTodayKey()
+            localStorage.setItem(key, JSON.stringify({ items, updated_at }))
+          }
         }
       }, delay)
     }
