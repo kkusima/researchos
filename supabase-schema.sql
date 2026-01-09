@@ -163,7 +163,7 @@ $$;
 CREATE TABLE IF NOT EXISTS public.today_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  day DATE NOT NULL,
+  day TEXT NOT NULL,
   items JSONB DEFAULT '[]'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, day)
