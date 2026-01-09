@@ -1115,6 +1115,14 @@ export const db = {
       filter: `user_id=eq.${userId}`
     }, callback)
 
+    // Subscribe to today_items changes for this user so Tod(o)ay stays in sync cross-device
+    channel.on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'today_items',
+      filter: `user_id=eq.${userId}`
+    }, callback)
+
     // Start the subscription and return the channel object so callers
     // can remove it later with `db.unsubscribe(channel)`.
     try {

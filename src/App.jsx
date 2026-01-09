@@ -7729,9 +7729,11 @@ function AppContent() {
         // Reload today items
         const { data: tData } = await db.getTodayItems(user.id)
         if (tData !== null && tData !== undefined) {
-          setTodayItems(tData)
+          const items = Array.isArray(tData.items) ? tData.items : []
+          const payload = { items, updated_at: tData.updated_at || new Date().toISOString() }
+          setTodayItems(items)
           const key = getTodayKey()
-          localStorage.setItem(key, JSON.stringify(tData))
+          localStorage.setItem(key, JSON.stringify(payload))
         }
       }, delay)
     }
