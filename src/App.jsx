@@ -6821,32 +6821,39 @@ function AppContent() {
       try {
         const key = getTodayKey()
 
-        // Try server if available and user is signed in
-        if (!demoMode && user && db && db.getTodayItems) {
-          let serverData = null
-          try {
-            const { data, error } = await db.getTodayItems(user.id)
-            if (!error && data !== null && data !== undefined) serverData = data
-          } catch (e) { }
-
-          if (serverData !== null && serverData !== undefined) {
-            // Trust the server as the source of truth.
-            setTodayItems(serverData)
-            localStorage.setItem(key, JSON.stringify(serverData))
-            return
-          }
-        }
-
-        // Fallback for Demo Mode or Offline: Local Storage
-        const rawLocal = localStorage.getItem(key)
-        if (rawLocal) {
+        const parseLocal = () => {
+          const rawLocal = localStorage.getItem(key)
+          if (!rawLocal) return null
           try {
             const parsed = JSON.parse(rawLocal)
-            if (Array.isArray(parsed)) {
-              setTodayItems(parsed)
-              return
+            if (Array.isArray(parsed)) return { items: parsed, updated_at: null }
+            if (parsed && Array.isArray(parsed.items)) return { items: parsed.items, updated_at: parsed.updated_at || null }
+          } catch (e) { }
+          return null
+        }
+
+        const localPayload = parseLocal()
+        let serverPayload = null
+
+        // Try server if available and user is signed in
+        if (!demoMode && user && db && db.getTodayItems) {
+          try {
+            const { data, error } = await db.getTodayItems(user.id)
+            if (!error && data && Array.isArray(data.items)) {
+              serverPayload = { items: data.items, updated_at: data.updated_at || null }
             }
           } catch (e) { }
+        }
+
+        const serverTime = serverPayload?.updated_at ? new Date(serverPayload.updated_at).getTime() : -Infinity
+        const localTime = localPayload?.updated_at ? new Date(localPayload.updated_at).getTime() : -Infinity
+
+        const chosen = serverTime > localTime ? serverPayload : (localPayload || serverPayload)
+
+        if (chosen && Array.isArray(chosen.items)) {
+          setTodayItems(chosen.items)
+          try { localStorage.setItem(key, JSON.stringify({ items: chosen.items, updated_at: chosen.updated_at || new Date().toISOString() })) } catch (e) { }
+          return
         }
 
         // Notifications Migration
@@ -6869,9 +6876,11 @@ function AppContent() {
   }, [user])
 
   const saveTodayItems = (items) => {
+    const payload = { items, updated_at: new Date().toISOString() }
+
     try {
       const key = getTodayKey()
-      localStorage.setItem(key, JSON.stringify(items))
+      localStorage.setItem(key, JSON.stringify(payload))
     } catch (e) { }
 
     // persist to server if available and user signed in

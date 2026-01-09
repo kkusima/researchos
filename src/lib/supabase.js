@@ -288,7 +288,7 @@ export const db = {
 
       const row = Array.isArray(data) ? data[0] : data
       if (!row) return { data: null, error: null }
-      return { data: row.items || [], error: null }
+      return { data: { items: row.items || [], updated_at: row.updated_at }, error: null }
     } catch (error) {
       return { data: null, error }
     }
@@ -305,7 +305,7 @@ export const db = {
         .select()
         .single()
       if (error) return { data: null, error }
-      return { data: data.items, error: null }
+      return { data: { items: data.items, updated_at: data.updated_at }, error: null }
     } catch (error) {
       return { data: null, error }
     }
