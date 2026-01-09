@@ -1686,6 +1686,7 @@ function TodayView() {
   const [newTitle, setNewTitle] = useState('')
   const [existingPicker, setExistingPicker] = useState(null) // { position }
   const [existingQuery, setExistingQuery] = useState('')
+  const [todaySearch, setTodaySearch] = useState('')
   const pickerRef = useRef(null)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -1700,6 +1701,12 @@ function TodayView() {
     if (todaySubtab === 'completed') return todayItems.filter(i => i.is_done)
     return todayItems
   }, [todayItems, todaySubtab])
+
+  const todaySearchQuery = todaySearch.trim().toLowerCase()
+  const filteredTodayItems = useMemo(() => {
+    if (!todaySearchQuery) return itemsToShow
+    return itemsToShow.filter(i => i.title?.toLowerCase().includes(todaySearchQuery) || (i.tags || []).some(t => t.name?.toLowerCase().includes(todaySearchQuery)))
+  }, [itemsToShow, todaySearchQuery])
 
   const onRenameItem = async (it, trimmed) => {
     if (!trimmed) return
@@ -1960,13 +1967,26 @@ function TodayView() {
         ))}
       </div>
 
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={todaySearch}
+            onChange={(e) => setTodaySearch(e.target.value)}
+            placeholder="Search today items..."
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition"
+          />
+        </div>
+      </div>
+
       <div className="space-y-2">
-        {itemsToShow.length === 0 ? (
+        {filteredTodayItems.length === 0 ? (
           <div className="p-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl">
             {todaySubtab === 'active' ? 'No active tasks for today.' : todaySubtab === 'completed' ? 'No completed tasks yet.' : 'Your list is empty.'}
           </div>
         ) : (
-          itemsToShow.map((it, i) => {
+          filteredTodayItems.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
             return (
               <TodayItem
@@ -5705,7 +5725,7 @@ function AllTasksView() {
       // Sort tasks within each stage by order_index before collecting
       const sortedStageTasks = [...(s.tasks || [])].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
       sortedStageTasks.forEach(t => {
-        allTasks.push({ project: p, stage: s, stageIndex: si, task: t })
+        allTasks.push({ project: p, stage: s, stageIndex: si, stageOrder: s.order_index ?? si, task: t })
       })
     })
   })
@@ -5773,8 +5793,10 @@ function AllTasksView() {
       if (a.project.priority_rank !== b.project.priority_rank) {
         return (a.project.priority_rank - b.project.priority_rank) * priorityDir
       }
-      if (a.stageIndex !== b.stageIndex) {
-        return (a.stageIndex - b.stageIndex) * priorityDir
+      const stageA = a.stageOrder ?? a.stageIndex
+      const stageB = b.stageOrder ?? b.stageIndex
+      if (stageA !== stageB) {
+        return (stageA - stageB) * priorityDir
       }
       const orderDiff = (a.task.order_index || 0) - (b.task.order_index || 0)
       if (orderDiff !== 0) return orderDiff
