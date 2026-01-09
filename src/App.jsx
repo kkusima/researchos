@@ -1728,6 +1728,16 @@ function TodayView() {
     return itemsToShow.filter(i => i.title?.toLowerCase().includes(todaySearchQuery) || (i.tags || []).some(t => t.name?.toLowerCase().includes(todaySearchQuery)))
   }, [itemsToShow, todaySearchQuery])
 
+  const displayedTodayItems = useMemo(() => {
+    if (todaySubtab !== 'completed') return filteredTodayItems
+    const sorted = [...filteredTodayItems].sort((a, b) => {
+      const aTime = new Date(a.completed_at || a.updated_at || a.created_at || 0).getTime()
+      const bTime = new Date(b.completed_at || b.updated_at || b.created_at || 0).getTime()
+      return bTime - aTime
+    })
+    return sorted
+  }, [filteredTodayItems, todaySubtab])
+
   const onRenameItem = async (it, trimmed) => {
     if (!trimmed) return
 
@@ -2001,12 +2011,12 @@ function TodayView() {
       </div>
 
       <div className="space-y-2">
-        {filteredTodayItems.length === 0 ? (
+        {displayedTodayItems.length === 0 ? (
           <div className="p-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl">
             {todaySubtab === 'active' ? 'No active tasks for today.' : todaySubtab === 'completed' ? 'No completed tasks yet.' : 'Your list is empty.'}
           </div>
         ) : (
-          filteredTodayItems.map((it, i) => {
+          displayedTodayItems.map((it, i) => {
             const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null
             return (
               <TodayItem
@@ -7041,13 +7051,15 @@ function AppContent() {
 
     const currentlyDone = !!item.is_done
     const newDone = !currentlyDone
+    const now = new Date().toISOString()
 
     // 1. Optimistically update Today items
-    const updatedItem = { ...item, is_done: newDone }
+    const updatedItem = { ...item, is_done: newDone, completed_at: newDone ? now : null }
     const remaining = todayItems.filter(i => i.id !== id)
     const active = newDone ? remaining.filter(i => !i.is_done) : [updatedItem, ...remaining.filter(i => !i.is_done)]
     const completed = newDone ? [...remaining.filter(i => i.is_done), updatedItem] : remaining.filter(i => i.is_done)
-    const next = [...active, ...completed]
+    const completedSorted = [...completed].sort((a, b) => new Date(b.completed_at || b.updated_at || b.created_at || 0) - new Date(a.completed_at || a.updated_at || a.created_at || 0))
+    const next = [...active, ...completedSorted]
 
     setTodayItems(next)
     saveTodayItems(next)
@@ -7057,7 +7069,6 @@ function AppContent() {
 
     // 3. For linked items, update the Projects state (for both Demo and Real modes)
     // This ensures "Modified" and "Completion" status is reflected immediately in Project views
-    const now = new Date().toISOString()
     const userName = user?.user_metadata?.name || user?.email || 'Unknown'
     const userId = user?.id
 
