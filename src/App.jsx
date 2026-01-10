@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext, useRef, useMemo } from 'react'
-import ReactDOM from 'react-dom'
+import { createPortal } from 'react-dom'
 import { useAuth } from './contexts/AuthContext'
 import { db, supabase } from './lib/supabase'
 import Avatar from './components/Avatar'
@@ -37,6 +37,13 @@ const DEV = import.meta.env.DEV
 const dlog = (...args) => { if (DEV) console.log(...args) }
 const dwarn = (...args) => { if (DEV) console.warn(...args) }
 const derr = (...args) => { if (DEV) console.error(...args) }
+
+// Custom hook to ensure component is mounted on the client
+const useMounted = () => {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted
+}
 
 // Check if a task/subtask is overdue
 const isOverdue = (reminderDate) => {
@@ -523,6 +530,8 @@ function GlobalSearch({ projects, onNavigate }) {
     }
   }, [isOpen])
 
+  const mounted = useMounted()
+
   const handleSelect = (type, item) => {
     setQuery('')
     setIsOpen(false)
@@ -542,7 +551,7 @@ function GlobalSearch({ projects, onNavigate }) {
         className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-gray-200 transition-all"
       />
 
-      {isOpen && query.trim() && anchorRect && ReactDOM.createPortal(
+      {mounted && isOpen && query.trim() && anchorRect && typeof document !== 'undefined' && createPortal(
         <>
           <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
           <div
@@ -693,9 +702,11 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
     }
   }
 
-  if (!position) return null
+  const mounted = useMounted()
 
-  return ReactDOM.createPortal(
+  if (!position || !mounted || typeof document === 'undefined') return null
+
+  return createPortal(
     <>
       <div className="fixed inset-0 z-[100]" onClick={onClose} />
       <div
@@ -1104,6 +1115,8 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
     })
   }
 
+  const mounted = useMounted()
+
   return (
     <div className="relative" ref={buttonRef}>
       <button
@@ -1121,7 +1134,7 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
           <span>{hasReminder ? formatReminderDate(value) : 'Remind'}</span>
         )}
       </button>
-      {isOpen && ReactDOM.createPortal(
+      {mounted && isOpen && typeof document !== 'undefined' && createPortal(
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setIsOpen(false)} />
           <div
@@ -1550,6 +1563,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifAnchor, setNotifAnchor] = useState(null)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const mounted = useMounted()
 
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
@@ -1634,14 +1648,14 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                   <span className="font-medium text-gray-700 hidden md:block">{userName}</span>
                 </button>
 
-                {showMenu && menuAnchor && ReactDOM.createPortal(
+                {mounted && showMenu && menuAnchor && typeof document !== 'undefined' && createPortal(
                   <>
                     <div className="fixed inset-0 z-[100]" onClick={() => { setShowMenu(false); setMenuAnchor(null); }} />
                     <div
                       style={{
                         position: 'fixed',
                         top: menuAnchor.bottom + 8,
-                        right: window.innerWidth - menuAnchor.right,
+                        right: typeof window !== 'undefined' ? window.innerWidth - menuAnchor.right : 0,
                         zIndex: 101
                       }}
                       className="w-56 glass-card rounded-xl shadow-lg py-2 animate-fade-in"
@@ -2143,7 +2157,7 @@ function TodayView() {
             Add Existing
           </button>
 
-          {existingPicker && ReactDOM.createPortal(
+          {mounted && existingPicker && typeof document !== 'undefined' && createPortal(
             <>
               <div className="fixed inset-0 z-[9999]" onClick={() => setExistingPicker(null)} />
               <div
@@ -2297,13 +2311,14 @@ function TodayView() {
 }
 
 function DuplicatePopup() {
+  const mounted = useMounted()
   const { duplicateCheck, handleDuplicateAction } = useApp()
-  if (!duplicateCheck) return null
+  if (!duplicateCheck || !mounted || typeof document === 'undefined') return null
 
   const { item, existingItem, type } = duplicateCheck
   const status = existingItem.is_done ? 'completed' : 'active'
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in" onClick={() => handleDuplicateAction(null)}>
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 text-amber-600">
