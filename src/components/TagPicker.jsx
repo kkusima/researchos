@@ -82,8 +82,8 @@ export default function TagPicker({
     const pickerStyles = position ? {
         position: 'fixed',
         top: `${position.top}px`,
-        left: position.left !== undefined ? `${Math.max(8, Math.min(position.left, window.innerWidth - 300))}px` : 'auto',
-        right: position.right !== undefined ? `${Math.max(8, Math.min(position.right, window.innerWidth - 300))}px` : 'auto',
+        left: position.left !== undefined ? `${Math.max(8, Math.min(position.left, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 300))}px` : 'auto',
+        right: position.right !== undefined ? `${Math.max(8, Math.min(position.right, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 300))}px` : 'auto',
         zIndex: 10000,
         backgroundColor: '#ffffff',
         maxHeight: 'calc(100vh - 40px)',

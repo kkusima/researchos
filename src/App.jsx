@@ -803,7 +803,13 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
                     } ${selectedIds.has(notif.id) ? 'bg-brand-50 ring-1 ring-brand-200' : ''}`}
                   onClick={() => {
                     if (isSelectionMode) {
-                      toggleSelection(notif.id, { stopPropagation: () => { } })
+                      const newSelected = new Set(selectedIds)
+                      if (newSelected.has(notif.id)) {
+                        newSelected.delete(notif.id)
+                      } else {
+                        newSelected.add(notif.id)
+                      }
+                      setSelectedIds(newSelected)
                     } else {
                       if (!notif.is_read) onMarkRead(notif.id)
                       if (notif.project_id) onNavigate(notif)
