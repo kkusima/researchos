@@ -1573,13 +1573,6 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                   />
                 )}
 
-                {showNotificationSettings && (
-                  <NotificationSettingsPanel
-                    settings={notificationSettings}
-                    onUpdateSettings={onUpdateNotificationSettings}
-                    onClose={() => { setShowNotificationSettings(false); setShowNotifications(false) }}
-                  />
-                )}
               </div>
 
               {/* User Menu */}
@@ -1635,6 +1628,13 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
       </header>
 
       {showSettings && <ProfileSettingsModal onClose={() => setShowSettings(false)} />}
+      {showNotificationSettings && (
+        <NotificationSettingsPanel
+          settings={notificationSettings}
+          onUpdateSettings={onUpdateNotificationSettings}
+          onClose={() => setShowNotificationSettings(false)}
+        />
+      )}
     </>
   )
 }
