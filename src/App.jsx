@@ -679,7 +679,7 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[70vh] flex flex-col">
+      <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">
             Notifications
@@ -918,8 +918,8 @@ function NotificationSettingsPanel({ settings, onUpdateSettings, onClose, isLoad
   )
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in max-h-[85vh] flex flex-col shadow-2xl border border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in max-h-[85vh] flex flex-col shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -1122,6 +1122,12 @@ function ReminderPicker({ value, onChange, compact = false, isShared = false, de
               type="datetime-local"
               value={pendingValue}
               onChange={(e) => setPendingValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && e.shiftKey) {
+                  onConfirm(pendingValue)
+                }
+                if (e.key === 'Escape') setIsOpen(false)
+              }}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             />
 
@@ -1327,8 +1333,8 @@ function ProfileSettingsModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in shadow-2xl border border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in shadow-2xl border border-gray-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900">Account Settings</h2>
@@ -1403,6 +1409,7 @@ function ProfileSettingsModal({ onClose }) {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); handleUpdateProfile(e); } }}
                   placeholder="Your name"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent"
                 />
@@ -2057,7 +2064,12 @@ function TodayView() {
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { addLocalTodayTask(newTitle); setNewTitle('') } }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                addLocalTodayTask(newTitle);
+                setNewTitle('')
+              }
+            }}
             placeholder="+ New task for today"
             className="input-sleek flex-1 min-w-[12rem] sm:min-w-[20rem] lg:min-w-[24rem]"
           />
@@ -2080,68 +2092,75 @@ function TodayView() {
           </button>
 
           {existingPicker && ReactDOM.createPortal(
-            <div
-              ref={pickerRef}
-              style={{
-                position: 'fixed',
-                top: `${Math.min(existingPicker.position.top - window.scrollY, window.innerHeight - 450)}px`,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 10000
-              }}
-              className="w-[calc(100vw-32px)] sm:w-[52rem] max-w-[52rem] bg-white border border-gray-100 rounded-xl shadow-2xl p-3 max-h-[80vh] overflow-y-auto animate-fade-in"
-            >
-              <input
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-2 text-sm"
-                placeholder="Search tasks..."
-                value={existingQuery}
-                onChange={e => setExistingQuery(e.target.value)}
-                autoFocus
-              />
-              <div className="max-h-96 overflow-auto">
-                {allEntries.filter(entry => {
-                  const title = entry.type === 'task' ? entry.task.title : `${entry.task.title} — ${entry.subtask.title}`
-                  const projectTitle = entry.project?.title || ''
-                  if (!existingQuery) return true
-                  return title.toLowerCase().includes(existingQuery.toLowerCase()) || projectTitle.toLowerCase().includes(existingQuery.toLowerCase())
-                }).slice(0, 200).map(entry => {
-                  const entryTags = entry.type === 'subtask' ? (entry.subtask.tags || []) : (entry.task.tags || [])
-                  return (
-                    <div key={entry.type === 'subtask' ? `s-${entry.subtask.id}` : `t-${entry.task.id}`} className="flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={() => {
-                      if (entry.type === 'subtask') {
-                        addSubtaskToToday(entry.subtask, entry.task, { projectId: entry.project?.id })
-                      } else {
-                        addToToday(entry.task, { projectId: entry.project?.id })
-                      }
-                      setExistingPicker(null)
-                    }}>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          {entry.project?.title && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{entry.project.title}</span>}
-                          {entry.stage?.name && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{entry.stage.name}</span>}
-                          {entry.type === 'subtask' && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">subtask</span>}
-                          {/* Tags Display */}
-                          {entryTags.map(tag => (
-                            <span key={tag.id} className={`text-xs px-1.5 py-0.5 rounded ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
-                              tag.color === 'red' ? 'bg-red-100 text-red-700' :
-                                tag.color === 'green' ? 'bg-green-100 text-green-700' :
-                                  tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
-                                    tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
-                                      'bg-gray-100 text-gray-700'
-                              }`}>{tag.name}</span>
-                          ))}
+            <>
+              <div className="fixed inset-0 z-[9999]" onClick={() => setExistingPicker(null)} />
+              <div
+                ref={pickerRef}
+                style={{
+                  position: 'fixed',
+                  top: `${Math.min(existingPicker.position.top - window.scrollY, window.innerHeight - 450)}px`,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10000
+                }}
+                className="w-[calc(100vw-32px)] sm:w-[52rem] max-w-[52rem] bg-white border border-gray-100 rounded-xl shadow-2xl p-3 max-h-[80vh] overflow-y-auto animate-fade-in"
+                onClick={e => e.stopPropagation()}
+              >
+                <input
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-2 text-sm"
+                  placeholder="Search tasks..."
+                  value={existingQuery}
+                  onChange={e => setExistingQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') setExistingPicker(null)
+                  }}
+                  autoFocus
+                />
+                <div className="max-h-96 overflow-auto">
+                  {allEntries.filter(entry => {
+                    const title = entry.type === 'task' ? entry.task.title : `${entry.task.title} — ${entry.subtask.title}`
+                    const projectTitle = entry.project?.title || ''
+                    if (!existingQuery) return true
+                    return title.toLowerCase().includes(existingQuery.toLowerCase()) || projectTitle.toLowerCase().includes(existingQuery.toLowerCase())
+                  }).slice(0, 200).map(entry => {
+                    const entryTags = entry.type === 'subtask' ? (entry.subtask.tags || []) : (entry.task.tags || [])
+                    return (
+                      <div key={entry.type === 'subtask' ? `s-${entry.subtask.id}` : `t-${entry.task.id}`} className="flex items-center justify-between px-2 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={() => {
+                        if (entry.type === 'subtask') {
+                          addSubtaskToToday(entry.subtask, entry.task, { projectId: entry.project?.id })
+                        } else {
+                          addToToday(entry.task, { projectId: entry.project?.id })
+                        }
+                        setExistingPicker(null)
+                      }}>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{entry.type === 'subtask' ? `${entry.task.title} — ${entry.subtask.title}` : entry.task.title}</div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {entry.project?.title && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{entry.project.title}</span>}
+                            {entry.stage?.name && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">{entry.stage.name}</span>}
+                            {entry.type === 'subtask' && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">subtask</span>}
+                            {/* Tags Display */}
+                            {entryTags.map(tag => (
+                              <span key={tag.id} className={`text-xs px-1.5 py-0.5 rounded ${tag.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                                tag.color === 'red' ? 'bg-red-100 text-red-700' :
+                                  tag.color === 'green' ? 'bg-green-100 text-green-700' :
+                                    tag.color === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                      tag.color === 'purple' ? 'bg-purple-100 text-purple-700' :
+                                        'bg-gray-100 text-gray-700'
+                                }`}>{tag.name}</span>
+                            ))}
+                          </div>
                         </div>
+                        <div className="text-xs text-gray-400 ml-2 flex-shrink-0">Add</div>
                       </div>
-                      <div className="text-xs text-gray-400 ml-2 flex-shrink-0">Add</div>
-                    </div>
-                  )
-                })}
-                {allEntries.length === 0 && (
-                  <div className="text-sm text-gray-400 p-4 text-center">No tasks available</div>
-                )}
+                    )
+                  })}
+                  {allEntries.length === 0 && (
+                    <div className="text-sm text-gray-400 p-4 text-center">No tasks available</div>
+                  )}
+                </div>
               </div>
-            </div>,
+            </>,
             document.body
           )}
         </div>
@@ -2233,8 +2252,8 @@ function DuplicatePopup() {
   const status = existingItem.is_done ? 'completed' : 'active'
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4">
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in" onClick={() => handleDuplicateAction(null)}>
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 text-amber-600">
           <div className="p-2 bg-amber-50 rounded-full">
             <AlertCircle className="w-6 h-6" />
@@ -3442,6 +3461,11 @@ function CreateProjectModal({ onClose }) {
               placeholder="Enter project title"
               value={title}
               onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.shiftKey || title.trim())) {
+                  handleCreate()
+                }
+              }}
               className="input-sleek"
               autoFocus
             />
@@ -4093,7 +4117,9 @@ function ProjectDetail() {
             placeholder="Add a new task..."
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addTask()}
+            onKeyDown={e => {
+              if (e.key === 'Enter') addTask()
+            }}
             className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-400 min-w-0"
           />
           <button
@@ -4546,11 +4572,19 @@ function ProjectSettingsModal({ project, onClose, onUpdate, onDelete }) {
     onClose()
   }
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      handleSave();
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="glass-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in"
         onClick={e => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Project Settings</h2>
@@ -4805,7 +4839,9 @@ function ShareModal({ project, onClose, onUpdate }) {
                   placeholder="Enter email address"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleShare()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleShare()
+                  }}
                   className="input-sleek pl-10"
                 />
               </div>
@@ -4999,6 +5035,8 @@ function TaskDetail() {
     const now = new Date().toISOString()
     const updated = {
       ...project,
+      title: updates.title !== undefined ? updates.title : currentTask.title,
+      description: updates.description !== undefined ? updates.description : currentTask.description,
       updated_at: now,
       modified_by: user?.id,
       modified_by_name: userName,
@@ -5381,6 +5419,14 @@ function TaskDetail() {
               type="text"
               value={currentTask.title}
               onChange={e => updateTask({ title: e.target.value })}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && e.shiftKey) {
+                  e.preventDefault()
+                  // Task title is saved locally on change, but we could trigger a DB sync if needed.
+                  // For now, Shift+Enter just blurs to signify "done"
+                  e.currentTarget.blur()
+                }
+              }}
               className={`w-full text-xl sm:text-2xl font-bold bg-transparent outline-none ${taskOverdue ? 'text-red-700' : ''}`}
             />
             {/* Tags Display and Picker Button */}
@@ -5499,6 +5545,12 @@ function TaskDetail() {
               <textarea
                 value={localDescription}
                 onChange={e => setLocalDescription(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && e.shiftKey) {
+                    e.preventDefault();
+                    saveDescription();
+                  }
+                }}
                 placeholder="Add a description..."
                 className="w-full min-h-[100px] bg-white border border-gray-200 rounded-lg p-3 resize-y outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-gray-700"
                 autoFocus
@@ -5623,7 +5675,7 @@ function TaskDetail() {
                               value={editingSubtaskTitle}
                               onChange={e => setEditingSubtaskTitle(e.target.value)}
                               onKeyDown={e => {
-                                if (e.key === 'Enter') updateSubtaskTitle(s.id, editingSubtaskTitle)
+                                if (e.key === 'Enter' && (!e.shiftKey || e.shiftKey)) updateSubtaskTitle(s.id, editingSubtaskTitle)
                                 if (e.key === 'Escape') setEditingSubtaskId(null)
                               }}
                               className="flex-1 bg-white rounded px-2 py-1 border border-gray-300 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
@@ -5780,7 +5832,12 @@ function TaskDetail() {
               placeholder="Add subtask..."
               value={newSubtask}
               onChange={e => setNewSubtask(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addSubtask()}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSubtask();
+                }
+              }}
               className="input-sleek"
             />
             <button onClick={addSubtask} className="p-3 hover:bg-gray-100 rounded-lg">
@@ -5831,7 +5888,10 @@ function TaskDetail() {
                           value={editingCommentContent}
                           onChange={e => setEditingCommentContent(e.target.value)}
                           onKeyDown={e => {
-                            if (e.key === 'Enter') saveCommentEdit(c.id)
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveCommentEdit(c.id);
+                            }
                             if (e.key === 'Escape') setEditingCommentId(null)
                           }}
                           className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
@@ -5862,7 +5922,12 @@ function TaskDetail() {
               placeholder="Write a comment..."
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addComment()}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addComment();
+                }
+              }}
               className="input-sleek"
             />
             <button onClick={addComment} className="btn-gradient px-4">Post</button>

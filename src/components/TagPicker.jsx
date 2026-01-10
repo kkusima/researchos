@@ -149,12 +149,12 @@ export default function TagPicker({
                                 onChange={e => setSearch(e.target.value)}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter') {
-                                        if (exactMatch) {
+                                        if (e.shiftKey || !exactMatch) {
+                                            if (search.trim()) handleCreate()
+                                        } else if (exactMatch) {
                                             if (assignedTagIds.has(exactMatch.id)) onUnassign(exactMatch.id)
                                             else onAssign(exactMatch.id)
                                             setSearch('')
-                                        } else if (search.trim()) {
-                                            handleCreate()
                                         }
                                     }
                                     if (e.key === 'Escape') onClose()
