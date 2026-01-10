@@ -918,29 +918,29 @@ function NotificationSettingsPanel({ settings, onUpdateSettings, onClose, isLoad
   )
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="absolute right-0 mt-2 w-[400px] max-w-[calc(100vw-2rem)] glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="glass-card rounded-2xl w-full max-w-lg animate-fade-in max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4 text-gray-500" />
-            </button>
-            <h3 className="font-semibold text-gray-900">Notification Settings</h3>
+            <Bell className="w-5 h-5 text-gray-700" />
+            <h2 className="text-lg font-bold text-gray-900">Notification Settings</h2>
           </div>
-          {saving && (
-            <span className="text-xs text-gray-400 flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Saving...
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {saving && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Saving...
+              </span>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Header row */}
+          {/* Column headers */}
           <div className="flex items-center justify-end gap-2 text-[10px] font-medium text-gray-500 uppercase tracking-wider pr-1">
             <span className="w-12 text-center">In-App</span>
             <span className="w-12 text-center">Email</span>
@@ -990,17 +990,17 @@ function NotificationSettingsPanel({ settings, onUpdateSettings, onClose, isLoad
           ))}
 
           {/* Info footer */}
-          <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
+          <div className="text-xs text-gray-400 pt-4 border-t border-gray-100 space-y-1">
             <p className="flex items-center gap-1">
               <Bell className="w-3 h-3" />
               <span><strong>In-App:</strong> Shows in the notification bell</span>
             </p>
-            <p className="flex items-center gap-1 mt-1">
+            <p className="flex items-center gap-1">
               <Mail className="w-3 h-3" />
               <span><strong>Email:</strong> Sent to your email address</span>
             </p>
             {isPushSupported && (
-              <p className="flex items-center gap-1 mt-1">
+              <p className="flex items-center gap-1">
                 <Smartphone className="w-3 h-3" />
                 <span><strong>Push:</strong> {isElectron ? 'Desktop notifications' : 'Browser notifications'}</span>
               </p>
@@ -1008,7 +1008,7 @@ function NotificationSettingsPanel({ settings, onUpdateSettings, onClose, isLoad
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -1247,7 +1247,6 @@ function ProfileSettingsModal({ onClose }) {
 
   // Profile state
   const [name, setName] = useState(user?.user_metadata?.full_name || user?.user_metadata?.name || '')
-  const [emailNotifications, setEmailNotifications] = useState(user?.user_metadata?.email_notifications ?? true)
 
   // Email state
   const [newEmail, setNewEmail] = useState('')
@@ -1265,8 +1264,7 @@ function ProfileSettingsModal({ onClose }) {
 
     const { error } = await updateProfile({
       full_name: name,
-      name,
-      email_notifications: emailNotifications
+      name
     })
 
     if (error) {
@@ -1422,28 +1420,6 @@ function ProfileSettingsModal({ onClose }) {
                 </p>
               </div>
 
-              <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                      <Bell className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Email Notifications</p>
-                      <p className="text-xs text-gray-500">Receive alerts via email</p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={emailNotifications}
-                      onChange={(e) => setEmailNotifications(e.target.checked)}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                  </label>
-                </div>
-              </div>
               <button
                 type="submit"
                 disabled={loading}
