@@ -1607,29 +1607,6 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                   )}
                 </button>
 
-                {showNotifications && !showNotificationSettings && (
-                  <NotificationPane
-                    notifications={notifications || []}
-                    onMarkRead={onMarkNotificationRead}
-                    onMarkUnread={onMarkNotificationUnread}
-                    onMarkAllRead={onMarkAllNotificationsRead}
-                    onDelete={onDeleteNotification}
-                    onDeleteMultiple={onDeleteMultipleNotifications}
-                    onClear={onClearAllNotifications}
-                    onNavigate={(notif) => {
-                      setShowNotifications(false)
-                      setNotifAnchor(null)
-                      onNotificationNavigate(notif)
-                    }}
-                    onClose={() => { setShowNotifications(false); setNotifAnchor(null); }}
-                    onOpenSettings={() => setShowNotificationSettings(true)}
-                    position={notifAnchor ? {
-                      top: notifAnchor.bottom + 8,
-                      right: window.innerWidth - notifAnchor.right
-                    } : null}
-                  />
-                )}
-
               </div>
 
               {/* User Menu */}
@@ -1704,6 +1681,28 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
           settings={notificationSettings}
           onUpdateSettings={onUpdateNotificationSettings}
           onClose={() => setShowNotificationSettings(false)}
+        />
+      )}
+      {showNotifications && !showNotificationSettings && (
+        <NotificationPane
+          notifications={notifications || []}
+          onMarkRead={onMarkNotificationRead}
+          onMarkUnread={onMarkNotificationUnread}
+          onMarkAllRead={onMarkAllNotificationsRead}
+          onDelete={onDeleteNotification}
+          onDeleteMultiple={onDeleteMultipleNotifications}
+          onClear={onClearAllNotifications}
+          onNavigate={(notif) => {
+            setShowNotifications(false)
+            setNotifAnchor(null)
+            onNotificationNavigate(notif)
+          }}
+          onClose={() => { setShowNotifications(false); setNotifAnchor(null); }}
+          onOpenSettings={() => setShowNotificationSettings(true)}
+          position={notifAnchor ? {
+            top: notifAnchor.bottom + 8,
+            right: typeof window !== 'undefined' ? window.innerWidth - notifAnchor.right : 0
+          } : null}
         />
       )}
     </>
