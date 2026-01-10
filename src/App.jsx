@@ -919,7 +919,7 @@ function NotificationSettingsPanel({ settings, onUpdateSettings, onClose, isLoad
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in max-h-[85vh] flex flex-col shadow-xl">
+      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in max-h-[85vh] flex flex-col shadow-2xl border border-gray-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -1328,7 +1328,7 @@ function ProfileSettingsModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="glass-card rounded-2xl w-full max-w-md animate-fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in shadow-2xl border border-gray-200">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900">Account Settings</h2>
