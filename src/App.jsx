@@ -1942,6 +1942,7 @@ const TodayItem = React.memo(({
 
 function TodayView() {
   const { todayItems, addLocalTodayTask, addToToday, addSubtaskToToday, removeTodayItem, removeTodayItems, duplicateTodayItems, reorderToday, projects, toggleTodayDone, setSelectedTask, setSelectedProject, setView, setTodayItems, saveTodayItems, showToast, user, demoMode, reloadProjects, setProjects } = useApp()
+  const mounted = useMounted()
   const [newTitle, setNewTitle] = useState('')
   const [existingPicker, setExistingPicker] = useState(null) // { position }
   const [existingQuery, setExistingQuery] = useState('')
