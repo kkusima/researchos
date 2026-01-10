@@ -702,11 +702,9 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
     }
   }
 
-  const mounted = useMounted()
+  if (!position) return null
 
-  if (!position || !mounted || typeof document === 'undefined') return null
-
-  return createPortal(
+  return (
     <>
       <div className="fixed inset-0 z-[100]" onClick={onClose} />
       <div
