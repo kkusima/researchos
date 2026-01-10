@@ -1308,6 +1308,80 @@ export const db = {
     }
   },
 
+  // Notification Settings
+  async getNotificationSettings(userId) {
+    if (!supabase) return { data: null, error: null }
+
+    try {
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (error) logError('getNotificationSettings', error)
+      return { data, error }
+    } catch (error) {
+      logError('getNotificationSettings:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  async updateNotificationSettings(userId, settings) {
+    if (!supabase) return { data: null, error: null }
+
+    try {
+      // Use upsert to create or update settings
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .upsert({
+          user_id: userId,
+          ...settings,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+        .select()
+        .single()
+
+      if (error) logError('updateNotificationSettings', error)
+      return { data, error }
+    } catch (error) {
+      logError('updateNotificationSettings:catch', error)
+      return { data: null, error }
+    }
+  },
+
+  // Initialize notification settings with defaults for a new user
+  async initializeNotificationSettings(userId) {
+    if (!supabase) return { data: null, error: null }
+
+    try {
+      // Check if settings already exist
+      const { data: existing } = await supabase
+        .from('notification_settings')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (existing) {
+        // Settings already exist, return them
+        return await this.getNotificationSettings(userId)
+      }
+
+      // Create default settings (all defaults are already defined in schema)
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .insert({ user_id: userId })
+        .select()
+        .single()
+
+      if (error) logError('initializeNotificationSettings', error)
+      return { data, error }
+    } catch (error) {
+      logError('initializeNotificationSettings:catch', error)
+      return { data: null, error }
+    }
+  },
+
   // Notify all project collaborators about a change (excludes the person who made the change)
   async notifyCollaborators(projectId, excludeUserId, notification) {
     if (!supabase) return { error: null }

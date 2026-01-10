@@ -1,9 +1,32 @@
 // Supabase Edge Function: Send Email Notifications via Resend
-// Uses only native Deno APIs - no external imports needed
+// Uses granular notification_settings for per-type email control
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+}
+
+// Map notification types to their email setting column
+const notificationTypeToEmailSetting: Record<string, string> = {
+    // Reminders
+    "task_reminder": "reminder_upcoming_email",
+    "subtask_reminder": "reminder_upcoming_email",
+    "task_reminder_set": "reminder_upcoming_email",
+    "subtask_reminder_set": "reminder_upcoming_email",
+    "task_overdue": "reminder_overdue_email",
+    "subtask_overdue": "reminder_overdue_email",
+    // Task Activity
+    "task_created": "task_created_email",
+    "task_updated": "task_updated_email",
+    "task_deleted": "task_deleted_email",
+    "subtask_created": "subtask_activity_email",
+    "subtask_updated": "subtask_activity_email",
+    "subtask_deleted": "subtask_activity_email",
+    // Collaboration
+    "project_shared": "project_shared_email",
+    "project_invite": "project_shared_email",
+    "project_removed": "project_removed_email",
+    "comment_added": "comment_added_email",
 }
 
 Deno.serve(async (req: Request) => {
@@ -35,10 +58,21 @@ Deno.serve(async (req: Request) => {
         }
 
         const notification = payload.record
+        const notificationType = notification.type
 
-        // Fetch user details using native fetch
+        // Determine which email setting column to check
+        const emailSettingColumn = notificationTypeToEmailSetting[notificationType]
+        if (!emailSettingColumn) {
+            console.log(`Unknown notification type: ${notificationType}, skipping email`)
+            return new Response(JSON.stringify({ skipped: true, reason: `Unknown type: ${notificationType}` }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            })
+        }
+
+        // Fetch user and their notification settings
         const userResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/users?id=eq.${notification.user_id}&select=email,name,email_notifications`,
+            `${SUPABASE_URL}/rest/v1/users?id=eq.${notification.user_id}&select=email,name`,
             {
                 headers: {
                     "apikey": SUPABASE_SERVICE_ROLE_KEY,
@@ -46,7 +80,6 @@ Deno.serve(async (req: Request) => {
                 },
             }
         )
-
         const users = await userResponse.json()
         const userData = users?.[0]
 
@@ -58,9 +91,25 @@ Deno.serve(async (req: Request) => {
             })
         }
 
-        // Skip if email_notifications is disabled
-        if (!userData.email_notifications) {
-            return new Response(JSON.stringify({ skipped: true, reason: "email_notifications disabled" }), {
+        // Fetch notification settings for this user
+        const settingsResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/notification_settings?user_id=eq.${notification.user_id}&select=${emailSettingColumn}`,
+            {
+                headers: {
+                    "apikey": SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                },
+            }
+        )
+        const settings = await settingsResponse.json()
+        const userSettings = settings?.[0]
+
+        // Check if email is enabled for this notification type
+        // Default to false (email OFF) if no settings exist
+        const emailEnabled = userSettings?.[emailSettingColumn] ?? false
+
+        if (!emailEnabled) {
+            return new Response(JSON.stringify({ skipped: true, reason: `${emailSettingColumn} is disabled` }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             })
@@ -117,3 +166,4 @@ Deno.serve(async (req: Request) => {
         })
     }
 })
+

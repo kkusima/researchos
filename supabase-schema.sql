@@ -198,6 +198,50 @@ CREATE INDEX IF NOT EXISTS idx_task_tags_task ON public.task_tags(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_tags_tag ON public.task_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_subtask_tags_subtask ON public.subtask_tags(subtask_id);
 
+-- Notification Settings table (granular per-channel preferences)
+CREATE TABLE IF NOT EXISTS public.notification_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  
+  -- Reminders & Due Dates
+  reminder_upcoming_inapp BOOLEAN DEFAULT TRUE,
+  reminder_upcoming_email BOOLEAN DEFAULT FALSE,
+  reminder_upcoming_push BOOLEAN DEFAULT TRUE,
+  reminder_overdue_inapp BOOLEAN DEFAULT TRUE,
+  reminder_overdue_email BOOLEAN DEFAULT FALSE,
+  reminder_overdue_push BOOLEAN DEFAULT TRUE,
+  
+  -- Task Activity
+  task_created_inapp BOOLEAN DEFAULT TRUE,
+  task_created_email BOOLEAN DEFAULT FALSE,
+  task_created_push BOOLEAN DEFAULT FALSE,
+  task_updated_inapp BOOLEAN DEFAULT FALSE,
+  task_updated_email BOOLEAN DEFAULT FALSE,
+  task_updated_push BOOLEAN DEFAULT FALSE,
+  task_deleted_inapp BOOLEAN DEFAULT TRUE,
+  task_deleted_email BOOLEAN DEFAULT FALSE,
+  task_deleted_push BOOLEAN DEFAULT FALSE,
+  subtask_activity_inapp BOOLEAN DEFAULT FALSE,
+  subtask_activity_email BOOLEAN DEFAULT FALSE,
+  subtask_activity_push BOOLEAN DEFAULT FALSE,
+  
+  -- Collaboration
+  project_shared_inapp BOOLEAN DEFAULT TRUE,
+  project_shared_email BOOLEAN DEFAULT FALSE,
+  project_shared_push BOOLEAN DEFAULT TRUE,
+  project_removed_inapp BOOLEAN DEFAULT TRUE,
+  project_removed_email BOOLEAN DEFAULT FALSE,
+  project_removed_push BOOLEAN DEFAULT TRUE,
+  comment_added_inapp BOOLEAN DEFAULT TRUE,
+  comment_added_email BOOLEAN DEFAULT FALSE,
+  comment_added_push BOOLEAN DEFAULT FALSE,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_settings_user ON public.notification_settings(user_id);
+
 -- Disable Row Level Security (RLS is now handled at the application level)
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects DISABLE ROW LEVEL SECURITY;
@@ -212,6 +256,7 @@ ALTER TABLE public.today_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tags DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_tags DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subtask_tags DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_settings DISABLE ROW LEVEL SECURITY;
 
 -- 
 -- DROP RLS POLICIES (No longer needed since RLS is disabled)
