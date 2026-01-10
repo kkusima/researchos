@@ -514,6 +514,15 @@ function GlobalSearch({ projects, onNavigate }) {
 
   const hasResults = results.projects.length > 0 || results.tasks.length > 0 || results.subtasks.length > 0
 
+  const containerRef = useRef(null)
+  const [anchorRect, setAnchorRect] = useState(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      setAnchorRect(containerRef.current?.getBoundingClientRect())
+    }
+  }, [isOpen])
+
   const handleSelect = (type, item) => {
     setQuery('')
     setIsOpen(false)
@@ -521,7 +530,7 @@ function GlobalSearch({ projects, onNavigate }) {
   }
 
   return (
-    <div className="relative flex-1 max-w-md">
+    <div ref={containerRef} className="relative flex-1 max-w-md">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <input
         ref={inputRef}
@@ -533,10 +542,17 @@ function GlobalSearch({ projects, onNavigate }) {
         className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-transparent rounded-xl text-sm focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-gray-200 transition-all"
       />
 
-      {isOpen && query.trim() && (
+      {isOpen && query.trim() && anchorRect && ReactDOM.createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-2 glass-card rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto animate-fade-in">
+          <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
+          <div
+            className="fixed mt-2 glass-card rounded-xl shadow-xl z-[101] max-h-96 overflow-y-auto animate-fade-in"
+            style={{
+              top: anchorRect.bottom,
+              left: anchorRect.left,
+              width: anchorRect.width
+            }}
+          >
             {!hasResults ? (
               <div className="p-4 text-center text-gray-500 text-sm">
                 No results found for "{query}"
@@ -612,7 +628,8 @@ function GlobalSearch({ projects, onNavigate }) {
               </div>
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
@@ -621,7 +638,7 @@ function GlobalSearch({ projects, onNavigate }) {
 // ============================================
 // NOTIFICATION PANE
 // ============================================
-function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRead, onDelete, onDeleteMultiple, onClear, onNavigate, onClose, onOpenSettings }) {
+function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRead, onDelete, onDeleteMultiple, onClear, onNavigate, onClose, onOpenSettings, position }) {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const unreadCount = notifications.filter(n => !n.is_read).length
@@ -676,10 +693,19 @@ function NotificationPane({ notifications, onMarkRead, onMarkUnread, onMarkAllRe
     }
   }
 
-  return (
+  if (!position) return null
+
+  return ReactDOM.createPortal(
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-card rounded-xl shadow-xl z-50 animate-fade-in max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-[100]" onClick={onClose} />
+      <div
+        className="fixed glass-card rounded-xl shadow-xl z-[101] animate-fade-in max-h-[70vh] flex flex-col w-80 sm:w-96"
+        onClick={e => e.stopPropagation()}
+        style={{
+          top: position.top,
+          right: position.right
+        }}
+      >
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">
             Notifications
@@ -1519,8 +1545,10 @@ function ProfileSettingsModal({ onClose }) {
 function Header({ projects, onSearchNavigate, notifications, onMarkNotificationRead, onMarkNotificationUnread, onMarkAllNotificationsRead, onDeleteNotification, onDeleteMultipleNotifications, onClearAllNotifications, onNotificationNavigate, onLogoClick, notificationSettings, onUpdateNotificationSettings }) {
   const { user, signOut, demoMode, isEmailAuth } = useAuth()
   const [showMenu, setShowMenu] = useState(false)
+  const [menuAnchor, setMenuAnchor] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [notifAnchor, setNotifAnchor] = useState(null)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
 
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
@@ -1551,7 +1579,12 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
               {/* Notifications Bell */}
               <div className="relative">
                 <button
-                  onClick={() => { setShowNotifications(!showNotifications); setShowNotificationSettings(false) }}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setNotifAnchor(rect);
+                    setShowNotifications(!showNotifications);
+                    setShowNotificationSettings(false);
+                  }}
                   className="p-2 rounded-xl hover:bg-gray-100 transition-colors relative"
                 >
                   <Bell className="w-5 h-5 text-gray-500" />
@@ -1573,10 +1606,15 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                     onClear={onClearAllNotifications}
                     onNavigate={(notif) => {
                       setShowNotifications(false)
+                      setNotifAnchor(null)
                       onNotificationNavigate(notif)
                     }}
-                    onClose={() => setShowNotifications(false)}
+                    onClose={() => { setShowNotifications(false); setNotifAnchor(null); }}
                     onOpenSettings={() => setShowNotificationSettings(true)}
+                    position={notifAnchor ? {
+                      top: notifAnchor.bottom + 8,
+                      right: window.innerWidth - notifAnchor.right
+                    } : null}
                   />
                 )}
 
@@ -1585,17 +1623,30 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
               {/* User Menu */}
               <div className="relative">
                 <button
-                  onClick={() => setShowMenu(!showMenu)}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuAnchor(rect);
+                    setShowMenu(!showMenu);
+                  }}
                   className="flex items-center gap-2 sm:gap-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
                 >
                   <Avatar size={32} />
                   <span className="font-medium text-gray-700 hidden md:block">{userName}</span>
                 </button>
 
-                {showMenu && (
+                {showMenu && menuAnchor && ReactDOM.createPortal(
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 glass-card rounded-xl shadow-lg z-50 py-2 animate-fade-in">
+                    <div className="fixed inset-0 z-[100]" onClick={() => { setShowMenu(false); setMenuAnchor(null); }} />
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: menuAnchor.bottom + 8,
+                        right: window.innerWidth - menuAnchor.right,
+                        zIndex: 101
+                      }}
+                      className="w-56 glass-card rounded-xl shadow-lg py-2 animate-fade-in"
+                      onClick={e => e.stopPropagation()}
+                    >
                       <div className="px-4 py-2 border-b border-gray-100">
                         <p className="text-sm font-medium text-gray-900">{userName}</p>
                         <p className="text-xs text-gray-500 truncate">{user?.email}</p>
@@ -1612,7 +1663,7 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                         )}
                       </div>
                       <button
-                        onClick={() => { setShowMenu(false); setShowSettings(true); }}
+                        onClick={() => { setShowMenu(false); setMenuAnchor(null); setShowSettings(true); }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                       >
                         <Settings className="w-4 h-4" />
@@ -1626,7 +1677,8 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                         Sign out
                       </button>
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
             </div>
