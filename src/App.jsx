@@ -5079,7 +5079,7 @@ function ShareModal({ project, onClose, onUpdate }) {
 // ============================================
 function TaskDetail() {
   const {
-    projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday,
+    projects, setProjects, selectedProject, setSelectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday,
     tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag, reorderSubtasks,
     showToast
   } = useApp()
