@@ -1737,12 +1737,19 @@ function TabNav({ tab, setTab }) {
           {[
             { id: 'projects', label: 'Projects', icon: '◫' },
             { id: 'tasks', label: 'Tasks', icon: '✓' },
-            { id: 'today', label: 'Tod(o)ay', icon: '☀' }
+            { id: 'today', label: 'Tod(o)ay', icon: '☀' },
+            ...(typeof window !== 'undefined' && window.desktopBridge ? [{ id: 'sync', label: 'Sync', icon: '↻' }] : [])
           ].map(t => (
             <button
               id={`tab-${t.id}`}
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                if (t.id === 'sync') {
+                  window.location.reload();
+                  return;
+                }
+                setTab(t.id)
+              }}
               className={`px-5 py-4 font-medium text-sm border-b-2 transition-colors ${tab === t.id
                 ? 'border-brand-600 text-brand-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -5303,18 +5310,23 @@ function TaskDetail() {
 
     if (!demoMode) {
       // Filter for valid DB columns only
+      console.log('📝 Attempting to save subtask with task_id:', currentTask.id);
+      
       const cleanSubtask = {
         id: localId,
-        task_id: task.id,
+        task_id: currentTask.id, // Use currentTask.id to ensure we have the live task ID
         title: subtask.title,
         is_completed: false,
         reminder_date: subtask.reminder_date || null,
         order_index: newSubtaskOrderIndex,
-        created_by: user?.id,
-        modified_by: user?.id
+        created_by: user ? user.id : null, 
+        modified_by: user ? user.id : null
       }
+      
+      console.log('📝 Saving subtask to DB object:', cleanSubtask);
 
       db.createSubtask(cleanSubtask).then(async ({ data: createdSubtask, error }) => {
+
         if (error) {
           console.error('Failed to create subtask:', error)
           showToast('Failed to save subtask. Please try again.')
