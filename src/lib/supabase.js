@@ -127,6 +127,18 @@ export const db = {
         return { data: [], error: bulkError }
       }
 
+      devLog('📊 Raw Supabase response - checking subtasks in all tasks:')
+      bulkData.forEach(p => {
+        p.stages?.forEach(s => {
+          s.tasks?.forEach(t => {
+            devLog(`  Task: ${t.id} (${t.title}) has ${(t.subtasks || []).length} subtasks`)
+            t.subtasks?.forEach(st => {
+              devLog(`    - Subtask: ${st.id} (${st.title}) with task_id: ${st.task_id}`)
+            })
+          })
+        })
+      })
+
       // 3. Process, Sort, and Format Data in Memory
       // Supabase nested sort is limited, so we sort arrays here.
 
@@ -154,11 +166,14 @@ export const db = {
               .map(task => {
                 const subtasks = (task.subtasks || [])
                   .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-                  .map(st => ({
-                    ...st,
-                    created_by_name: st.creator?.name || st.creator?.email,
-                    modified_by_name: st.modifier?.name || st.modifier?.email
-                  }))
+                  .map(st => {
+                    devLog(`📋 Subtask retrieved: ${st.id} | task: ${st.task_id} | title: ${st.title}`)
+                    return {
+                      ...st,
+                      created_by_name: st.creator?.name || st.creator?.email,
+                      modified_by_name: st.modifier?.name || st.modifier?.email
+                    }
+                  })
 
                 const comments = (task.comments || [])
                   .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
@@ -530,16 +545,29 @@ export const db = {
     if (!supabase) return { data: null, error: null }
 
     try {
+      devLog('📝 Creating subtask with data:', JSON.stringify(subtask, null, 2))
       const { data, error } = await supabase
         .from('subtasks')
         .insert(subtask)
         .select()
         .single()
 
-      if (error) logError('createSubtask', error)
+      if (error) {
+        logError('createSubtask', error)
+        console.error('❌ Subtask insert failed. Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          subtask
+        })
+      } else {
+        devLog('✅ Subtask created successfully:', data.id)
+      }
       return { data, error }
     } catch (error) {
       logError('createSubtask:catch', error)
+      console.error('❌ Subtask creation exception:', error)
       return { data: null, error }
     }
   },
