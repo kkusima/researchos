@@ -5359,10 +5359,18 @@ function TaskDetail() {
             }
           }
 
+          // Sync local state with real ID
           setProjects(prev => prev.map(syncSubtaskProject))
           if (selectedProject?.id === project.id) {
             setSelectedProject(prev => syncSubtaskProject(prev))
           }
+
+          // Persist ordering so the new subtask stays at the top after reload
+          const updatedSubtasks = (currentTask.subtasks || []).map(st =>
+            st.id === localId ? { ...st, id: createdSubtask.id, is_local: false } : st
+          )
+          const orderUpdates = updatedSubtasks.map((st, idx) => ({ id: st.id, order_index: idx }))
+          db.bulkUpdateSubtasks(orderUpdates).catch(err => console.warn('subtask order sync failed', err))
 
           // Notify collaborators about the new subtask
           if (isShared) {
