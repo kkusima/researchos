@@ -96,16 +96,10 @@ export const db = {
             *,
             tasks (
               *,
-              tags:tags (
-                *
-              ),
               creator:users!created_by (name, email),
               modifier:users!modified_by (name, email),
               subtasks (
                 *,
-                tags:tags (
-                  *
-                ),
                 creator:users!created_by (name, email),
                 modifier:users!modified_by (name, email)
               ),

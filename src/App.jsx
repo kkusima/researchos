@@ -5312,9 +5312,10 @@ function TaskDetail() {
       // Filter for valid DB columns only
       console.log('📝 Attempting to save subtask with task_id:', currentTask.id);
       
+      // NOTE: Don't pass 'id' - let Supabase auto-generate it
+      // Then we'll update local state with the actual ID from the response
       const cleanSubtask = {
-        id: localId,
-        task_id: currentTask.id, // Use currentTask.id to ensure we have the live task ID
+        task_id: currentTask.id,
         title: subtask.title,
         is_completed: false,
         reminder_date: subtask.reminder_date || null,
@@ -5323,7 +5324,7 @@ function TaskDetail() {
         modified_by: user ? user.id : null
       }
       
-      console.log('📝 Saving subtask to DB object:', cleanSubtask);
+      console.log('📝 Saving subtask to DB object (NO local ID):', cleanSubtask);
 
       db.createSubtask(cleanSubtask).then(async ({ data: createdSubtask, error }) => {
 
@@ -5334,9 +5335,9 @@ function TaskDetail() {
           updateTask({ subtasks: currentTask.subtasks.filter(st => st.id !== localId) })
           return
         }
-        // Update local state - subtask already has correct ID
+        // Update local state - NOW use the actual ID from the database response
         if (createdSubtask) {
-          console.log('✅ Subtask saved to DB, syncing local state...');
+          console.log('✅ Subtask saved to DB with REAL ID:', createdSubtask.id);
           const now = new Date().toISOString()
           const syncSubtaskProject = (p) => {
             if (p.id !== project.id) return p
@@ -5349,7 +5350,7 @@ function TaskDetail() {
                 s.id === stage.id
                   ? {
                     ...s, tasks: s.tasks.map(t => t.id === task.id
-                      ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, is_local: false } : st) }
+                      ? { ...t, subtasks: t.subtasks.map(st => st.id === localId ? { ...st, id: createdSubtask.id, is_local: false } : st) }
                       : t
                     )
                   }
@@ -5370,7 +5371,7 @@ function TaskDetail() {
               title: 'New subtask added',
               message: `${currentTask.title} → ${subtask.title}`,
               task_id: task.id,
-              subtask_id: localId
+              subtask_id: createdSubtask.id
             })
           }
         }
