@@ -9,7 +9,7 @@ import {
   Check, Plus, Trash2, Settings, ChevronLeft, ChevronRight,
   LogOut, Users, Share2, Mail, Clock, FileText, MessageSquare, Sun,
   Loader2, Search, MoreVertical, X, Copy, UserPlus, ChevronUp, ChevronDown, GripVertical,
-  LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle, Tag, Smartphone
+  LayoutGrid, List, Bell, Calendar, AlertCircle, CheckCircle, Tag, Smartphone, RefreshCw
 } from 'lucide-react'
 
 // App Context
@@ -1614,6 +1614,17 @@ function Header({ projects, onSearchNavigate, notifications, onMarkNotificationR
                 </button>
 
               </div>
+
+              {/* Sync Button (Desktop Only) */}
+              {typeof window !== 'undefined' && window.desktopBridge && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors relative"
+                  title="Sync (Reload)"
+                >
+                  <RefreshCw className="w-5 h-5 text-gray-500" />
+                </button>
+              )}
 
               {/* User Menu */}
               <div className="relative">
@@ -5094,6 +5105,7 @@ function TaskDetail() {
 
   const { task, stageIndex } = selectedTask
   const currentTask = project.stages[stageIndex]?.tasks?.find(t => t.id === task.id)
+  const stage = project.stages[stageIndex]
   if (!currentTask) return null
 
   const taskOverdue = isOverdue(currentTask.reminder_date) && !currentTask.is_completed
