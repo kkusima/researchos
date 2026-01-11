@@ -5080,7 +5080,8 @@ function ShareModal({ project, onClose, onUpdate }) {
 function TaskDetail() {
   const {
     projects, setProjects, selectedProject, selectedTask, setSelectedTask, setView, addToToday, addSubtaskToToday,
-    tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag, reorderSubtasks
+    tags, activeTagPicker, setActiveTagPicker, assignTag, unassignTag, createTag, editTag, deleteTag, reorderSubtasks,
+    showToast
   } = useApp()
   const { demoMode, user } = useAuth()
   const [newSubtask, setNewSubtask] = useState('')
@@ -5318,9 +5319,8 @@ function TaskDetail() {
         task_id: currentTask.id,
         title: subtask.title,
         is_completed: false,
-        reminder_date: subtask.reminder_date || null,
         order_index: newSubtaskOrderIndex,
-        created_by: user ? user.id : null, 
+        created_by: user ? user.id : null,
         modified_by: user ? user.id : null
       }
       
@@ -5725,6 +5725,27 @@ function TaskDetail() {
               </div>
             )}
           </div>
+
+          {/* Add subtask bar on top */}
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Add subtask..."
+              value={newSubtask}
+              onChange={e => setNewSubtask(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addSubtask()
+                }
+              }}
+              className="input-sleek"
+            />
+            <button onClick={addSubtask} className="p-3 hover:bg-gray-100 rounded-lg">
+              <Plus className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
           <div className="space-y-2 mb-4">
             {sortedSubtasks.map((s, idx) => {
               const subtaskOverdue = isOverdue(s.reminder_date) && !s.is_completed
@@ -5922,24 +5943,7 @@ function TaskDetail() {
               )
             })}
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Add subtask..."
-              value={newSubtask}
-              onChange={e => setNewSubtask(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addSubtask();
-                }
-              }}
-              className="input-sleek"
-            />
-            <button onClick={addSubtask} className="p-3 hover:bg-gray-100 rounded-lg">
-              <Plus className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
+          
         </div>
 
         {/* Comments */}
