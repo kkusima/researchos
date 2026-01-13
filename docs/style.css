@@ -619,6 +619,14 @@ h6 {
     color: var(--color-text-tertiary);
 }
 
+.footer__trademark {
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--color-text-tertiary);
+    max-width: 600px;
+    line-height: 1.5;
+    opacity: 0.8;
+}
+
 /* Downloads Page Specific */
 .downloads-hero {
     padding: calc(52px + var(--space-4xl)) var(--space-lg) var(--space-4xl);
