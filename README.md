@@ -64,7 +64,7 @@ MIT License
 
 ## Trademark Notice
 
-**HypotheSys™** is a trademark. The name and associated branding are proprietary. Use of the HypotheSys™ name, or branding for derivative works or commercial purposes requires prior written permission.
+**HypotheSys™** is a trademark. The name and associated branding are proprietary. 
 
 ---
 
