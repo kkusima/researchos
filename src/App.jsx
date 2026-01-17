@@ -1925,24 +1925,21 @@ const TodayItem = React.memo(({
                   })}
                 </div>
               )}
-              {/* Reminder Badge */}
-              {item.reminder_date && (
-                <div className="flex items-center gap-1 mt-1.5">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${new Date(item.reminder_date) < new Date() ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    {formatReminderDate(item.reminder_date)}
-                  </span>
-                </div>
-              )}
             </div>
           )}
         </div>
       </div>
 
       <div className="flex items-center gap-2 relative flex-shrink-0 ml-2">
+        {/* Quick Reminder Picker */}
+        <ReminderPicker
+          value={item.reminder_date || null}
+          compact={true}
+          onChange={(newDate) => {
+            onSetReminder(item.id, newDate)
+          }}
+        />
+
         <button
           onClick={(e) => { e.stopPropagation(); onMenuToggle(item.id) }}
           className={`p-1.5 rounded-lg transition-colors ${isMenuOpen ? 'bg-gray-100 text-gray-800' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}
@@ -2008,7 +2005,7 @@ const TodayItem = React.memo(({
           document.body
         )}
       </div>
-    </div>
+    </div >
   )
 })
 
@@ -7806,9 +7803,10 @@ function AppContent() {
   }, [user])
 
   // Check for overdue tasks and create notifications
-  const checkOverdueTasks = (projectsList, existingNotifications) => {
+  const checkOverdueTasks = (projectsList, existingNotifications, todayItemsList = []) => {
     const overdueTasks = []
     const overdueSubtasks = []
+    const overdueTodayItems = []
 
     projectsList.forEach(project => {
       project.stages?.forEach((stage, stageIndex) => {
@@ -7838,14 +7836,24 @@ function AppContent() {
         })
       })
     })
+
+    // Check today items for overdue reminders
+    todayItemsList.forEach(item => {
+      if (item.reminder_date && isOverdue(item.reminder_date) && !item.is_done) {
+        overdueTodayItems.push(item)
+      }
+    })
+
     // Prune notifiedOverdueRef for items that are no longer overdue or removed
     try {
       const currentTaskKeys = new Set(overdueTasks.map(o => `task-${o.task.id}`))
       const currentSubtaskKeys = new Set(overdueSubtasks.map(o => `subtask-${o.task.id}-${o.subtask.id}`))
+      const currentTodayKeys = new Set(overdueTodayItems.map(o => `today-${o.id}`))
       const keep = new Set()
       notifiedOverdueRef.current.forEach(k => {
         if (k.startsWith('task-') && currentTaskKeys.has(k)) keep.add(k)
         if (k.startsWith('subtask-') && currentSubtaskKeys.has(k)) keep.add(k)
+        if (k.startsWith('today-') && currentTodayKeys.has(k)) keep.add(k)
       })
       notifiedOverdueRef.current = keep
     } catch (e) { }
@@ -7895,6 +7903,24 @@ function AppContent() {
       }
     })
 
+    overdueTodayItems.forEach((item) => {
+      const key = `today-${item.id}`
+      const existingKey = `today_overdue-${item.id}`
+      if (!notifiedOverdueRef.current.has(key) && !existingNotifKeys.has(existingKey) && !dismissedNotificationsRef.current.has(existingKey)) {
+        newNotifications.push({
+          id: uuid(),
+          type: 'today_overdue',
+          title: `Tod(o)ay Task Overdue: ${item.title}`,
+          message: `Reminder for: ${formatReminderDate(item.reminder_date)}`,
+          today_item_id: item.id,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          reminder_date: item.reminder_date
+        })
+        try { notifiedOverdueRef.current.add(key) } catch (e) { }
+      }
+    })
+
     return newNotifications
   }
 
@@ -7904,7 +7930,7 @@ function AppContent() {
 
     const runOverdueCheck = async () => {
       const currentNotifications = notificationsRef.current
-      const newOverdueNotifications = checkOverdueTasks(projects, currentNotifications)
+      const newOverdueNotifications = checkOverdueTasks(projects, currentNotifications, todayItems)
 
       if (newOverdueNotifications.length > 0) {
         const allNotifications = [...newOverdueNotifications, ...currentNotifications]
@@ -7931,7 +7957,7 @@ function AppContent() {
     const interval = setInterval(runOverdueCheck, 30000)
 
     return () => clearInterval(interval)
-  }, [projects, demoMode, user?.id])
+  }, [projects, todayItems, demoMode, user?.id])
 
   // Notification handlers
   const handleMarkNotificationRead = async (id) => {
