@@ -383,3 +383,82 @@ body {
     padding: 0 4px;
   }
 }
+
+/* ============================================
+   DRAG AND DROP STYLING
+   ============================================ */
+
+/* Draggable items */
+[draggable="true"] {
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Dragging state */
+.dragging,
+[draggable="true"]:active {
+  transform: scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 0 2px rgba(99, 102, 241, 0.3);
+  opacity: 0.95;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Drop target indicator */
+.drop-target {
+  border: 2px dashed #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* Smooth reorder animation */
+@keyframes slideInFromBelow {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.new-item {
+  animation: slideInFromBelow 0.3s ease-out;
+}
+
+/* ============================================
+   REMINDER BADGE STYLING
+   ============================================ */
+
+/* Reminder badge with subtle glow */
+.reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.reminder-badge-upcoming {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.reminder-badge-overdue {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.reminder-badge:hover {
+  transform: scale(1.05);
+}

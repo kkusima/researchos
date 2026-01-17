@@ -1737,19 +1737,12 @@ function TabNav({ tab, setTab }) {
           {[
             { id: 'projects', label: 'Projects', icon: '◫' },
             { id: 'tasks', label: 'Tasks', icon: '✓' },
-            { id: 'today', label: 'Tod(o)ay', icon: '☀' },
-            ...(typeof window !== 'undefined' && window.desktopBridge ? [{ id: 'sync', label: 'Sync', icon: '↻' }] : [])
+            { id: 'today', label: 'Tod(o)ay', icon: '☀' }
           ].map(t => (
             <button
               id={`tab-${t.id}`}
               key={t.id}
-              onClick={() => {
-                if (t.id === 'sync') {
-                  window.location.reload();
-                  return;
-                }
-                setTab(t.id)
-              }}
+              onClick={() => setTab(t.id)}
               className={`px-5 py-4 font-medium text-sm border-b-2 transition-colors ${tab === t.id
                 ? 'border-brand-600 text-brand-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1928,6 +1921,18 @@ const TodayItem = React.memo(({
                   })}
                 </div>
               )}
+              {/* Reminder Badge */}
+              {item.reminder_date && (
+                <div className="flex items-center gap-1 mt-1.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${new Date(item.reminder_date) < new Date() ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {formatReminderDate(item.reminder_date)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1983,6 +1988,7 @@ function TodayView() {
   const itemsToShow = useMemo(() => {
     if (todaySubtab === 'active') return todayItems.filter(i => !i.is_done)
     if (todaySubtab === 'completed') return todayItems.filter(i => i.is_done)
+    if (todaySubtab === 'scheduled') return todayItems.filter(i => i.reminder_date && !i.is_done)
     return todayItems
   }, [todayItems, todaySubtab])
 
@@ -2258,6 +2264,7 @@ function TodayView() {
       <div className="flex border-b border-gray-200 mb-6 gap-6">
         {[
           { id: 'active', label: 'Active', count: todayItems.filter(i => !i.is_done).length },
+          { id: 'scheduled', label: 'Scheduled', count: todayItems.filter(i => i.reminder_date && !i.is_done).length },
           { id: 'completed', label: 'Completed', count: todayItems.filter(i => i.is_done).length },
           { id: 'all', label: 'All', count: todayItems.length }
         ].map(tab => (
@@ -2289,7 +2296,7 @@ function TodayView() {
       <div className="space-y-2">
         {displayedTodayItems.length === 0 ? (
           <div className="p-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl">
-            {todaySubtab === 'active' ? 'No active tasks for today.' : todaySubtab === 'completed' ? 'No completed tasks yet.' : 'Your list is empty.'}
+            {todaySubtab === 'active' ? 'No active tasks for today.' : todaySubtab === 'scheduled' ? 'No scheduled tasks with reminders.' : todaySubtab === 'completed' ? 'No completed tasks yet.' : 'Your list is empty.'}
           </div>
         ) : (
           displayedTodayItems.map((it, i) => {
@@ -5312,7 +5319,7 @@ function TaskDetail() {
     if (!demoMode) {
       // Filter for valid DB columns only
       console.log('📝 Attempting to save subtask with task_id:', currentTask.id);
-      
+
       // NOTE: Don't pass 'id' - let Supabase auto-generate it
       // Then we'll update local state with the actual ID from the response
       const cleanSubtask = {
@@ -5323,7 +5330,7 @@ function TaskDetail() {
         created_by: user ? user.id : null,
         modified_by: user ? user.id : null
       }
-      
+
       console.log('📝 Saving subtask to DB object (NO local ID):', cleanSubtask);
 
       db.createSubtask(cleanSubtask).then(async ({ data: createdSubtask, error }) => {
@@ -5951,7 +5958,7 @@ function TaskDetail() {
               )
             })}
           </div>
-          
+
         </div>
 
         {/* Comments */}
@@ -7306,6 +7313,7 @@ function AppContent() {
       isLocal: true,
       sourceTaskId: task.id,
       tags: task.tags || [],
+      reminder_date: task.reminder_date || null,
       created_at: new Date().toISOString()
     }
     const next = appendTodayItem(todayItems, item)
@@ -7353,6 +7361,7 @@ function AppContent() {
         sourceTaskId: type === 'task' ? item.id : (type === 'subtask' ? opts.parentTaskId : null),
         sourceSubtaskId: type === 'subtask' ? item.id : null,
         tags: item.tags || [],
+        reminder_date: item.reminder_date || null,
         created_at: new Date().toISOString()
       }
       const next = appendTodayItem(todayItems, newItem)
@@ -7385,6 +7394,7 @@ function AppContent() {
       sourceTaskId: parentTask.id,
       sourceSubtaskId: subtask.id,
       tags: subtask.tags || [],
+      reminder_date: subtask.reminder_date || null,
       created_at: new Date().toISOString()
     }
     const next = appendTodayItem(todayItems, item)
@@ -7530,9 +7540,21 @@ function AppContent() {
 
   const duplicateTodayItems = async (ids = []) => {
     if (!ids || ids.length === 0) return
-    const toDup = todayItems.filter(i => ids.includes(i.id))
-    const copies = toDup.map(i => ({ ...i, id: uuid(), created_at: new Date().toISOString(), is_done: false }))
-    const next = [...todayItems, ...copies]
+    // Process in reverse order to maintain correct indices after each insertion
+    const sortedIds = [...ids].sort((a, b) => {
+      const aIdx = todayItems.findIndex(i => i.id === a)
+      const bIdx = todayItems.findIndex(i => i.id === b)
+      return bIdx - aIdx // Descending order so we insert from bottom to top
+    })
+    let next = [...todayItems]
+    for (const id of sortedIds) {
+      const idx = next.findIndex(i => i.id === id)
+      if (idx !== -1) {
+        const item = next[idx]
+        const copy = { ...item, id: uuid(), created_at: new Date().toISOString(), is_done: false }
+        next.splice(idx + 1, 0, copy)
+      }
+    }
     setTodayItems(next)
     await saveTodayItems(next)
   }
