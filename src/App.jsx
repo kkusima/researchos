@@ -1792,11 +1792,13 @@ const TodayItem = React.memo(({
   onRename,
   onDelete,
   onDuplicate,
+  onSetReminder,
   onDragStart,
   onDragOver,
   onDrop
 }) => {
   const [editText, setEditText] = useState(item.title || '')
+  const [showReminderPicker, setShowReminderPicker] = useState(false)
   const lastTapRef = useRef(0)
 
   // Sync local edit text when item changes or editing starts
@@ -1956,11 +1958,37 @@ const TodayItem = React.memo(({
                 <Copy className="w-4 h-4 text-gray-400" /> Duplicate
               </button>
               <button
+                onClick={(e) => { e.stopPropagation(); setShowReminderPicker(true); onMenuToggle(null); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+              >
+                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                {item.reminder_date ? 'Edit Reminder' : 'Set Reminder'}
+              </button>
+              <button
                 onClick={(e) => { e.stopPropagation(); onDelete([item.id]); onMenuToggle(null); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
               >
                 <Trash2 className="w-4 h-4" /> Delete
               </button>
+            </div>
+          </>
+        )}
+        {/* Inline Reminder Picker */}
+        {showReminderPicker && (
+          <>
+            <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setShowReminderPicker(false); }} />
+            <div className="absolute right-0 top-full mt-1 z-40 animate-fade-in" onClick={e => e.stopPropagation()}>
+              <ReminderPicker
+                value={item.reminder_date || null}
+                compact={true}
+                onChange={(newDate) => {
+                  onSetReminder(item.id, newDate)
+                  setShowReminderPicker(false)
+                }}
+              />
             </div>
           </>
         )}
@@ -2007,6 +2035,13 @@ function TodayView() {
     })
     return sorted
   }, [filteredTodayItems, todaySubtab])
+
+  // Set reminder on a today item
+  const setTodayItemReminder = async (itemId, reminderDate) => {
+    const next = todayItems.map(x => x.id === itemId ? { ...x, reminder_date: reminderDate } : x)
+    setTodayItems(next)
+    await saveTodayItems(next)
+  }
 
   const onRenameItem = async (it, trimmed) => {
     if (!trimmed) return
@@ -2324,6 +2359,7 @@ function TodayView() {
                 onRename={onRenameItem}
                 onDelete={removeTodayItems}
                 onDuplicate={duplicateTodayItems}
+                onSetReminder={setTodayItemReminder}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
