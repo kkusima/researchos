@@ -1799,6 +1799,8 @@ const TodayItem = React.memo(({
 }) => {
   const [editText, setEditText] = useState(item.title || '')
   const [showReminderPicker, setShowReminderPicker] = useState(false)
+  const [pickerPosition, setPickerPosition] = useState(null)
+  const reminderBtnRef = useRef(null)
   const lastTapRef = useRef(0)
 
   // Sync local edit text when item changes or editing starts
@@ -1958,7 +1960,14 @@ const TodayItem = React.memo(({
                 <Copy className="w-4 h-4 text-gray-400" /> Duplicate
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); setShowReminderPicker(true); onMenuToggle(null); }}
+                ref={reminderBtnRef}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setPickerPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
+                  setShowReminderPicker(true)
+                  onMenuToggle(null)
+                }}
                 className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
               >
                 <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1976,21 +1985,27 @@ const TodayItem = React.memo(({
             </div>
           </>
         )}
-        {/* Inline Reminder Picker */}
-        {showReminderPicker && (
+        {/* Inline Reminder Picker - rendered via portal for proper z-index */}
+        {showReminderPicker && pickerPosition && typeof document !== 'undefined' && createPortal(
           <>
-            <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setShowReminderPicker(false); }} />
-            <div className="absolute right-0 top-full mt-1 z-40 animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[10000]" onClick={(e) => { e.stopPropagation(); setShowReminderPicker(false); setPickerPosition(null); }} />
+            <div
+              style={{ position: 'fixed', top: pickerPosition.top, right: pickerPosition.right, zIndex: 10001 }}
+              className="animate-fade-in"
+              onClick={e => e.stopPropagation()}
+            >
               <ReminderPicker
                 value={item.reminder_date || null}
                 compact={true}
                 onChange={(newDate) => {
                   onSetReminder(item.id, newDate)
                   setShowReminderPicker(false)
+                  setPickerPosition(null)
                 }}
               />
             </div>
-          </>
+          </>,
+          document.body
         )}
       </div>
     </div>
